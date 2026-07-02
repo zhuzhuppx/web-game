@@ -29,12 +29,14 @@ body{background:#0a0a1a;color:#ccc;font-family:system-ui,-apple-system,sans-seri
 <script>
 var holes=[],score=0,timeLeft=30,gameOver=true,timerId,moleId,best=parseInt(localStorage.getItem('whackBest'))||0;
 document.getElementById('hs').textContent=best;
-function renderHoles(){var g=document.getElementById('grid');g.innerHTML='';for(var i=0;i<9;i++){var h=document.createElement('div');h.className='hole';h.id='h'+i;h.onclick=function(n){return function(){whack(n)}}(i);g.appendChild(h)}}
-function startGame(){if(timerId)clearInterval(timerId);score=0;timeLeft=30;gameOver=false;document.getElementById('sc').textContent='0';document.getElementById('tm').textContent='30';document.getElementById('startBtn').textContent='⏳ 游戏中...';renderHoles();timerId=setInterval(function(){timeLeft--;document.getElementById('tm').textContent=timeLeft;if(timeLeft<=0){gameOver=true;clearInterval(timerId);clearInterval(moleId);document.getElementById('startBtn').textContent='🎮 再来一局';for(var i=0;i<9;i++)document.getElementById('h'+i).className='hole';if(score>best){best=score;localStorage.setItem('whackBest',best);document.getElementById('hs').textContent=best}}},1000);spawnMole();moleId=setInterval(spawnMole,800)}
-function spawnMole(){if(gameOver)return;for(var i=0;i<9;i++)document.getElementById('h'+i).className='hole'
-var n=1+Math.floor(Math.random()*2);for(var i=0;i<n;i++){var idx=Math.floor(Math.random()*9);var h=document.getElementById('h'+idx);if(Math.random()<0.15)h.className='hole bonus';else h.className='hole mole'}}
+function renderHoles(){var g=document.getElementById('grid');g.innerHTML='';for(var i=0;i<9;i++){var h=document.createElement('div');h.className='hole';h.id='h'+i;h.textContent='⬚';h.onclick=function(n){return function(){whack(n)}}(i);g.appendChild(h)}}
+function startGame(){if(timerId)clearInterval(timerId);score=0;timeLeft=30;gameOver=false;document.getElementById('sc').textContent='0';document.getElementById('tm').textContent='30';document.getElementById('startBtn').textContent='⏳ 游戏中...';renderHoles();timerId=setInterval(function(){timeLeft--;document.getElementById('tm').textContent=timeLeft;if(timeLeft<=0){gameOver=true;clearInterval(timerId);clearInterval(moleId);document.getElementById('startBtn').textContent='🎮 再来一局';for(var i=0;i<9;i++){document.getElementById('h'+i).className='hole';document.getElementById('h'+i).textContent='⬚'}if(score>best){best=score;localStorage.setItem('whackBest',best);document.getElementById('hs').textContent=best}}},1000);spawnMole();moleId=setInterval(spawnMole,800)}
+function spawnMole(){if(gameOver)return;
+for(var i=0;i<9;i++){var h=document.getElementById('h'+i);h.className='hole';h.textContent='⬚'}
+var n=1+Math.floor(Math.random()*2);for(var i=0;i<n;i++){var idx=Math.floor(Math.random()*9);var h=document.getElementById('h'+idx);
+if(Math.random()<0.15){h.className='hole bonus';h.textContent='🐹'}else{h.className='hole mole';h.textContent='🐭'}}}
 function whack(i){if(gameOver)return;var h=document.getElementById('h'+i);if(!h.classList.contains('mole')&&!h.classList.contains('bonus'))return
-score+=h.classList.contains('bonus')?3:1;document.getElementById('sc').textContent=score;h.className='hole'
+score+=h.classList.contains('bonus')?3:1;document.getElementById('sc').textContent=score;h.className='hole';h.textContent='⬚'
 // Particle effect
 var p=document.createElement('div');p.className='particles';for(var j=0;j<5;j++){var dot=document.createElement('div');dot.className='particle';dot.style.setProperty('--x',(-20+Math.random()*40)+'px');dot.style.setProperty('--y',(-20+Math.random()*40)+'px');dot.style.background=h.classList.contains('bonus')?'#ffdd44':'#66cc66';p.appendChild(dot)}
 h.appendChild(p);setTimeout(function(){p.remove()},400)}
