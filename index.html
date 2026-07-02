@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎮 游戏大厅</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a1a;
+    color: #e0e0ff;
+    font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+  }
+
+  /* 背景动画粒子 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(88,0,255,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(0,200,255,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 80%, rgba(255,0,100,0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Header */
+  header {
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .logo {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #f0f, #0ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
+  }
+
+  .logo span { font-size: 16px; opacity: 0.5; background: none; -webkit-text-fill-color: rgba(255,255,255,0.5); }
+
+  header nav {
+    display: flex;
+    gap: 8px;
+  }
+
+  header nav a {
+    color: #8888bb;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: all 0.2s;
+    font-size: 14px;
+  }
+
+  header nav a:hover { background: rgba(255,255,255,0.05); color: #fff; }
+  header nav a.active { background: rgba(136,68,255,0.2); color: #b388ff; }
+
+  /* 搜索栏 */
+  .search-section {
+    padding: 32px 32px 0;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .search-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .search-bar input {
+    flex: 1;
+    min-width: 240px;
+    padding: 14px 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+    font-size: 16px;
+    outline: none;
+    transition: border 0.2s;
+  }
+
+  .search-bar input:focus { border-color: #8844ff; }
+  .search-bar input::placeholder { color: #555588; }
+
+  .search-bar .stats {
+    font-size: 14px;
+    color: #6666aa;
+    white-space: nowrap;
+  }
+
+  /* 分类标签 */
+  .categories {
+    padding: 20px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .categories button {
+    padding: 8px 20px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    background: transparent;
+    color: #8888bb;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+  }
+
+  .categories button:hover { border-color: rgba(136,68,255,0.4); color: #b388ff; }
+  .categories button.active { background: rgba(136,68,255,0.2); border-color: #8844ff; color: #b388ff; }
+
+  /* 游戏网格 */
+  .game-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 24px 32px 48px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .game-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .game-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(136,68,255,0.08), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .game-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(136,68,255,0.3);
+    box-shadow: 0 8px 40px rgba(136,68,255,0.12);
+  }
+
+  .game-card:hover::before { opacity: 1; }
+
+  .game-card .icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .game-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .game-card p {
+    font-size: 14px;
+    color: #6666aa;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .game-card .tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+  }
+
+  .game-card .tag {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    background: rgba(255,255,255,0.04);
+    color: #6666bb;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .game-card .status-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .status-badge.ready { background: rgba(0,200,100,0.15); color: #00c864; border: 1px solid rgba(0,200,100,0.2); }
+  .status-badge.wip { background: rgba(255,180,0,0.15); color: #ffb400; border: 1px solid rgba(255,180,0,0.2); }
+  .status-badge.idea { background: rgba(136,68,255,0.15); color: #b388ff; border: 1px solid rgba(136,68,255,0.2); }
+
+  .game-card .play-btn {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 12px 28px;
+    background: linear-gradient(135deg, #8844ff, #44bbff);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    z-index: 2;
+    transition: transform 0.2s;
+    box-shadow: 0 4px 20px rgba(136,68,255,0.3);
+  }
+
+  .game-card .play-btn:hover { transform: translate(-50%, -50%) scale(1.05); }
+
+  .game-card.ready:hover .play-btn { display: block; }
+  .game-card.ready:hover .content-bottom { filter: blur(2px); }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 32px;
+    color: #444477;
+    font-size: 13px;
+    border-top: 1px solid rgba(255,255,255,0.03);
+  }
+
+  /* 响应式 */
+  @media (max-width: 640px) {
+    header { padding: 16px 20px; }
+    .logo { font-size: 22px; }
+    .search-section { padding: 20px 20px 0; }
+    .categories { padding: 16px 20px; }
+    .game-grid {
+      padding: 16px 20px 32px;
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎮 游戏大厅 <span>· mini games</span></div>
+  <nav>
+    <a href="#" class="active">全部</a>
+    <a href="#">分类</a>
+    <a href="#">关于</a>
+  </nav>
+</header>
+
+<section class="search-section">
+  <div class="search-bar">
+    <input type="text" id="search" placeholder="搜索游戏..." oninput="filterGames()">
+    <span class="stats" id="stats">共 <strong>0</strong> 款游戏</span>
+  </div>
+</section>
+
+<section class="categories" id="categories">
+  <button class="active" data-cat="all" onclick="filterByCategory('all')">🔥 全部</button>
+</section>
+
+<section class="game-grid" id="gameGrid"></section>
+
+<footer>
+  游戏大厅 · 慢慢填坑中 🚧
+</footer>
+
+<script>
+// ============ 游戏数据 ============
+const GAMES = [
+  {
+    id: 'snake',
+    name: '贪吃蛇',
+    desc: '经典贪吃蛇，吃食物长大，别撞墙 · 支持手机触控',
+    icon: '🐍',
+    tags: ['经典', '休闲', 'NEW'],
+    category: 'action',
+    status: 'ready',
+    players: 1
+  },
+  {
+    id: 'tetris',
+    name: '俄罗斯方块',
+    desc: '经典下落方块拼图游戏，7种方块，随等级加速',
+    icon: '🧱',
+    tags: ['经典', '益智', 'NEW'],
+    category: 'puzzle',
+    status: 'ready',
+    players: 1
+  },
+  {
+    id: 'minesweeper',
+    name: '扫雷',
+    desc: '经典扫雷，数字推理找出所有地雷 · 三档难度可选',
+    icon: '💣',
+    tags: ['经典', '逻辑', 'NEW'],
+    category: 'puzzle',
+    status: 'ready',
+    players: 1
+  },
+  {
+    id: '2048',
+    name: '2048',
+    desc: '经典数字合成，合并方块冲击 2048',
+    icon: '🔢',
+    tags: ['益智', '数学'],
+    category: 'puzzle',
+    status: 'ready',
+    players: 1
+  },
+  {
+    id: 'flappy',
+    name: 'Flappy Bird',
+    desc: '点击控制小鸟穿越管道',
+    icon: '🐦',
+    tags: ['反应', '虐心', 'NEW'],
+    category: 'action',
+    status: 'ready',
+    players: 1
+  },
+  {
+    id: 'pacman',
+    name: '吃豆人',
+    desc: '经典迷宫吃豆，躲避幽灵',
+    icon: '👻',
+    tags: ['经典', '迷宫'],
+    category: 'action',
+    status: 'ready',
+    players: 1
+  },
+  {
+    id: 'sudoku',
+    name: '数独',
+    desc: '9x9 数字填空，锻炼逻辑思维',
+    icon: '🧩',
+    tags: ['益智', '逻辑'],
+    category: 'puzzle',
+    status: 'ready',
+    players: 1
+  },
+  {
+    id: 'tictactoe',
+    name: '井字棋',
+    desc: '两人对战或挑战 AI，三子连珠',
+    icon: '❌',
+    tags: ['对战', '策略'],
+    category: 'strategy',
+    status: 'idea',
+    players: 2
+  },
+  {
+    id: 'memory',
+    name: '记忆翻牌',
+    desc: '翻牌配对，考验你的记忆力',
+    icon: '🃏',
+    tags: ['记忆', '休闲'],
+    category: 'puzzle',
+    status: 'idea',
+    players: 1
+  },
+  {
+    id: 'space',
+    name: '太空射击',
+    desc: '操控飞船，击落外星入侵者',
+    icon: '🚀',
+    tags: ['射击', '动作'],
+    category: 'action',
+    status: 'idea',
+    players: 1
+  },
+  {
+    id: 'chess',
+    name: '中国象棋',
+    desc: '经典中国象棋，人机对战',
+    icon: '♟️',
+    tags: ['策略', '经典'],
+    category: 'strategy',
+    status: 'idea',
+    players: 2
+  },
+  {
+    id: 'whack',
+    name: '打地鼠',
+    desc: '敲打冒头的地鼠，看谁手速快',
+    icon: '🔨',
+    tags: ['反应', '休闲'],
+    category: 'action',
+    status: 'idea',
+    players: 1
+  },
+  {
+    id: 'doodle',
+    name: '涂鸦跳跃',
+    desc: '控制小弹簧不断向上跳跃',
+    icon: '🎈',
+    tags: ['跳跃', '休闲'],
+    category: 'action',
+    status: 'idea',
+    players: 1
+  },
+  {
+    id: 'poker',
+    name: '斗地主',
+    desc: '经典三人斗地主，AI 陪玩',
+    icon: '🃏',
+    tags: ['牌类', '竞技'],
+    category: 'card',
+    status: 'idea',
+    players: 3
+  },
+  {
+    id: 'brick',
+    name: '打砖块',
+    desc: '挡板反弹小球，击碎所有砖块',
+    icon: '🧱',
+    tags: ['经典', '休闲'],
+    category: 'action',
+    status: 'idea',
+    players: 1
+  },
+  {
+    id: 'connect4',
+    name: '四子棋',
+    desc: '竖落棋子，四子连珠获胜',
+    icon: '🔴',
+    tags: ['对战', '策略'],
+    category: 'strategy',
+    status: 'idea',
+    players: 2
+  },
+];
+
+// ============ 渲染 ============
+const CATEGORIES = [...new Set(GAMES.map(g => g.category))];
+const CATEGORY_NAMES = { action: '🎮 动作', puzzle: '🧩 益智', strategy: '🧠 策略', card: '🃏 牌类' };
+
+function init() {
+  const cats = document.getElementById('categories');
+  CATEGORIES.forEach(c => {
+    const btn = document.createElement('button');
+    btn.dataset.cat = c;
+    btn.textContent = CATEGORY_NAMES[c] || c;
+    btn.onclick = () => filterByCategory(c);
+    cats.appendChild(btn);
+  });
+  renderGames(GAMES);
+}
+
+function renderGames(games) {
+  const grid = document.getElementById('gameGrid');
+  grid.innerHTML = '';
+  games.forEach(g => {
+    const card = document.createElement('div');
+    card.className = `game-card ${g.status}`;
+    card.innerHTML = `
+      <span class="icon">${g.icon}</span>
+      <div class="content-bottom">
+        <h3>${g.name}</h3>
+        <p>${g.desc}</p>
+        <div class="tags">
+          ${g.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+        </div>
+      </div>
+      <span class="status-badge ${g.status}">${g.status === 'ready' ? '✅ 可玩' : g.status === 'wip' ? '🚧 开发中' : '💡 规划中'}</span>
+      <button class="play-btn" onclick="playGame('${g.id}')">▶ 开始游戏</button>
+    `;
+    grid.appendChild(card);
+  });
+  document.querySelector('#stats strong').textContent = games.length;
+}
+
+let currentCategory = 'all';
+
+function filterByCategory(cat) {
+  currentCategory = cat;
+  document.querySelectorAll('#categories button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`#categories button[data-cat="${cat}"]`).classList.add('active');
+  filterGames();
+}
+
+function filterGames() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = GAMES.filter(g => {
+    if (currentCategory !== 'all' && g.category !== currentCategory) return false;
+    if (q && !g.name.includes(q) && !g.desc.includes(q) && !g.tags.some(t => t.includes(q))) return false;
+    return true;
+  });
+  renderGames(filtered);
+}
+
+function playGame(id) {
+  const game = GAMES.find(g => g.id === id);
+  if (game.status === 'ready') {
+    window.open(`/${id}/`, '_blank');
+  } else {
+    alert(`「${game.name}」还没开发呢，先填别的坑 🚧`);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

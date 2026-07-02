@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>2048</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a; color: #ccc; font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+  }
+  .wrapper { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; width: 100%; max-width: 420px; }
+  .header { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 4px; }
+  .header h1 {
+    font-size: 28px; background: linear-gradient(135deg, #8844ff, #ff4488);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .scores { display: flex; gap: 10px; }
+  .scores div { background: rgba(255,255,255,0.04); padding: 6px 14px; border-radius: 8px; text-align: center; }
+  .scores .lbl { font-size: 11px; color: #6666aa; }
+  .scores .val { font-size: 20px; font-weight: 700; color: #fff; }
+  .scores .best { color: #ffb400; }
+
+  .board-wrap { position: relative; width: 100%; max-width: 420px; }
+  #board {
+    position: relative; width: 100%; aspect-ratio: 1;
+    background: rgba(255,255,255,0.03); border: 2px solid rgba(136,68,255,0.15);
+    border-radius: 12px; touch-action: none;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 6px;
+  }
+  .cell {
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; background: rgba(255,255,255,0.04); aspect-ratio: 1;
+    transition: all 0.12s ease-out; user-select: none;
+  }
+  .cell.pop { animation: pop 0.15s ease-out; }
+  @keyframes pop { 0% { transform: scale(0); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  .cell.merge { animation: mergePop 0.2s ease-out; }
+  @keyframes mergePop { 0% { transform: scale(1); } 40% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+  .cx2 { background: #2a1a3a; color: #d4b4ff; }
+  .cx4 { background: #3a1a4a; color: #d4b4ff; }
+  .cx8 { background: #6a2a5a; color: #fff; }
+  .cx16 { background: #8a2a5a; color: #fff; }
+  .cx32 { background: #aa2a5a; color: #fff; }
+  .cx64 { background: #cc2255; color: #fff; }
+  .cx128 { background: #cc6644; color: #fff; }
+  .cx256 { background: #dd8844; color: #fff; }
+  .cx512 { background: #eeaa44; color: #fff; }
+  .cx1024 { background: #ffcc44; color: #222; }
+  .cx2048 { background: #ffdd44; color: #222; }
+  .cx4096 { background: #ff4488; color: #fff; }
+  .cx8192 { background: #ff2266; color: #fff; }
+
+  .overlay {
+    position: absolute; inset: 0; display: none; border-radius: 10px;
+    align-items: center; justify-content: center; flex-direction: column; gap: 8px;
+    background: rgba(0,0,0,0.6); z-index: 10; backdrop-filter: blur(2px);
+    animation: fadeIn 0.3s ease-out;
+  }
+  .overlay.show { display: flex; }
+  .overlay h2 { font-size: 28px; }
+  .overlay p { color: #6666aa; font-size: 14px; }
+  .overlay .sub { color: #ffb400; font-size: 18px; font-weight: 700; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .hint { font-size: 12px; color: #444477; text-align: center; margin-top: 4px; }
+  .hint kbd {
+    background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px;
+    font-family: inherit; font-size: 11px; border: 1px solid rgba(255,255,255,0.06);
+  }
+  .back { color: #555588; text-decoration: none; font-size: 14px; margin-top: 4px; }
+  .back:hover { color: #8888bb; }
+
+  .mc { display: none; gap: 0; justify-content: center; align-items: center; max-width: 260px; width: 100%; padding: 0 8px; }
+  .mc .dp { position: relative; width: 144px; height: 144px; flex-shrink: 0; }
+  .mc .dp button {
+    position: absolute; width: 44px; height: 44px; border: none; border-radius: 6px;
+    background: rgba(255,255,255,0.06); color: #8888bb; font-size: 18px; cursor: pointer;
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  .mc .dp button:active { background: rgba(136,68,255,0.2); }
+  .mc .dp .u { top: 0; left: 50%; transform: translateX(-50%); border-radius: 6px 6px 2px 2px; }
+  .mc .dp .d { bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 2px 2px 6px 6px; }
+  .mc .dp .l { left: 0; top: 50%; transform: translateY(-50%); border-radius: 6px 2px 2px 6px; }
+  .mc .dp .r { right: 0; top: 50%; transform: translateY(-50%); border-radius: 2px 6px 6px 2px; }
+  .mc .dp .c {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 44px; height: 44px; border-radius: 6px; background: rgba(255,255,255,0.02); pointer-events: none;
+  }
+  @media (pointer: coarse) { .mc { display: flex; } .hint { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <h1>2048</h1>
+    <div class="scores">
+      <div><div class="lbl">分数</div><div class="val" id="score">0</div></div>
+      <div><div class="lbl">最高</div><div class="val best" id="best">0</div></div>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board">
+      <div class="cell" data-i="0"></div><div class="cell" data-i="1"></div><div class="cell" data-i="2"></div><div class="cell" data-i="3"></div>
+      <div class="cell" data-i="4"></div><div class="cell" data-i="5"></div><div class="cell" data-i="6"></div><div class="cell" data-i="7"></div>
+      <div class="cell" data-i="8"></div><div class="cell" data-i="9"></div><div class="cell" data-i="10"></div><div class="cell" data-i="11"></div>
+      <div class="cell" data-i="12"></div><div class="cell" data-i="13"></div><div class="cell" data-i="14"></div><div class="cell" data-i="15"></div>
+    </div>
+    <div class="overlay" id="overlay">
+      <h2 id="ot">🎉</h2>
+      <p id="om"></p>
+      <div class="sub" id="os"></div>
+      <p style="color:#555588;font-size:13px;margin-top:4px;cursor:pointer" id="or">点击重新开始</p>
+    </div>
+  </div>
+
+  <div class="mc" id="mc">
+    <div class="dp">
+      <button class="u" data-d="u">▲</button><button class="l" data-d="l">◀</button>
+      <div class="c"></div><button class="r" data-d="r">▶</button><button class="d" data-d="d">▼</button>
+    </div>
+  </div>
+
+  <div class="hint"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 滑动</div>
+  <a class="back" href="/">← 返回游戏大厅</a>
+</div>
+
+<script>
+var g, sc, best, over, won;
+var cells = document.querySelectorAll('#board .cell');
+var scoreEl = document.getElementById('score');
+var bestEl = document.getElementById('best');
+var overlay = document.getElementById('overlay');
+
+function idx(r, c) { return r * 4 + c; }
+
+function cls(v) {
+  if (v === 0) return '';
+  var sizes = [0,32,32,32,32,32,32,32,26,26,26,26,26,26,26,26,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,16];
+  var fs = v > 2048 ? (v > 8192 ? 14 : 16) : (v < 100 ? 32 : v < 1000 ? 26 : v < 10000 ? 20 : 16);
+  return 'cx' + v + ' fs' + fs;
+}
+
+function render(mergedIdx) {
+  for (var i = 0; i < 16; i++) {
+    var r = Math.floor(i / 4), c = i % 4;
+    var v = g[r][c];
+    var el = cells[i];
+    el.textContent = v || '';
+    el.className = 'cell';
+    if (v) {
+      el.className = 'cell cx' + v;
+      el.style.fontSize = (v < 100 ? 32 : v < 1000 ? 26 : v < 10000 ? 20 : 16) + 'px';
+      if (i === mergedIdx) { el.className += ' merge'; }
+      else if (mergedIdx === -2) { /* initial, animate all new tiles */ }
+    }
+  }
+}
+
+function init() {
+  g = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  sc = 0; over = false; won = false;
+  scoreEl.textContent = '0';
+  best = parseInt(localStorage.getItem('g2048_best') || '0');
+  bestEl.textContent = best;
+  overlay.className = 'overlay';
+  // Add 2 random tiles
+  addRandom();
+  addRandom();
+  render(-1);
+}
+
+function addRandom() {
+  var empty = [];
+  for (var r = 0; r < 4; r++)
+    for (var c = 0; c < 4; c++)
+      if (g[r][c] === 0) empty.push([r, c]);
+  if (empty.length === 0) return;
+  var p = empty[Math.floor(Math.random() * empty.length)];
+  g[p[0]][p[1]] = Math.random() < 0.1 ? 4 : 2;
+}
+
+// Slide a single row LEFT, return [newRow, scoreGain, mergedPositions]
+function slideRow(row) {
+  // Extract non-zero values
+  var vals = [];
+  for (var i = 0; i < 4; i++) if (row[i] !== 0) vals.push(row[i]);
+  
+  var newVals = [];
+  var merged = false;
+  var i = 0;
+  while (i < vals.length) {
+    if (i + 1 < vals.length && vals[i] === vals[i + 1]) {
+      newVals.push(vals[i] * 2);
+      sc += vals[i] * 2;
+      merged = true;
+      i += 2;
+    } else {
+      newVals.push(vals[i]);
+      i++;
+    }
+  }
+  
+  // Pad with zeros
+  while (newVals.length < 4) newVals.push(0);
+  
+  return newVals;
+}
+
+function move(dir) {
+  if (over) return;
+  
+  // Make a copy
+  var ng = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  for (var i = 0; i < 4; i++) for (var j = 0; j < 4; j++) ng[i][j] = g[i][j];
+  
+  var oldSc = sc;
+  
+  if (dir === 'l') {
+    for (var r = 0; r < 4; r++) ng[r] = slideRow(ng[r]);
+  } else if (dir === 'r') {
+    for (var r = 0; r < 4; r++) {
+      var rev = [ng[r][3], ng[r][2], ng[r][1], ng[r][0]];
+      var res = slideRow(rev);
+      ng[r] = [res[3], res[2], res[1], res[0]];
+    }
+  } else if (dir === 'u') {
+    for (var c = 0; c < 4; c++) {
+      var col = [ng[0][c], ng[1][c], ng[2][c], ng[3][c]];
+      var res = slideRow(col);
+      for (var r = 0; r < 4; r++) ng[r][c] = res[r];
+    }
+  } else if (dir === 'd') {
+    for (var c = 0; c < 4; c++) {
+      var col = [ng[3][c], ng[2][c], ng[1][c], ng[0][c]];
+      var res = slideRow(col);
+      for (var r = 0; r < 4; r++) ng[3-r][c] = res[r];
+    }
+  }
+  
+  // Check if anything changed
+  var changed = false;
+  for (var i = 0; i < 4 && !changed; i++)
+    for (var j = 0; j < 4 && !changed; j++)
+      if (g[i][j] !== ng[i][j]) changed = true;
+  if (!changed) return;
+  
+  g = ng;
+  scoreEl.textContent = sc;
+  
+  if (sc > best) {
+    best = sc;
+    localStorage.setItem('g2048_best', String(best));
+    bestEl.textContent = best;
+  }
+  
+  render(-1);
+  
+  // Check win
+  for (var r = 0; r < 4; r++)
+    for (var c = 0; c < 4; c++)
+      if (g[r][c] === 2048 && !won) { won = true; showOverlay(true); return; }
+  
+  addRandom();
+  render(-1);
+  
+  // Check game over
+  if (isOver()) { over = true; showOverlay(false); }
+}
+
+function isOver() {
+  for (var r = 0; r < 4; r++)
+    for (var c = 0; c < 4; c++) {
+      if (g[r][c] === 0) return false;
+      if (c + 1 < 4 && g[r][c] === g[r][c+1]) return false;
+      if (r + 1 < 4 && g[r][c] === g[r+1][c]) return false;
+    }
+  return true;
+}
+
+function showOverlay(win) {
+  document.getElementById('ot').textContent = win ? '🎉 你赢了！' : '💀 游戏结束';
+  document.getElementById('om').textContent = win ? '分数: ' + sc : '最终分数: ' + sc;
+  if (win) document.getElementById('os').textContent = '继续滑动可挑战更高分';
+  else {
+    var p = parseInt(localStorage.getItem('g2048_best') || '0');
+    document.getElementById('os').textContent = (sc >= p && sc > 0) ? '🏆 新纪录！' : '最高: ' + p;
+  }
+  overlay.className = 'overlay show';
+}
+
+document.getElementById('or').addEventListener('click', init);
+
+// Keyboard
+document.addEventListener('keydown', function(e) {
+  var k = e.key;
+  if (k === 'ArrowLeft' || k === 'a' || k === 'A') { e.preventDefault(); move('l'); }
+  else if (k === 'ArrowRight' || k === 'd' || k === 'D') { e.preventDefault(); move('r'); }
+  else if (k === 'ArrowUp' || k === 'w' || k === 'W') { e.preventDefault(); move('u'); }
+  else if (k === 'ArrowDown' || k === 's' || k === 'S') { e.preventDefault(); move('d'); }
+  else if (k === 'r' || k === 'R') { init(); }
+});
+
+// Touch
+var tx, ty;
+var board = document.getElementById('board');
+board.addEventListener('touchstart', function(e) {
+  var t = e.touches[0]; tx = t.clientX; ty = t.clientY;
+}, {passive:true});
+board.addEventListener('touchend', function(e) {
+  var dx = e.changedTouches[0].clientX - tx;
+  var dy = e.changedTouches[0].clientY - ty;
+  if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+  if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'r' : 'l');
+  else move(dy > 0 ? 'd' : 'u');
+}, {passive:true});
+
+// Mobile D-pad
+document.getElementById('mc').addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-d]');
+  if (!btn) return;
+  if (over) { init(); return; }
+  var map = {u:'u', d:'d', l:'l', r:'r'};
+  move(map[btn.dataset.d]);
+});
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>吃豆人</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a; color: #ccc; font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+  }
+  .wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; width: 100%; max-width: 450px; }
+  .hdr { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 4px; }
+  .hdr h1 { font-size: 22px; color: #ffdd44; }
+  .hdr .s { display: flex; gap: 12px; }
+  .hdr .s div { text-align: center; }
+  .hdr .s .l { font-size: 11px; color: #6666aa; }
+  .hdr .s .v { font-size: 20px; font-weight: 700; color: #fff; }
+  canvas {
+    background: #0d0d1a; border: 2px solid rgba(255,221,68,0.15); border-radius: 10px;
+    width: 100%; touch-action: none; display: block;
+  }
+  .hint { font-size: 12px; color: #444477; }
+  .hint kbd { background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; font-family: inherit; font-size: 11px; border: 1px solid rgba(255,255,255,0.06); }
+  .back { color: #555588; text-decoration: none; font-size: 14px; }
+  .back:hover { color: #8888bb; }
+
+  .mc { display: none; gap: 0; justify-content: center; align-items: center; max-width: 260px; width: 100%; padding: 0 8px; }
+  .mc .dp { position: relative; width: 144px; height: 144px; flex-shrink: 0; }
+  .mc .dp button {
+    position: absolute; width: 44px; height: 44px; border: none; border-radius: 6px;
+    background: rgba(255,255,255,0.06); color: #8888bb; font-size: 18px; cursor: pointer;
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  .mc .dp button:active { background: rgba(255,221,68,0.2); }
+  .mc .dp .u { top: 0; left: 50%; transform: translateX(-50%); border-radius: 6px 6px 2px 2px; }
+  .mc .dp .d { bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 2px 2px 6px 6px; }
+  .mc .dp .l { left: 0; top: 50%; transform: translateY(-50%); border-radius: 6px 2px 2px 6px; }
+  .mc .dp .r { right: 0; top: 50%; transform: translateY(-50%); border-radius: 2px 6px 6px 2px; }
+  .mc .dp .c { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 6px; background: rgba(255,255,255,0.02); pointer-events: none; }
+
+  .overlay {
+    display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.7);
+    align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    border-radius: 10px; z-index: 10; backdrop-filter: blur(2px);
+  }
+  .overlay.show { display: flex; }
+  .overlay .emoji { font-size: 48px; }
+  .overlay .title { font-size: 28px; font-weight: 700; color: #ffdd44; }
+  .overlay .sub { font-size: 14px; color: #8888bb; }
+  .overlay .score { font-size: 22px; color: #fff; }
+  .overlay .btn { padding: 10px 28px; border: none; border-radius: 8px; background: #ffdd44; color: #0a0a1a; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+  .overlay .btn:hover { background: #ffe066; }
+  .canvas-wrap { position: relative; width: 100%; }
+  @media (pointer: coarse) { .mc { display: flex; } .hint { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <h1>👻 吃豆人</h1>
+    <div class="s">
+      <div><div class="l">分数</div><div class="v" id="sc">0</div></div>
+      <div><div class="l">命</div><div class="v" id="lv">3</div></div>
+    </div>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="emoji">👻</div>
+      <div class="title">GAME OVER</div>
+      <div class="score" id="finalScore">得分：0</div>
+      <div class="sub" id="restartHint">按 <kbd>R</kbd> 或点击重新开始</div>
+      <button class="btn" onclick="restart()">🔄 再来一局</button>
+    </div>
+  </div>
+  <div class="mc" id="mc">
+    <div class="dp">
+      <button class="u" data-d="u">▲</button><button class="l" data-d="l">◀</button>
+      <div class="c"></div><button class="r" data-d="r">▶</button><button class="d" data-d="d">▼</button>
+    </div>
+  </div>
+  <div class="hint"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</div>
+  <a class="back" href="/">← 返回游戏大厅</a>
+</div>
+
+<script>
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+
+// Maze: 28 cols x 31 rows
+// 0=empty, 1=wall, 2=dot, 3=power, 4=ghost house, 5=ghost door
+var MAZE = [
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1],
+  [1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1],
+  [1,3,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,3,1],
+  [1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1],
+  [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+  [1,2,1,1,1,1,2,1,1,2,1,1,1,1,1,1,1,1,2,1,1,2,1,1,1,1,2,1],
+  [1,2,1,1,1,1,2,1,1,2,1,1,1,1,1,1,1,1,2,1,1,2,1,1,1,1,2,1],
+  [1,2,2,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,2,2,1],
+  [1,1,1,1,1,1,2,1,1,1,1,1,0,1,1,0,1,1,1,1,1,2,1,1,1,1,1,1],
+  [0,0,0,0,0,1,2,1,1,1,1,1,0,1,1,0,1,1,1,1,1,2,1,0,0,0,0,0],
+  [0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,1,0,0,0,0,0],
+  [0,0,0,0,0,1,2,1,1,0,1,1,1,5,5,1,1,1,0,1,1,2,1,0,0,0,0,0],
+  [1,1,1,1,1,1,2,1,1,0,1,4,4,4,4,4,4,1,0,1,1,2,1,1,1,1,1,1],
+  [0,0,0,0,0,0,2,0,0,0,1,4,4,4,4,4,4,1,0,0,0,2,0,0,0,0,0,0],
+  [1,1,1,1,1,1,2,1,1,0,1,4,4,4,4,4,4,1,0,1,1,2,1,1,1,1,1,1],
+  [0,0,0,0,0,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,0,0,0,0,0],
+  [0,0,0,0,0,1,2,1,1,0,0,0,0,0,0,0,0,0,0,1,1,2,1,0,0,0,0,0],
+  [0,0,0,0,0,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,0,0,0,0,0],
+  [1,1,1,1,1,1,2,1,1,0,1,1,1,1,1,1,1,1,0,1,1,2,1,1,1,1,1,1],
+  [1,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2,2,1],
+  [1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1],
+  [1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,2,1,1,1,1,1,2,1,1,1,1,2,1],
+  [1,3,2,2,1,1,2,2,2,2,2,2,2,0,0,2,2,2,2,2,2,2,1,1,2,2,3,1],
+  [1,1,1,2,1,1,2,1,1,2,1,1,1,1,1,1,1,1,2,1,1,2,1,1,2,1,1,1],
+  [1,1,1,2,1,1,2,1,1,2,1,1,1,1,1,1,1,1,2,1,1,2,1,1,2,1,1,1],
+  [1,2,2,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,1,1,2,2,2,2,2,2,1],
+  [1,2,1,1,1,1,1,1,1,1,1,1,2,1,1,2,1,1,1,1,1,1,1,1,1,1,2,1],
+  [1,2,1,1,1,1,1,1,1,1,1,1,2,1,1,2,1,1,1,1,1,1,1,1,1,1,2,1],
+  [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+
+var COLS = 28, ROWS = 31;
+var CELL, CS, pacman, ghosts, score, lives, dots, level, gameOver;
+var dirs = { u:[0,-1], d:[0,1], l:[-1,0], r:[1,0] };
+
+function resize() {
+  var w = Math.min(420, canvas.parentElement.clientWidth - 4);
+  canvas.style.width = w + 'px';
+  CELL = Math.floor(w / COLS * 2);
+  canvas.width = COLS * CELL;
+  canvas.height = ROWS * CELL;
+  CS = CELL;
+}
+resize();
+window.addEventListener('resize', resize);
+
+function init() {
+  score = 0; lives = 3; level = 1; gameOver = false;
+  document.getElementById('sc').textContent = '0';
+  document.getElementById('lv').textContent = '3';
+  dots = 0;
+  for (var r = 0; r < ROWS; r++)
+    for (var c = 0; c < COLS; c++)
+      if (MAZE[r][c] === 2 || MAZE[r][c] === 3) dots++;
+  pacman = { x: 14*CS+CS/2, y: 23*CS+CS/2, dir: 'l', nextDir: 'l', speed: 2, mouth: 0, eatTimer: 0 };
+  ghosts = [
+    { x: 14*CS+CS/2, y: 11*CS+CS/2, dir: 'u', color: '#ff4444', name: 'blinky', mode: 'chase', frightTimer: 0, inHouse: false },
+    { x: 12*CS+CS/2, y: 14*CS+CS/2, dir: 'u', color: '#ff88cc', name: 'pinky', mode: 'chase', frightTimer: 0, inHouse: true },
+    { x: 14*CS+CS/2, y: 14*CS+CS/2, dir: 'd', color: '#44ddff', name: 'inky', mode: 'chase', frightTimer: 0, inHouse: true },
+    { x: 16*CS+CS/2, y: 14*CS+CS/2, dir: 'u', color: '#ffaa44', name: 'clyde', mode: 'chase', frightTimer: 0, inHouse: true },
+  ];
+}
+
+function isWalkable(col, row) {
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
+  var v = MAZE[row][col];
+  return v !== 1 && v !== 4 && v !== 5;
+}
+
+function isWalkableForGhost(col, row) {
+  // Tunnel row: column wraps
+  if (row === 14) {
+    if (col < 0) col = COLS - 1;
+    if (col >= COLS) col = 0;
+  }
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
+  var v = MAZE[row][col];
+  return v !== 1 && v !== 5;
+}
+
+function getGridPos(px, py) {
+  return { c: Math.floor(px / CS), r: Math.floor(py / CS) };
+}
+
+function dist(px, py, cx, cy) {
+  return Math.sqrt((px-cx)*(px-cx) + (py-cy)*(py-cy));
+}
+
+function canMove(px, py, dir, speed, isGhost) {
+  var d = dirs[dir];
+  var nx = px + d[0] * speed;
+  var ny = py + d[1] * speed;
+  var g = getGridPos(nx, ny);
+  var cx = g.c, cy = g.r;
+  // Check if we're crossing into a new cell
+  var oc = Math.floor(px / CS), or = Math.floor(py / CS);
+  if (cx !== oc || cy !== or) {
+    var walk = isGhost ? isWalkableForGhost(cx, cy) : isWalkable(cx, cy);
+    // Also check corners
+    if (!walk) return false;
+  }
+  // Check all four corners of the entity
+  var s = speed;
+  var checks = [
+    [nx - CS*0.4, ny - CS*0.4],
+    [nx + CS*0.4, ny - CS*0.4],
+    [nx - CS*0.4, ny + CS*0.4],
+    [nx + CS*0.4, ny + CS*0.4],
+  ];
+  for (var i = 0; i < checks.length; i++) {
+    var cc = Math.floor(checks[i][0] / CS);
+    var rr = Math.floor(checks[i][1] / CS);
+    var w = isGhost ? isWalkableForGhost(cc, rr) : isWalkable(cc, rr);
+    if (!w) return false;
+  }
+  return true;
+}
+
+function moveEntity(e, dir, speed, isGhost) {
+  var d = dirs[dir];
+  e.x += d[0] * speed;
+  e.y += d[1] * speed;
+  e.dir = dir;
+  // Tunnel wrap
+  if (e.x < -CS/2) e.x = COLS*CS + CS/2;
+  if (e.x > COLS*CS + CS/2) e.x = -CS/2;
+  // Ghost safety: snap back if inside wall
+  if (isGhost) {
+    var gc = Math.floor(e.x / CS), gr = Math.floor(e.y / CS);
+    // Tunnel tunnel
+    if (gr === 14) {
+      if (gc < 0) gc = COLS - 1;
+      if (gc >= COLS) gc = 0;
+    }
+    if (!isWalkableForGhost(gc, gr)) {
+      e.x -= d[0] * speed;
+      e.y -= d[1] * speed;
+    }
+  }
+}
+
+function eatDot() {
+  var g = getGridPos(pacman.x, pacman.y);
+  var c = g.c, r = g.r;
+  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+  var v = MAZE[r][c];
+  if (v === 2) {
+    MAZE[r][c] = 0;
+    score += 10;
+    dots--;
+    pacman.eatTimer = 5;
+    document.getElementById('sc').textContent = score;
+    return true;
+  }
+  if (v === 3) {
+    MAZE[r][c] = 0;
+    score += 50;
+    dots--;
+    pacman.eatTimer = 5;
+    // Frighten ghosts
+    for (var i = 0; i < ghosts.length; i++) {
+      if (!ghosts[i].inHouse) {
+        ghosts[i].frightTimer = 300;
+        if (ghosts[i].mode !== 'eaten') ghosts[i].mode = 'fright';
+        ghosts[i].dir = reverseDir(ghosts[i].dir);
+      }
+    }
+    document.getElementById('sc').textContent = score;
+    return true;
+  }
+  return false;
+}
+
+function reverseDir(d) {
+  return {u:'d', d:'u', l:'r', r:'l'}[d];
+}
+
+function randomDir() {
+  var ds = ['u','d','l','r'];
+  return ds[Math.floor(Math.random() * 4)];
+}
+
+function getGhostTarget(ghost) {
+  if (ghost.mode === 'fright') return {cx: -1, cy: -1}; // random
+  if (ghost.mode === 'eaten') return {cx: 14, cy: 11}; // back to house
+
+  var pc = getGridPos(pacman.x, pacman.y);
+  var pd = pacman.dir;
+  var d = dirs[pd];
+
+  switch (ghost.name) {
+    case 'blinky': // Chase directly
+      return {cx: pc.c, cy: pc.r};
+    case 'pinky': // 4 ahead of pacman
+      return {cx: pc.c + d[0]*4, cy: pc.r + d[1]*4};
+    case 'inky': // 2 ahead + vector from blinky
+      var ahead = {cx: pc.c + d[0]*2, cy: pc.r + d[1]*2};
+      var b = ghosts[0]; // blinky
+      var bg = getGridPos(b.x, b.y);
+      return {cx: ahead.cx + (ahead.cx - bg.c), cy: ahead.cy + (ahead.cy - bg.r)};
+    case 'clyde': // Chase if far, scatter if close
+      var dx = pc.c - Math.floor(ghost.x/CS);
+      var dy = pc.r - Math.floor(ghost.y/CS);
+      if (Math.sqrt(dx*dx + dy*dy) > 8) return {cx: pc.c, cy: pc.r};
+      else return {cx: 0, cy: 30}; // scatter corner
+    default:
+      return {cx: pc.c, cy: pc.r};
+  }
+}
+
+function ghostAI(g) {
+  if (g.inHouse) {
+    // Move up and out of ghost house
+    var hx = 13.5*CS, hy = 11*CS+CS/2;
+    g.x = hx;
+    g.y -= 1;
+    if (g.y <= hy) {
+      g.inHouse = false;
+      g.mode = 'chase';
+      g.x = hx; g.y = hy;
+      g.dir = 'l';
+    }
+    return;
+  }
+
+  // Reduce fright timer
+  if (g.frightTimer > 0) {
+    g.frightTimer--;
+    if (g.frightTimer === 0 && g.mode === 'fright') g.mode = 'chase';
+  }
+
+  // Eaten ghost: go back to house center
+  if (g.mode === 'eaten') {
+    var hx = 13.5*CS, hy = 11*CS+CS/2;
+    var dx = hx - g.x, dy = hy - g.y;
+    if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
+      g.x = hx; g.y = hy;
+      g.mode = 'chase';
+      g.inHouse = true;
+      g.frightTimer = 0;
+      return;
+    }
+    // Simple direct movement back
+    if (Math.abs(dx) > Math.abs(dy)) g.dir = dx > 0 ? 'r' : 'l';
+    else g.dir = dy > 0 ? 'd' : 'u';
+    moveEntity(g, g.dir, 2, true);
+    return;
+  }
+
+  // ---- Grid-based movement ----
+  // Snap to grid center when near
+  var cx = Math.floor(g.x / CS) * CS + CS/2;
+  var cy = Math.floor(g.y / CS) * CS + CS/2;
+  var atCenter = Math.abs(g.x - cx) <= 1 && Math.abs(g.y - cy) <= 1;
+
+  if (atCenter) {
+    g.x = cx; g.y = cy;
+  }
+
+  // Get current grid cell
+  var gc = Math.floor(g.x / CS);
+  var gr = Math.floor(g.y / CS);
+
+  // If we're at a grid cell center, decide next direction
+  if (atCenter) {
+    var possible = [];
+    var rev = reverseDir(g.dir);
+    var allDirs = ['u','d','l','r'];
+    for (var i = 0; i < allDirs.length; i++) {
+      var d = allDirs[i];
+      if (d === rev) continue;
+      var dd = dirs[d];
+      var nc = gc + dd[0], nr = gr + dd[1];
+      if (isWalkableForGhost(nc, nr)) possible.push(d);
+    }
+
+    if (possible.length > 0) {
+      var target = getGhostTarget(g);
+      if (g.mode === 'fright') {
+        g.dir = possible[Math.floor(Math.random() * possible.length)];
+      } else {
+        // Pick direction closest to target (in grid coords)
+        var best = possible[0], bestDist = Infinity;
+        for (var i = 0; i < possible.length; i++) {
+          var dd = dirs[possible[i]];
+          var tx = (gc + dd[0]) * CS, ty = (gr + dd[1]) * CS;
+          var nd = dist(tx, ty, target.cx * CS, target.cy * CS);
+          if (nd < bestDist) { bestDist = nd; best = possible[i]; }
+        }
+        g.dir = best;
+      }
+    } else {
+      // Dead end: reverse
+      g.dir = rev;
+    }
+  }
+
+  // Move one grid cell per step when at center, else continue current dir
+  moveEntity(g, g.dir, 1.5, true);
+}
+
+function restart() {
+  init();
+  document.getElementById('overlay').classList.remove('show');
+}
+
+// Collision
+function checkGhostCollision() {
+  for (var i = 0; i < ghosts.length; i++) {
+    var g = ghosts[i];
+    if (g.inHouse) continue;
+    if (dist(pacman.x, pacman.y, g.x, g.y) < CS * 0.7) {
+      if (g.mode === 'fright') {
+        g.mode = 'eaten';
+        score += 200;
+        document.getElementById('sc').textContent = score;
+      } else if (g.mode !== 'eaten') {
+        return true; // Pacman dies
+      }
+    }
+  }
+  return false;
+}
+
+// ======================== 绘制 ========================
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  var cs = CS;
+
+  // Maze
+  for (var r = 0; r < ROWS; r++) {
+    for (var c = 0; c < COLS; c++) {
+      var v = MAZE[r][c];
+      var x = c * cs, y = r * cs;
+      if (v === 1) {
+        // Wall
+        ctx.fillStyle = '#1a1a3a';
+        ctx.fillRect(x+1, y+1, cs-2, cs-2);
+        // Wall decor
+        ctx.strokeStyle = 'rgba(68,68,136,0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x+1, y+1, cs-2, cs-2);
+      } else if (v === 2) {
+        // Dot
+        ctx.fillStyle = '#ffbbaa';
+        ctx.beginPath();
+        ctx.arc(x + cs/2, y + cs/2, cs*0.12, 0, Math.PI*2);
+        ctx.fill();
+      } else if (v === 3) {
+        // Power pellet
+        ctx.fillStyle = '#ffdd44';
+        ctx.shadowColor = '#ffdd44';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(x + cs/2, y + cs/2, cs*0.25, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+  }
+
+  // Ghost house walls
+  ctx.fillStyle = '#ff88cc';
+  ctx.fillRect(11*cs, 13*cs, 2*cs, cs);
+  ctx.fillRect(15*cs, 13*cs, 2*cs, cs);
+  ctx.fillStyle = 'rgba(255,136,204,0.15)';
+  ctx.fillRect(12*cs+2, 13*cs+2, cs-4, cs-4);
+  ctx.fillRect(14*cs+2, 13*cs+2, cs-4, cs-4);
+
+  // Ghost door
+  ctx.fillStyle = '#ff88cc';
+  ctx.fillRect(13*cs, 11*cs, 2*cs, cs);
+
+  // Pac-Man
+  drawPacman(pacman.x, pacman.y, pacman.dir, pacman.mouth);
+
+  // Ghosts
+  for (var i = 0; i < ghosts.length; i++) {
+    var g = ghosts[i];
+    if (g.inHouse && g.mode !== 'eaten') continue;
+    drawGhost(g.x, g.y, g);
+  }
+}
+
+function drawPacman(x, y, dir, mouth) {
+  var r = CS * 0.45;
+  // Direction angle: 0=right, π/2=down, π=left, 3π/2=up
+  var dirAngle = { l: Math.PI, r: 0, u: Math.PI*1.5, d: Math.PI*0.5 };
+  // Mouth half-angle: fully closed=0, fully open≈0.5 rad (28°)
+  var m = mouth * 0.5;
+
+  // Draw full yellow circle
+  ctx.shadowColor = '#ffdd44';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ffdd44';
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Draw mouth wedge in background color (cuts out the mouth)
+  // Wedge from dirAngle-m clockwise to dirAngle+m
+  ctx.fillStyle = '#0d0d1a';
+  ctx.beginPath();
+  ctx.arc(x, y, r+1, dirAngle[dir] - m, dirAngle[dir] + m);
+  ctx.lineTo(x, y);
+  ctx.closePath();
+  ctx.fill();
+
+  // Eye
+  var eyeOff = { l: [-r*0.35, -r*0.3], r: [r*0.35, -r*0.3], u: [0, -r*0.45], d: [0, r*0.35] };
+  var eo = eyeOff[dir] || eyeOff.r;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(x + eo[0], y + eo[1], r*0.18, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function drawGhost(x, y, g) {
+  var r = CS * 0.42;
+  var color = g.mode === 'fright' ? (g.frightTimer < 60 && Math.floor(g.frightTimer/6)%2 ? '#fff' : '#4488ff')
+    : g.mode === 'eaten' ? 'transparent' : g.color;
+
+  if (g.mode === 'eaten') {
+    // Just draw eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x - r*0.3, y - r*0.15, r*0.18, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + r*0.3, y - r*0.15, r*0.18, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#4488ff';
+    var gd = dirs[g.dir];
+    ctx.beginPath(); ctx.arc(x - r*0.3 + gd[0]*r*0.08, y - r*0.15 + gd[1]*r*0.08, r*0.08, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + r*0.3 + gd[0]*r*0.08, y - r*0.15 + gd[1]*r*0.08, r*0.08, 0, Math.PI*2); ctx.fill();
+    return;
+  }
+
+  // Body
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y - r*0.15, r, Math.PI, 0);
+  ctx.lineTo(x + r, y + r*0.6);
+  // Wavy bottom
+  var wave = 3;
+  for (var i = 0; i <= wave; i++) {
+    var bx = x + r - (i/wave) * r * 2;
+    var by = y + r*0.6 + (i % 2 === 0 ? r*0.15 : -r*0.15);
+    ctx.lineTo(bx, by);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Eyes
+  if (g.mode === 'fright') {
+    // Frightened face
+    ctx.fillStyle = '#fff';
+    ctx.font = r*0.6 + 'px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('×', x - r*0.3, y + r*0.1);
+    ctx.fillText('×', x + r*0.3, y + r*0.1);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x - r*0.3, y - r*0.15, r*0.25, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + r*0.3, y - r*0.15, r*0.25, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#4488ff';
+    var gd = dirs[g.dir];
+    ctx.beginPath(); ctx.arc(x - r*0.3 + gd[0]*r*0.1, y - r*0.15 + gd[1]*r*0.1, r*0.12, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + r*0.3 + gd[0]*r*0.1, y - r*0.15 + gd[1]*r*0.1, r*0.12, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+// ======================== 游戏逻辑 ========================
+function update() {
+  if (gameOver) return;
+
+  // Pac-Man mouth animation (0~1)
+  pacman.mouth = 0.5 + Math.sin(Date.now() * 0.008) * 0.5;
+  if (pacman.eatTimer > 0) pacman.eatTimer--;
+
+  // Move Pac-Man
+  // Try next direction first
+  if (pacman.nextDir && pacman.nextDir !== pacman.dir) {
+    if (canMove(pacman.x, pacman.y, pacman.nextDir, pacman.speed, false)) {
+      pacman.dir = pacman.nextDir;
+    }
+  }
+  if (canMove(pacman.x, pacman.y, pacman.dir, pacman.speed, false)) {
+    moveEntity(pacman, pacman.dir, pacman.speed, false);
+    // Eat dots
+    eatDot();
+  }
+
+  // Check win
+  if (dots === 0) {
+    level++;
+    init();
+    return;
+  }
+
+  // Ghosts
+  for (var i = 0; i < ghosts.length; i++) ghostAI(ghosts[i]);
+
+  // Collision
+  if (checkGhostCollision()) {
+    lives--;
+    document.getElementById('lv').textContent = lives;
+    if (lives <= 0) {
+      gameOver = true;
+      document.getElementById('finalScore').textContent = '得分：' + score;
+      document.getElementById('overlay').classList.add('show');
+    } else {
+      // Reset positions
+      pacman.x = 14*CS+CS/2; pacman.y = 23*CS+CS/2;
+      pacman.dir = 'l'; pacman.nextDir = 'l';
+      for (var j = 0; j < ghosts.length; j++) {
+        ghosts[j].x = [14,12,14,16][j]*CS+CS/2;
+        ghosts[j].y = [11,14,14,14][j]*CS+CS/2;
+        ghosts[j].dir = ['u','u','d','u'][j];
+        ghosts[j].mode = 'chase';
+        ghosts[j].frightTimer = 0;
+        ghosts[j].inHouse = j > 1;
+      }
+    }
+  }
+}
+
+// ======================== 输入 ========================
+document.addEventListener('keydown', function(e) {
+  if (gameOver) { if (e.key === 'r' || e.key === 'R') restart(); return; }
+  var k = e.key;
+  if (k === 'ArrowLeft' || k === 'a' || k === 'A') { e.preventDefault(); pacman.nextDir = 'l'; }
+  else if (k === 'ArrowRight' || k === 'd' || k === 'D') { e.preventDefault(); pacman.nextDir = 'r'; }
+  else if (k === 'ArrowUp' || k === 'w' || k === 'W') { e.preventDefault(); pacman.nextDir = 'u'; }
+  else if (k === 'ArrowDown' || k === 's' || k === 'S') { e.preventDefault(); pacman.nextDir = 'd'; }
+  else if (k === 'r' || k === 'R') { init(); }
+});
+
+// Touch swipe
+var tx, ty;
+canvas.addEventListener('touchstart', function(e) {
+  var t = e.touches[0]; tx = t.clientX; ty = t.clientY;
+}, {passive:true});
+canvas.addEventListener('touchend', function(e) {
+  var dx = e.changedTouches[0].clientX - tx;
+  var dy = e.changedTouches[0].clientY - ty;
+  if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+  if (Math.abs(dx) > Math.abs(dy)) pacman.nextDir = dx > 0 ? 'r' : 'l';
+  else pacman.nextDir = dy > 0 ? 'd' : 'u';
+}, {passive:true});
+
+// Mobile D-pad
+document.getElementById('mc').addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-d]');
+  if (!btn) return;
+  if (gameOver) { restart(); return; }
+  pacman.nextDir = btn.dataset.d;
+});
+
+// ======================== 游戏循环 ========================
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+init();
+loop();
+</script>
+</body>
+</html>

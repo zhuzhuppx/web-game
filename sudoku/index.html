@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>数独</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0a0a1a; color:#ccc; font-family:system-ui,-apple-system,sans-serif;
+    min-height:100dvh; display:flex; align-items:center; justify-content:center;
+  }
+  .wrap { display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px; width:100%; max-width:450px; }
+  .hdr { display:flex; align-items:center; justify-content:space-between; width:100%; padding:0 4px; }
+  .hdr h1 { font-size:20px; color:#88ddff; }
+  .hdr .s { display:flex; gap:10px; align-items:center; }
+  .hdr .s .l { font-size:11px; color:#6666aa; }
+  .hdr .s .v { font-size:18px; font-weight:700; color:#fff; }
+
+  .board-wrap { position:relative; width:100%; touch-action:none; }
+  .board-wrap canvas { width:100%; display:block; touch-action:none; background:#0d0d1a; border-radius:8px; }
+
+  .controls { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; width:100%; margin:2px 0; }
+  .controls button {
+    width:32px; height:32px; border:1px solid rgba(136,221,255,0.15); border-radius:6px;
+    background:rgba(255,255,255,0.03); color:#88ddff; font-size:15px; font-weight:700;
+    cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  }
+  .controls button:active { background:rgba(136,221,255,0.15); }
+  .controls button.clr { width:auto; padding:0 10px; color:#ff6688; }
+  .controls button.note { width:auto; padding:0 10px; color:#ffaa44; }
+  .controls button.note.on { background:rgba(255,170,68,0.15); }
+
+  .difficulty { display:flex; gap:6px; align-items:center; }
+  .difficulty button {
+    padding:4px 12px; border:1px solid rgba(136,221,255,0.15); border-radius:6px;
+    background:rgba(255,255,255,0.03); color:#88ddff; font-size:12px; cursor:pointer;
+    touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+  }
+  .difficulty button.active { background:rgba(136,221,255,0.12); border-color:#88ddff; }
+  .difficulty button:active { background:rgba(136,221,255,0.15); }
+
+  .hint { font-size:12px; color:#444477; }
+  .hint kbd { background:rgba(255,255,255,0.04); padding:2px 6px; border-radius:4px; font-family:inherit; font-size:11px; border:1px solid rgba(255,255,255,0.06); }
+  .back { color:#555588; text-decoration:none; font-size:14px; }
+  .back:hover { color:#8888bb; }
+
+  .overlay {
+    display:none; position:absolute; inset:0; background:rgba(0,0,0,0.7);
+    align-items:center; justify-content:center; flex-direction:column; gap:8px;
+    border-radius:8px; z-index:10; backdrop-filter:blur(2px);
+  }
+  .overlay.show { display:flex; }
+  .overlay .emoji { font-size:48px; }
+  .overlay .title { font-size:26px; font-weight:700; color:#88ddff; }
+  .overlay .sub { font-size:14px; color:#8888bb; }
+  .overlay .btn { padding:10px 28px; border:none; border-radius:8px; background:#88ddff; color:#0a0a1a; font-size:16px; font-weight:700; cursor:pointer; margin-top:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <h1>🧩 数独</h1>
+    <div class="s">
+      <div><div class="l">⏱</div><div class="v" id="timer">0:00</div></div>
+      <div><div class="l">❌</div><div class="v" id="mistakes">0</div></div>
+    </div>
+  </div>
+  <div class="difficulty">
+    <button data-d="easy" class="active" onclick="setDifficulty('easy')">简单</button>
+    <button data-d="medium" onclick="setDifficulty('medium')">中等</button>
+    <button data-d="hard" onclick="setDifficulty('hard')">困难</button>
+    <button data-d="evil" onclick="setDifficulty('evil')">地狱</button>
+  </div>
+  <div class="board-wrap" id="boardWrap">
+    <canvas id="c"></canvas>
+    <div class="overlay" id="overlay">
+      <div class="emoji">🎉</div>
+      <div class="title">通关！</div>
+      <div class="sub" id="winSub">用时 0:00 · 失误 0 次</div>
+      <button class="btn" onclick="startGame()">🔄 再来一局</button>
+    </div>
+  </div>
+  <div class="controls" id="numBtns"></div>
+  <div class="hint">点击格子，再按数字 / <kbd>1</kbd>-<kbd>9</kbd> 填入 · <kbd>0</kbd>/退格 清除</div>
+  <a class="back" href="/">← 返回游戏大厅</a>
+</div>
+
+<script>
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+
+var CELL, OFF, N=9;
+var board, solution, fixed, notes, selected, difficulty, timer, mistakes, timerId, gameOver;
+
+// Pre-built seed puzzles (81 chars, 0=empty)
+var SEEDS = {
+  easy: [
+    '530070000600195000098000060800060003400803001700020006060000280000419005000080079',
+    '000260701680070090190004500820100040004602900050003028009300074040050036703018000',
+    '480006000002000800000300006900040100006000700005030004500004000009000200000100038',
+  ],
+  medium: [
+    '000000907000420180000705026100904000050000040000507009920108000034059000507000000',
+    '020000000000600003074000800000003002080040006003000700008000570600001000000000090',
+    '100000009030780000006039000008000100000050007000300400000860700000027040500000003',
+  ],
+  hard: [
+    '000700000200005060003000800001002000800000002000400700009000400060100007000006000',
+    '020005300007100004400090000000002080009000700060400000000050003100004900003700010',
+    '300080000000700005100000800006000400000050000004000200007000006800009000000040007',
+  ],
+  evil: [
+    '000000000000003085001020000000507000004000100090000000500000073002010000000040009',
+    '800000000003600000070090200050007000000045700000100030001000068008500010090000400',
+    '000900800007001060000003000280000700000082000005070000400009010600200000001000300',
+  ],
+};
+
+function resize() {
+  var w = Math.min(420, canvas.parentElement.clientWidth - 4);
+  canvas.style.width = w + 'px';
+  CELL = Math.floor(w / 9);
+  canvas.width = CELL * 9;
+  canvas.height = CELL * 9;
+  OFF = CELL * 0.05;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ============ 数独求解器 ============
+function solve(grid) {
+  var g = grid.slice();
+  function isValid(g, r, c, num) {
+    for (var i = 0; i < 9; i++)
+      if (g[r*9+i] === num || g[i*9+c] === num) return false;
+    var br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+    for (var i = 0; i < 3; i++)
+      for (var j = 0; j < 3; j++)
+        if (g[(br+i)*9+bc+j] === num) return false;
+    return true;
+  }
+  function solveInner(g) {
+    for (var i = 0; i < 81; i++)
+      if (g[i] === 0) {
+        for (var num = 1; num <= 9; num++) {
+          if (isValid(g, Math.floor(i/9), i%9, num)) {
+            g[i] = num;
+            if (solveInner(g)) return true;
+            g[i] = 0;
+          }
+        }
+        return false;
+      }
+    return true;
+  }
+  solveInner(g);
+  return g;
+}
+
+function stripCells(grid, count) {
+  var g = grid.slice();
+  var removed = 0;
+  var indices = [];
+  for (var i = 0; i < 81; i++) indices.push(i);
+  // Shuffle
+  for (var i = indices.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = indices[i]; indices[i] = indices[j]; indices[j] = t;
+  }
+  for (var k = 0; k < indices.length && removed < count; k++) {
+    var idx = indices[k];
+    if (g[idx] !== 0) {
+      g[idx] = 0;
+      removed++;
+    }
+  }
+  return g;
+}
+
+function parseSeed(s) {
+  var g = [];
+  for (var i = 0; i < 81; i++) g.push(parseInt(s[i]) || 0);
+  return g;
+}
+
+function generatePuzzle(diff) {
+  var seeds = SEEDS[diff] || SEEDS.easy;
+  var seed = seeds[Math.floor(Math.random() * seeds.length)];
+  var puzzle = parseSeed(seed);
+  var sol = solve(puzzle);
+  // Verify solution matches (seed should be valid)
+  // Now remove more cells based on difficulty
+  var removeCount = { easy: 30, medium: 40, hard: 50, evil: 55 }[diff] || 30;
+  var stripped = stripCells(sol, removeCount);
+  return { puzzle: stripped, solution: sol };
+}
+
+// ============ 游戏逻辑 ============
+function startGame() {
+  if (timerId) clearInterval(timerId);
+  document.getElementById('overlay').classList.remove('show');
+  timer = 0; mistakes = 0; gameOver = false; selected = -1;
+  document.getElementById('mistakes').textContent = '0';
+  document.getElementById('timer').textContent = '0:00';
+  timerId = setInterval(function() {
+    timer++;
+    var m = Math.floor(timer / 60), s = timer % 60;
+    document.getElementById('timer').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+  }, 1000);
+
+  var data = generatePuzzle(difficulty || 'easy');
+  board = data.puzzle.slice();
+  solution = data.solution;
+  fixed = board.map(function(v) { return v !== 0; });
+  notes = [];
+  for (var i = 0; i < 81; i++) notes[i] = [];
+  draw();
+}
+
+function setDifficulty(d) {
+  difficulty = d;
+  document.querySelectorAll('.difficulty button').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.d === d);
+  });
+  startGame();
+}
+
+function getCell(x, y) {
+  var rect = canvas.getBoundingClientRect();
+  var scaleX = canvas.width / rect.width;
+  var scaleY = canvas.height / rect.height;
+  var cx = Math.floor((x - rect.left) * scaleX / CELL);
+  var cy = Math.floor((y - rect.top) * scaleY / CELL);
+  if (cx >= 0 && cx < 9 && cy >= 0 && cy < 9) return cy * 9 + cx;
+  return -1;
+}
+
+canvas.addEventListener('click', function(e) {
+  if (gameOver) { startGame(); return; }
+  var idx = getCell(e.clientX, e.clientY);
+  if (idx >= 0) {
+    selected = idx;
+    draw();
+  }
+});
+
+canvas.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  if (gameOver) { startGame(); return; }
+  var t = e.touches[0];
+  var idx = getCell(t.clientX, t.clientY);
+  if (idx >= 0) {
+    selected = idx;
+    draw();
+  }
+}, {passive:false});
+
+function inputNumber(num) {
+  if (selected < 0 || gameOver) return;
+  var row = Math.floor(selected / 9), col = selected % 9;
+  if (fixed[selected]) return;
+
+  if (num === 0) {
+    board[selected] = 0;
+    notes[selected] = [];
+    draw();
+    return;
+  }
+
+  // Check if note mode
+  if (notesMode) {
+    var i = notes[selected].indexOf(num);
+    if (i >= 0) notes[selected].splice(i, 1);
+    else if (notes[selected].length < 8) notes[selected].push(num);
+    board[selected] = 0;
+    draw();
+    return;
+  }
+
+  board[selected] = num;
+  notes[selected] = [];
+
+  // Check if correct
+  if (num !== solution[selected]) {
+    mistakes++;
+    document.getElementById('mistakes').textContent = mistakes;
+    board[selected] = 0;
+    draw();
+    return;
+  }
+
+  draw();
+
+  // Check win
+  var won = true;
+  for (var i = 0; i < 81; i++) if (board[i] !== solution[i]) { won = false; break; }
+  if (won) {
+    gameOver = true;
+    if (timerId) clearInterval(timerId);
+    var m = Math.floor(timer / 60), s = timer % 60;
+    document.getElementById('winSub').textContent = '用时 ' + m + ':' + (s < 10 ? '0' : '') + s + ' · 失误 ' + mistakes + ' 次';
+    document.getElementById('overlay').classList.add('show');
+  }
+}
+
+var notesMode = false;
+function toggleNotes() {
+  notesMode = !notesMode;
+  document.getElementById('noteBtn').classList.toggle('on', notesMode);
+}
+
+// ============ 绘制 ============
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Grid background
+  ctx.fillStyle = '#0d0d1a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Cells
+  for (var r = 0; r < 9; r++) {
+    for (var c = 0; c < 9; c++) {
+      var idx = r*9+c;
+      var x = c * CELL, y = r * CELL;
+
+      // Selected highlight
+      if (idx === selected) {
+        ctx.fillStyle = 'rgba(136,221,255,0.12)';
+        ctx.fillRect(x, y, CELL, CELL);
+      } else if (selected >= 0) {
+        var sr = Math.floor(selected / 9), sc = selected % 9;
+        if (r === sr || c === sc || (Math.floor(r/3) === Math.floor(sr/3) && Math.floor(c/3) === Math.floor(sc/3))) {
+          ctx.fillStyle = 'rgba(136,221,255,0.04)';
+          ctx.fillRect(x, y, CELL, CELL);
+        }
+      }
+
+      // Same number highlight
+      if (selected >= 0 && board[selected] > 0 && board[idx] === board[selected] && idx !== selected) {
+        ctx.fillStyle = 'rgba(136,221,255,0.08)';
+        ctx.fillRect(x, y, CELL, CELL);
+      }
+
+      // Number
+      if (board[idx] > 0) {
+        ctx.fillStyle = fixed[idx] ? '#88ddff' : '#fff';
+        ctx.font = 'bold ' + Math.round(CELL * 0.55) + 'px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(board[idx], x + CELL/2, y + CELL/2 + 1);
+      } else if (notes[idx] && notes[idx].length > 0) {
+        // Pencil marks
+        ctx.fillStyle = 'rgba(136,221,255,0.4)';
+        ctx.font = Math.round(CELL * 0.22) + 'px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        var ns = notes[idx];
+        for (var ni = 0; ni < ns.length; ni++) {
+          var nn = ns[ni] - 1;
+          var nx = x + (nn % 3 + 0.5) * CELL / 3;
+          var ny = y + (Math.floor(nn / 3) + 0.5) * CELL / 3;
+          ctx.fillText(ns[ni], nx, ny);
+        }
+      }
+    }
+  }
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(136,221,255,0.15)';
+  ctx.lineWidth = 1;
+  for (var i = 0; i <= 9; i++) {
+    ctx.beginPath();
+    if (i % 3 === 0) {
+      ctx.strokeStyle = 'rgba(136,221,255,0.5)';
+      ctx.lineWidth = 2;
+    } else {
+      ctx.strokeStyle = 'rgba(136,221,255,0.15)';
+      ctx.lineWidth = 1;
+    }
+    ctx.beginPath();
+    ctx.moveTo(i * CELL, 0);
+    ctx.lineTo(i * CELL, canvas.height);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, i * CELL);
+    ctx.lineTo(canvas.width, i * CELL);
+    ctx.stroke();
+  }
+}
+
+// ============ 输入 ============
+document.addEventListener('keydown', function(e) {
+  if (e.key >= '1' && e.key <= '9') { inputNumber(parseInt(e.key)); e.preventDefault(); }
+  else if (e.key === '0' || e.key === 'Backspace' || e.key === 'Delete') { inputNumber(0); e.preventDefault(); }
+  else if (e.key === 'n' || e.key === 'N') { toggleNotes(); }
+  else if (e.key === 'r' || e.key === 'R') { startGame(); }
+  else if (e.key === 'ArrowLeft' && selected >= 0) { selected = Math.max(0, selected - 1); draw(); e.preventDefault(); }
+  else if (e.key === 'ArrowRight' && selected >= 0) { selected = Math.min(80, selected + 1); draw(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp' && selected >= 0) { selected = Math.max(0, selected - 9); draw(); e.preventDefault(); }
+  else if (e.key === 'ArrowDown' && selected >= 0) { selected = Math.min(80, selected + 9); draw(); e.preventDefault(); }
+});
+
+// Number buttons
+(function() {
+  var container = document.getElementById('numBtns');
+  for (var i = 1; i <= 9; i++) {
+    var btn = document.createElement('button');
+    btn.textContent = i;
+    btn.onclick = function(n) { return function() { inputNumber(n); }; }(i);
+    container.appendChild(btn);
+  }
+  var clr = document.createElement('button');
+  clr.className = 'clr'; clr.textContent = '✕';
+  clr.onclick = function() { inputNumber(0); };
+  container.appendChild(clr);
+  var note = document.createElement('button');
+  note.className = 'note'; note.id = 'noteBtn'; note.textContent = '✏️';
+  note.onclick = toggleNotes;
+  container.appendChild(note);
+})();
+
+// Init
+difficulty = 'easy';
+startGame();
+</script>
+</body>
+</html>
