@@ -392,7 +392,7 @@ class ChessScene extends Phaser.Scene {
     
     // Switch turn
     this.turn = enemyColor;
-    g_ply++;g_moves.push({fr:row,fc:col,tr:targetR,tc:targetC});
+    g_ply++;g_moves.push({fr:fr,fc:fc,tr:tr,tc:tc});
     document.getElementById('turn').textContent = this.turn==='r'?'红方':'黑方';
     
     // AI move
