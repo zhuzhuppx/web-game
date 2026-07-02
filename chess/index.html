@@ -24,8 +24,8 @@ body{background:#0a0a1a;display:flex;align-items:center;justify-content:center;m
 <script>
 // ===== CHESS GAME LOGIC (unchanged) =====
 var COLS=9,ROWS=10;
-var PIECES_RED=['r','h','e','a','k','a','e','h','r',' ','c',' ',' ',' ',' ','c',' ',' ','p',' ','p',' ','p',' ','p',' ','p'];
-var PIECES_BLK=['R','H','E','A','K','A','E','H','R',' ','C',' ',' ',' ',' ','C',' ',' ','P',' ','P',' ','P',' ','P',' ','P'];
+var PIECES_RED=['r','h','e','a','k','a','e','h','r',' ','c',' ',' ',' ',' ',' ','c',' ','p',' ','p',' ','p',' ','p',' ','p'];
+var PIECES_BLK=['R','H','E','A','K','A','E','H','R',' ','C',' ',' ',' ',' ',' ','C',' ','P',' ','P',' ','P',' ','P',' ','P'];
 var PIECE_NAMES={r:'车',h:'马',e:'相',a:'仕',k:'帅',c:'炮',p:'兵',R:'車',H:'馬',E:'象',A:'士',K:'將',C:'砲',P:'卒'};
 function getColorType(type){return type>='a'&&type<='z'?'r':'b'}
 function isEnemy(p1,p2){return p1&&p2&&p1.color!==p2.color}
