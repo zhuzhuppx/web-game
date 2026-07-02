@@ -31,7 +31,10 @@ var W,H,player,platforms={},best=parseInt(localStorage.getItem('doodleBest'))||0
 document.getElementById('hs').textContent=best;
 function resize(){var w=Math.min(420,canvas.parentElement.clientWidth-4);canvas.style.width=w+'px';W=Math.floor(w*1.2);H=Math.floor(W*1.6);canvas.width=W;canvas.height=H;if(typeof player!=='undefined')player.y=H-80;}
 resize();window.addEventListener('resize',resize);
-function startGame(){player={x:W/2-15,y:H-80,w:30,h:30,vy:0};score=0;gameOver=false;running=true;document.getElementById('sc').textContent='0';document.getElementById('msg').textContent='';platforms={};for(var i=0;i<10;i++){platforms['p'+i]={x:Math.random()*(W-80),y:H-i*60,w:Math.floor(60+Math.random()*40),h:12,type:Math.random()<0.15?'b':'n'}}
+function startGame(){player={x:W/2-15,y:H-80,w:30,h:30,vy:0};score=0;gameOver=false;running=true;document.getElementById('sc').textContent='0';document.getElementById('msg').textContent='';platforms={};
+// 初始脚下跳板
+platforms.st={x:player.x-10,y:player.y+player.h,w:player.w+20,h:12,type:'n'};
+for(var i=0;i<10;i++){platforms['p'+i]={x:Math.random()*(W-80),y:H-i*60,w:Math.floor(60+Math.random()*40),h:12,type:Math.random()<0.15?'b':'n'}}
 loop()}
 function loop(){if(gameOver){drawGameOver();return}
 // Gravity
