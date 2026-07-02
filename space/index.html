@@ -17,7 +17,7 @@ canvas{width:100%;touch-action:none;background:#0d0d1a;border-radius:8px;display
 </style>
 <div class="wrap">
 <div class="hdr"><h1>🚀 太空射击</h1><div class="s"><div><div class="l">分数</div><div class="v" id="sc">0</div></div><div><div class="l">波次</div><div class="v" id="wave">0</div></div></div></div>
-<canvas id="c"></canvas><div class="msg" id="msg">← → 移动 · 空格/点击 射击</div>
+<canvas id="c"></canvas><div class="msg" id="msg">← → 移动 · 🔥 自动开火</div>
 <div class="mc"><div class="row"><button id="sL">◀</button><button id="sF">🔥</button><button id="sR">▶</button></div></div>
 <button class="btn" onclick="startGame()">🎮 开始</button>
 <a class="back" href="/">← 返回</a></div>
@@ -37,9 +37,9 @@ for(var i=0;i<stars.length;i++){stars[i].y+=stars[i].s;if(stars[i].y>H){stars[i]
 // Player movement
 var spd=4;if(keys.left||keys.a)player.x-=spd;if(keys.right||keys.d)player.x+=spd
 player.x=Math.max(0,Math.min(W-player.w,player.x))
-// Shoot
+// Auto-shoot
 if(player.cooldown>0)player.cooldown--
-if(keys.space&&player.cooldown===0){bullets.push({x:player.x+player.w/2-2,y:player.y-8,w:4,h:12,dy:-6});player.cooldown=10}
+if(player.cooldown===0){bullets.push({x:player.x+player.w/2-2,y:player.y-8,w:4,h:12,dy:-6});player.cooldown=8}
 // Bullets
 for(var i=bullets.length-1;i>=0;i--){bullets[i].y+=bullets[i].dy;if(bullets[i].y<-20)bullets.splice(i,1)}
 // Enemies
@@ -63,7 +63,35 @@ ctx.fillStyle='rgba(255,255,255,0.4)';for(var i=0;i<stars.length;i++){ctx.beginP
 // Player
 ctx.fillStyle='#44ddff';ctx.shadowColor='#44ddff';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(player.x+player.w/2,player.y);ctx.lineTo(player.x+player.w,player.y+player.h);ctx.lineTo(player.x,player.y+player.h);ctx.closePath();ctx.fill();ctx.shadowBlur=0
 // Enemies
-for(var i=0;i<enemies.length;i++){var e=enemies[i];ctx.fillStyle='#ff4466';ctx.shadowColor='#ff4466';ctx.shadowBlur=6;ctx.beginPath();ctx.roundRect(e.x,e.y,e.w,e.h,4);ctx.fill();ctx.shadowBlur=0;if(e.hp>1){ctx.fillStyle='#fff';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText(e.hp,e.x+e.w/2,e.y+e.h/2+4)}}
+for(var i=0;i<enemies.length;i++){var e=enemies[i];
+// Draw alien body
+ctx.save();ctx.translate(e.x+e.w/2,e.y+e.h/2);
+var colors=['#44dd44','#dd44dd','#ff8844','#44ddff'];var col=colors[(e.hp||1)%colors.length];
+// Body (UFO-like dome)
+ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=8;
+ctx.beginPath();ctx.ellipse(0,2,e.w/2*0.8,e.h/2*0.7,0,0,Math.PI*2);ctx.fill();
+// Head dome top
+ctx.fillStyle=col;ctx.shadowBlur=4;
+ctx.beginPath();ctx.ellipse(0,-4,e.w/2*0.5,e.h/2*0.35,0,Math.PI,Math.PI*2);ctx.fill();
+// Eyes (two big glowing circles)
+ctx.shadowBlur=6;ctx.fillStyle='#fff';
+ctx.beginPath();ctx.arc(-5,-4,4,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.arc(5,-4,4,0,Math.PI*2);ctx.fill();
+ctx.shadowBlur=0;ctx.fillStyle='#111';
+ctx.beginPath();ctx.arc(-5,-3,2,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.arc(5,-3,2,0,Math.PI*2);ctx.fill();
+// Antenna
+ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.shadowBlur=3;
+ctx.beginPath();ctx.moveTo(-3,-10);ctx.lineTo(-6,-17);ctx.stroke();
+ctx.beginPath();ctx.moveTo(3,-10);ctx.lineTo(6,-17);ctx.stroke();
+// Antenna tips
+ctx.fillStyle='#fff';ctx.shadowBlur=4;
+ctx.beginPath();ctx.arc(-6,-17,2,0,Math.PI*2);ctx.fill();
+ctx.beginPath();ctx.arc(6,-17,2,0,Math.PI*2);ctx.fill();
+ctx.shadowBlur=0;
+// HP badge
+if(e.hp>1){ctx.fillStyle='#fff';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(e.hp,0,e.h/2*0.5)}
+ctx.restore()}
 // Bullets
 for(var i=0;i<bullets.length;i++){var b=bullets[i];ctx.fillStyle=b.dy<0?'#ffdd44':'#ff4466';ctx.shadowColor=b.dy<0?'#ffdd44':'#ff4466';ctx.shadowBlur=4;ctx.fillRect(b.x,b.y,b.w,b.h);ctx.shadowBlur=0}}
 function drawGameOver(){draw();ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#44ddff';ctx.font='bold 30px sans-serif';ctx.textAlign='center';ctx.fillText('GAME OVER',W/2,H/2-15);ctx.fillStyle='#8888bb';ctx.font='16px sans-serif';ctx.fillText('得分: '+score+' | 波次: '+wave,W/2,H/2+25)}
