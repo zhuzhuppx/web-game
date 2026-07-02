@@ -1,14 +1,16 @@
 <!DOCTYPE html><html lang="zh-CN"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-<title>斗地主</title><style>
+<title>斗地主 - Phaser</title>
+<style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;color:#ccc;font-family:system-ui,-apple-system,sans-serif;min-height:100dvh;display:flex;align-items:center;justify-content:center}
-.wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;width:100%;max-width:640px}
+#game{width:100%;max-width:660px;touch-action:none}
+#game canvas{display:block;border-radius:8px;width:100%!important;height:auto!important}
+.wrap{max-width:660px;width:100%;padding:10px;display:flex;flex-direction:column;gap:6px;align-items:center}
 .hdr{display:flex;align-items:center;justify-content:space-between;width:100%}
 .hdr h1{font-size:20px;color:#ff8844}.hdr .s{font-size:14px;color:#6666aa}
-canvas{width:100%;touch-action:none;background:#0d5c2e;border-radius:8px;display:block}
-.msg{font-size:15px;color:#ddd;min-height:20px;text-align:center}
+.msg{font-size:15px;color:#ddd;min-height:22px;text-align:center}
 .actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
-.actions button{padding:6px 16px;border:none;border-radius:6px;font-size:13px;cursor:pointer;touch-action:manipulation}
+.actions button{padding:6px 16px;border:none;border-radius:6px;font-size:14px;cursor:pointer;touch-action:manipulation}
 .actions button:disabled{opacity:0.3;cursor:default}
 .actions .p{background:rgba(255,136,68,0.2);color:#ff8844}.actions .p:active{background:rgba(255,136,68,0.3)}
 .actions .s{background:rgba(255,255,255,0.05);color:#888}.actions .s:active{background:rgba(255,255,255,0.1)}
@@ -17,166 +19,54 @@ canvas{width:100%;touch-action:none;background:#0d5c2e;border-radius:8px;display
 .btn:active{background:rgba(255,136,68,0.25)}
 .back{color:#555588;text-decoration:none;font-size:14px}.back:hover{color:#8888bb}
 </style>
-<div class="wrap">
-<div class="hdr"><h1>🃏 斗地主</h1><div class="s" id="status"></div></div>
-<canvas id="c"></canvas><div class="msg" id="msg">发牌中...</div>
+<div class="wrap"><div class="hdr"><h1>🃏 斗地主</h1><div class="s" id="status"></div></div>
+<div id="game"></div>
+<div class="msg" id="msg">加载中...</div>
 <div class="actions" id="actions">
-<button class="p" id="btnPlay" disabled onclick="playCards()">出牌</button>
-<button class="s" id="btnPass" disabled onclick="passTurn()">不出</button>
-<button class="h" onclick="showHint()">💡 提示</button>
+<button class="p" id="btnPlay" disabled onclick="window.gameScene.playCards()">出牌</button>
+<button class="s" id="btnPass" disabled onclick="window.gameScene.passTurn()">不出</button>
+<button class="h" onclick="window.gameScene.showHint()">💡 提示</button>
 </div>
-<button class="btn" onclick="startGame()">🔄 新一局</button>
+<button class="btn" onclick="window.gameScene.startGame()">🔄 新一局</button>
 <a class="back" href="/">← 返回</a></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
 <script>
-var canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
-var W,H,CARD_W,CARD_H,hand=[],ai1=[],ai2=[],selected=[];
-var landlord,curPlayer,lastPlay,lastPlayer,lastCards=[],passCount,gameOver,lock;
+// ===== GAME LOGIC (unchanged from canvas version) =====
 var SUITS=['♠','♥','♣','♦'],RANKS=['3','4','5','6','7','8','9','10','J','Q','K','A','2'];
-
-function resize(){var w=Math.min(600,canvas.parentElement.clientWidth-4);canvas.style.width=w+'px';W=Math.floor(w*0.98);H=Math.floor(W*0.75);canvas.width=W;canvas.height=H;CARD_W=Math.min(Math.floor(W/8),80);CARD_H=Math.floor(CARD_W*1.45)}
-resize();window.addEventListener('resize',resize);
-
 function deck(){var d=[];for(var s=0;s<4;s++)for(var r=0;r<13;r++)d.push({r:RANKS[r],s:SUITS[s],v:r});d.push({r:'S',s:'🃏',v:13},{r:'B',s:'🃏',v:14});return d}
 function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.random()*(i+1)|0;var t=a[i];a[i]=a[j];a[j]=t}}
 function sort(h){h.sort(function(a,b){return a.v-b.v||SUITS.indexOf(a.s)-SUITS.indexOf(b.s)})}
-function hands(h){return h.length}
-
-function startGame(){lock=false;lastPlay=null;lastPlayer=-1;lastCards=[];passCount=0;selected=[];gameOver=false
-disableBtns()
-var d=shuffle(deck())||deck();d=shuffle(d)||d
-hand=d.slice(0,17);ai1=d.slice(17,34);ai2=d.slice(34,51);var landCards=d.slice(51,54)
-sort(hand);sort(ai1);sort(ai2)
-landlord=Math.random()*3|0;curPlayer=landlord
-if(landlord===0)hand=hand.concat(landCards);else if(landlord===1)ai1=ai1.concat(landCards);else ai2=ai2.concat(landCards)
-sort(hand);sort(ai1);sort(ai2)
-document.getElementById('status').textContent='👑 地主: '+(landlord===0?'你':(landlord===1?'AI-1':'AI-2'))
-msg('发牌完成')
-draw()
-if(curPlayer===0){myTurn()}else{setTimeout(aiPlay,500)}}
-
-function msg(s){document.getElementById('msg').textContent=s}
-function disableBtns(){document.getElementById('btnPlay').disabled=true;document.getElementById('btnPass').disabled=true}
-
-function myTurn(){if(gameOver)return;disableBtns()
-if(lastPlay&&lastPlayer!==0)document.getElementById('btnPass').disabled=false
-document.getElementById('btnPlay').disabled=false
-msg(lastPlay&&lastPlayer!==0?'轮到你了，出牌压过（或点"不出"）':'轮到你了，请出牌')
-draw()}
-
-// Click card to select/deselect
-canvas.onclick=function(e){if(gameOver)return;disableBtns()
-var rect=canvas.getBoundingClientRect(),sx=canvas.width/rect.width,sy=canvas.height/rect.height
-var x=(e.clientX-rect.left)*sx,y=(e.clientY-rect.top)*sy
-var start=(W-hand.length*CARD_W*0.28)/2
-// Check from right to left so overlapping cards select the topmost one
-for(var i=hand.length-1;i>=0;i--){var cx=start+i*CARD_W*0.28,cy=H-CARD_H-8
-if(x>=cx&&x<=cx+CARD_W&&y>=cy&&y<=cy+CARD_H){var idx=selected.indexOf(hand[i])
-if(idx>=0)selected.splice(idx,1);else selected.push(hand[i])
-draw()
-if(lastPlay&&lastPlayer!==0)document.getElementById('btnPass').disabled=false
-document.getElementById('btnPlay').disabled=false
-break}}}
-canvas.ontouchstart=function(e){e.preventDefault();var t=e.touches[0];canvas.onclick({clientX:t.clientX,clientY:t.clientY})}
-
-// Parse card combination
 function parse(cards){if(!cards||!cards.length)return null
 var v=cards.map(function(c){return c.v}).sort(function(a,b){return a-b})
 var g={};v.forEach(function(x){g[x]=(g[x]||0)+1})
 var u=Object.keys(g).map(Number).sort(function(a,b){return a-b})
 var uc=Object.values(g).sort(function(a,b){return b-a})
 var n=v.length
-// Single
 if(n===1)return{t:0,r:v[0]}
-// Pair
 if(n===2&&v[0]===v[1])return{t:1,r:v[0]}
-// Triple
 if(n===3&&uc[0]===3)return{t:2,r:v[0]}
-// Triple+1
 if(n===4&&uc[0]===3&&uc[1]===1)return{t:3,r:u[uc.indexOf(3)]}
-// Triple+2
 if(n===5&&uc[0]===3&&uc[1]===2)return{t:4,r:u[uc.indexOf(3)]}
-// Bomb
 if(n===4&&uc[0]===4)return{t:5,r:v[0]}
-// Rocket (2 jokers)
 if(n===2&&((v[0]===13&&v[1]===14)||(v[0]===14&&v[1]===13)))return{t:6,r:99}
-// Straight (5+ consecutive singles, all < 2)
 if(u.length===n&&n>=5&&u.every(function(x){return x<12})){var ok=true;for(var i=1;i<u.length;i++)if(u[i]-u[i-1]!==1){ok=false;break}if(ok)return{t:7,r:u[0],l:n}}
-// Pair straight (3+ consecutive pairs)
 if(n%2===0&&uc.every(function(x){return x===2})&&uc.length>=3&&u.every(function(x){return x<12})){var ok=true;for(var i=1;i<u.length;i++)if(u[i]-u[i-1]!==1){ok=false;break}if(ok)return{t:8,r:u[0],l:u.length}}
-// Plane (2+ consecutive triples)
 if(uc.every(function(x){return x===3})&&uc.length>=2&&u.every(function(x){return x<12})){var ok=true;for(var i=1;i<u.length;i++)if(u[i]-u[i-1]!==1){ok=false;break}if(ok)return{t:9,r:u[0],l:u.length}}
 return null}
-
 function canBeat(p,last){if(!last)return true
-if(p.t===6)return true // rocket beats everything
+if(p.t===6)return true
 if(last.t===6)return false
-if(p.t===5&&last.t!==5)return true // bomb beats non-bomb
+if(p.t===5&&last.t!==5)return true
 if(last.t===5&&p.t!==5)return false
 if(p.t!==last.t||p.l!==last.l)return false
 return p.r>last.r}
-
-function playCards(){if(gameOver||lock)return;lock=true
-var play=parse(selected)
-if(!play){msg('无效牌型！');lock=false;return}
-if(lastPlay&&lastPlayer!==0&&!canBeat(play,lastPlay)){msg('打不过，换一组牌');lock=false;return}
-// Remove cards
-selected.forEach(function(c){var idx=hand.indexOf(c);if(idx>=0)hand.splice(idx,1)})
-lastPlay=play;lastPlayer=0;lastCards=selected.slice();passCount=0;selected=[]
-msg('出牌成功！手牌 '+hands(hand)+' 张')
-draw()
-if(hand.length===0){gameOver=true;msg('🎉 你赢了！');disableBtns();draw();lock=false;return}
-disableBtns()
-setTimeout(function(){nextTurn()},400)}
-
-function passTurn(){if(gameOver||lock)return
-if(!lastPlay||lastPlayer===0){msg('必须出牌！');return}
-lock=true;selected=[];passCount++
-msg('你不出 ('+passCount+'人过)')
-disableBtns();draw()
-setTimeout(function(){if(passCount>=2){lastPlay=null;lastPlayer=-1;lastCards=[];passCount=0;msg('新回合')}
-nextTurn()},300)}
-
-function nextTurn(){if(gameOver)return
-curPlayer=(curPlayer+1)%3
-if(curPlayer===0&&hand.length>0){lock=false;myTurn();return}
-if(curPlayer===1&&!ai1.length||curPlayer===2&&!ai2.length){lock=false;nextTurn();return}
-var h=curPlayer===1?ai1:ai2
-if(!h.length){lock=false;nextTurn();return}
-lock=false
-setTimeout(aiPlay,500)}
-
-function aiPlay(){if(gameOver||lock)return;lock=true
-var h=curPlayer===1?ai1:ai2
-if(!h.length){lock=false;nextTurn();return}
-var needBeat=lastPlay&&lastPlayer!==curPlayer?lastPlay:null
-sort(h)
-var pick
-if(!needBeat){pick=[h[0]]}else{pick=findBest(h,needBeat)}
-if(!pick){// pass
-passCount++
-msg('AI-'+(curPlayer)+' 不出 ('+passCount+'人过)')
-draw()
-if(passCount>=2){lastPlay=null;lastPlayer=-1;lastCards=[];passCount=0;msg('新回合')}
-lock=false;nextTurn();return}
-// Play
-pick.forEach(function(c){var idx=h.indexOf(c);if(idx>=0)h.splice(idx,1)})
-lastPlay=parse(pick);lastPlayer=curPlayer;lastCards=pick.slice();passCount=0
-msg('AI-'+(curPlayer)+' 出了 '+pick.length+' 张')
-draw()
-if(!h.length){gameOver=true;var who=curPlayer===1?'AI-1':'AI-2';msg(who+' 赢了...😅');disableBtns();draw();lock=false;return}
-lock=false;nextTurn()}
-
-function findBest(h,need){var best=null
+function findBest(h,need){var best=null,self=this
 function tryPick(c){var p=parse(c);if(p&&canBeat(p,need)){if(!best||p.r<best.r||(p.r===best.r&&c.length<best.length))best=c.slice()}}
-// Single
 for(var i=0;i<h.length;i++){tryPick([h[i]])}
-// Pair
 for(var i=0;i<h.length-1;i++){if(h[i].v===h[i+1].v)tryPick([h[i],h[i+1]])}
-// Triple
 for(var i=0;i<h.length-2;i++){if(h[i].v===h[i+1].v&&h[i].v===h[i+2].v)tryPick([h[i],h[i+1],h[i+2]])}
-// Bomb
 for(var i=0;i<h.length-3;i++){if(h[i].v===h[i+1].v&&h[i].v===h[i+2].v&&h[i].v===h[i+3].v)tryPick([h[i],h[i+1],h[i+2],h[i+3]])}
-// Straight
 for(var start=0;start<11;start++){for(var len=5;len<=12-start;len++){var s=[]
 for(var v=start;v<start+len;v++){var found=false
 for(var i=0;i<h.length;i++){if(h[i].v===v&&!s.includes(h[i])){s.push(h[i]);found=true;break}}
@@ -184,54 +74,314 @@ if(!found)break}
 if(s.length===len)tryPick(s)}}
 return best}
 
-function showHint(){if(gameOver)return
-var need=lastPlay&&lastPlayer!==0?lastPlay:null
-if(!need||passCount>=2){selected=[hand[0]];draw();if(lastPlay&&lastPlayer!==0)document.getElementById('btnPass').disabled=false;document.getElementById('btnPlay').disabled=false;return}
-var best=findBest(hand.slice(),need)
-if(best){selected=best;msg('试试这组')}else{selected=[];msg('打不过，点不出')}
-draw();if(lastPlay&&lastPlayer!==0)document.getElementById('btnPass').disabled=false;document.getElementById('btnPlay').disabled=!best}
+// ===== PHASER SCENE =====
+class PokerScene extends Phaser.Scene {
+  constructor() { super('Poker') }
 
-function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#0d5c2e';ctx.fillRect(0,0,W,H);ctx.textBaseline='alphabetic'
-// AI cards (back)
-for(var i=0;i<ai1.length;i++){drawBack(10+i*16,12)}
-for(var i=0;i<ai2.length;i++){drawBack(W-10-ai2.length*16+i*16,12)}
-ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='11px sans-serif';ctx.textAlign='center'
-ctx.fillText('AI-1 ('+ai1.length+')',10+ai1.length*8,8);ctx.fillText('AI-2 ('+ai2.length+')',W-10-ai2.length*8,8)
-ctx.fillText('你 ('+hand.length+')',W/2,H-4)
-// Landlord
-ctx.fillStyle='#ffdd44';ctx.font='14px sans-serif';ctx.textAlign='left'
-ctx.fillText('👑 '+(landlord===0?'你':landlord===1?'AI-1':'AI-2'),10,landlord===0?H-CARD_H-25:40)
-// Last play cards in center
-var centerY=Math.floor(H*0.35)
-if(lastCards&&lastCards.length>0&&lastPlayer>=0){var names=['你','AI-1','AI-2'];ctx.fillStyle='rgba(255,255,255,0.4)';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText(names[lastPlayer]+'出牌:',W/2,centerY-10)
-var cw=Math.min(CARD_W*0.9,50);var ch=Math.floor(cw*1.4);var totalW=lastCards.length*cw*0.35;var cx=(W-totalW)/2
-for(var i=0;i<lastCards.length;i++){var cc=lastCards[i];var cxx=cx+i*cw*0.35;var cyy=centerY
-ctx.fillStyle='#fff';ctx.shadowColor='rgba(0,0,0,0.2)';ctx.shadowBlur=2;ctx.fillRect(cxx,cyy,cw,ch);ctx.shadowBlur=0;ctx.strokeStyle='rgba(0,0,0,0.1)';ctx.lineWidth=1;ctx.strokeRect(cxx,cyy,cw,ch)
-var col2=cc.s==='♥'||cc.s==='♦'?'#cc2244':'#222'
-if(cc.s==='🃏'){col2=cc.v===14?'#e02444':'#3388ee';ctx.fillStyle=col2;ctx.font='bold '+(cw*0.2)+'px sans-serif';ctx.textAlign='center';ctx.fillText(cc.v===14?'大王':'小王',cxx+cw/2,cyy+ch/2+3)}
-else{ctx.fillStyle=col2;ctx.font='bold '+(cw*0.25)+'px sans-serif';ctx.textAlign='center';ctx.fillText(cc.s+cc.r,cxx+cw/2,cyy+ch/2+3)}}}
-// My hand
-var start=(W-hand.length*CARD_W*0.28)/2
-for(var i=0;i<hand.length;i++){var c=hand[i];var x=start+i*CARD_W*0.28,y=H-CARD_H-8;var up=selected.includes(c)
-if(up)y-=12
-// Card shadow
-ctx.shadowColor='rgba(0,0,0,0.3)';ctx.shadowBlur=4
-// Card body
-ctx.fillStyle='#fff';ctx.fillRect(x,y,CARD_W,CARD_H);ctx.shadowBlur=0
-ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=1;ctx.strokeRect(x,y,CARD_W,CARD_H)
-// Suit color
-var col=c.s==='♥'||c.s==='♦'?'#cc2244':'#222'
-if(c.s==='🃏'){var col=c.v===14?'#e02444':'#3388ee'}
-// Top-left suit + rank
-ctx.fillStyle=col;ctx.font='bold '+(CARD_W*0.28)+'px sans-serif';ctx.textAlign='left';ctx.textBaseline='top'
-if(c.s==='🃏'){ctx.font='bold '+(CARD_W*0.2)+'px sans-serif';ctx.fillText(c.v===14?'大王':'小王',x+4,y+4)}else{ctx.fillText(c.r,x+4,y+3);ctx.font=(CARD_W*0.18)+'px sans-serif';ctx.fillText(c.s,x+4,y+3+CARD_W*0.28+1)}
-// Center big suit
-if(c.s!=='🃏'){ctx.font=(CARD_W*0.5)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText(c.s,x+CARD_W/2,y+CARD_H/2)}
-// Bottom-right suit + rank (inverted)
-if(c.s!=='🃏'){ctx.save();ctx.translate(x+CARD_W,y+CARD_H);ctx.rotate(Math.PI);ctx.fillStyle=col;ctx.font='bold '+(CARD_W*0.28)+'px sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(c.r,4,3);ctx.font=(CARD_W*0.18)+'px sans-serif';ctx.fillText(c.s,4,3+CARD_W*0.28+1);ctx.restore()}}
-ctx.textBaseline='alphabetic'}
-function drawBack(x,y){ctx.fillStyle='#1a4a7a';ctx.shadowColor='rgba(0,0,0,0.2)';ctx.shadowBlur=2;ctx.fillRect(x,y,CARD_W,CARD_H);ctx.shadowBlur=0
-ctx.fillStyle='rgba(255,255,255,0.06)';ctx.font='20px sans-serif';ctx.textAlign='center';ctx.fillText('🃏',x+CARD_W/2,y+CARD_H/2+3)}
+  create() {
+    window.gameScene = this;
+    this.W = this.scale.width;
+    this.H = this.scale.height;
+    this.CW = 72; // card width
+    this.CH = 102; // card height
+    this.GAP = this.CW * 0.28; // card overlap
+    this.SEL_UP = 14; // pixels up when selected
 
-startGame()
+    this.hand = []; this.ai1 = []; this.ai2 = [];
+    this.selected = []; this.lastCards = [];
+    this.landlord = -1; this.curPlayer = 0;
+    this.lastPlay = null; this.lastPlayer = -1;
+    this.passCount = 0; this.gameOver = false; this.lock = false;
+
+    // Phaser objects
+    this.aiGroup = this.add.group();
+    this.myGroup = this.add.group();
+    this.centerGroup = this.add.group();
+    this.labels = this.add.group();
+
+    this.createUI();
+    this.startGame();
+  }
+
+  createUI() {
+    // Message
+    this.msgT = this.add.text(this.W/2, this.H*0.04, '发牌中...', {
+      fontSize: '16px', color: '#ffffff', fontFamily: 'system-ui'
+    }).setOrigin(0.5).setDepth(100);
+
+    // AI labels
+    this.ai1Label = this.add.text(0,0,'',{fontSize:'12px',color:'rgba(255,255,255,0.5)',fontFamily:'system-ui'});
+    this.ai2Label = this.add.text(0,0,'',{fontSize:'12px',color:'rgba(255,255,255,0.5)',fontFamily:'system-ui'});
+    this.myLabel = this.add.text(0,0,'',{fontSize:'12px',color:'rgba(255,255,255,0.5)',fontFamily:'system-ui'});
+    this.labels.add(this.ai1Label);this.labels.add(this.ai2Label);this.labels.add(this.myLabel);
+
+    // Landlord badge
+    this.landlordT = this.add.text(0,0,'',{fontSize:'13px',color:'#ffdd44',fontFamily:'system-ui'}).setDepth(90);
+
+    // Center last-play label
+    this.lastLabel = this.add.text(this.W/2,0,'',{fontSize:'11px',color:'rgba(255,255,255,0.3)',fontFamily:'system-ui'}).setOrigin(0.5,0).setDepth(90);
+  }
+
+  msg(s) { this.msgT.setText(s); document.getElementById('msg').textContent = s; }
+  disableBtns() { document.getElementById('btnPlay').disabled=true; document.getElementById('btnPass').disabled=true; }
+
+  msgStatus(s) { document.getElementById('status').textContent = s; }
+
+  startGame() {
+    this.lock=false;this.lastPlay=null;this.lastPlayer=-1;this.lastCards=[];this.passCount=0;this.selected=[];
+    this.gameOver=false;this.disableBtns();
+    var d=deck();shuffle(d);
+    this.hand=d.slice(0,17);this.ai1=d.slice(17,34);this.ai2=d.slice(34,51);var landCards=d.slice(51,54);
+    sort(this.hand);sort(this.ai1);sort(this.ai2);
+    this.landlord=Math.random()*3|0;this.curPlayer=this.landlord;
+    if(this.landlord===0)this.hand=this.hand.concat(landCards);
+    else if(this.landlord===1)this.ai1=this.ai1.concat(landCards);
+    else this.ai2=this.ai2.concat(landCards);
+    sort(this.hand);sort(this.ai1);sort(this.ai2);
+    this.msgStatus('👑 地主: '+(this.landlord===0?'你':(this.landlord===1?'AI-1':'AI-2')));
+    this.msg('发牌完成');
+    this.syncView();
+    if(this.curPlayer===0){this.myTurn()}else{setTimeout(()=>this.aiPlay(),500)}
+  }
+
+  myTurn() { if(this.gameOver)return;this.disableBtns();
+    if(this.lastPlay&&this.lastPlayer!==0) document.getElementById('btnPass').disabled=false;
+    document.getElementById('btnPlay').disabled=false;
+    this.msg(this.lastPlay&&this.lastPlayer!==0?'轮到你了，出牌压过（或点"不出"）':'轮到你了，请出牌');
+    this.syncView();
+  }
+
+  syncView() {
+    this.drawAI();
+    this.drawMyHand();
+    this.drawCenter();
+    this.drawLabels();
+  }
+
+  // ---- Draw AI cards (back) ----
+  drawAI() {
+    this.aiGroup.clear(true,true);
+    var y = this.H * 0.09;
+    // AI-1 (left)
+    if(this.ai1.length){
+      var x1 = Math.max(10, (this.W - this.ai1.length * 14) / 2 - 40);
+      for(var i=0;i<this.ai1.length;i++) this.createBack(x1+i*14, y);
+    }
+    if(this.ai2.length){
+      var x2 = Math.max(10, (this.W - this.ai2.length * 14) / 2 + 40);
+      for(var i=0;i<this.ai2.length;i++) this.createBack(x2+i*14, y);
+    }
+  }
+
+  createBack(x,y) {
+    var g = this.add.graphics().setDepth(5);
+    g.fillStyle(0x1a4a7a,1); g.fillRoundedRect(x,y,this.CW*0.55,this.CH*0.5,4);
+    g.fillStyle(0x2a5a8a,0.3); g.fillRoundedRect(x+2,y+2,this.CW*0.55-4,this.CH*0.5-4,3);
+    g.lineStyle(1,0x3a6a9a,0.5); g.strokeRoundedRect(x,y,this.CW*0.55,this.CH*0.5,4);
+    var t = this.add.text(x+this.CW*0.275, y+this.CH*0.25, '🃏', {
+      fontSize: (this.CW*0.22)+'px'
+    }).setOrigin(0.5).setDepth(6);
+    this.aiGroup.add(g); this.aiGroup.add(t);
+  }
+
+  // ---- Draw my hand ----
+  drawMyHand() {
+    this.myGroup.clear(true,true);
+    var h = this.hand;
+    if(!h.length) return;
+    var totalW = h.length * this.GAP;
+    var startX = (this.W - totalW) / 2;
+    var y = this.H - this.CH - 8;
+    for(var i=0;i<h.length;i++){
+      var x = startX + i * this.GAP;
+      var selY = this.selected.includes(h[i]) ? y - this.SEL_UP : y;
+      this.createCard(x, selY, h[i], i);
+    }
+  }
+
+  createCard(x,y,c,idx) {
+    var cw=this.CW, ch=this.CH;
+    var g = this.add.graphics().setInteractive(new Phaser.Geom.Rectangle(0,0,cw,ch), Phaser.Geom.Rectangle.Contains);
+    g.setDepth(50 + idx); // rightmost on top
+    // Shadow
+    g.fillStyle(0x000000,0.2); g.fillRoundedRect(2,4,cw,ch,6);
+    // Body
+    g.fillStyle(0xffffff,1); g.fillRoundedRect(0,0,cw,ch,6);
+    g.lineStyle(1,0xcccccc,0.5); g.strokeRoundedRect(0,0,cw,ch,6);
+    g.setPosition(x,y);
+
+    // Text
+    var col = (c.s==='♥'||c.s==='♦') ? '#cc2244' : '#222';
+    var isJoker = c.s==='🃏';
+    if(isJoker) col = c.v===14 ? '#e02444' : '#3388ee';
+
+    var txtStyle = {fontFamily:'system-ui',fontSize:Math.round(cw*0.26)+'px',fontStyle:'bold',color:col};
+    var suitStyle = {fontFamily:'system-ui',fontSize:Math.round(cw*0.2)+'px',color:col};
+    var bigSuitStyle = {fontFamily:'system-ui',fontSize:Math.round(cw*0.48)+'px',color:col};
+
+    if(isJoker){
+      var lbl = c.v===14 ? '大王' : '小王';
+      var t = this.add.text(cw/2, ch/2-4, lbl, {fontFamily:'system-ui',fontSize:Math.round(cw*0.22)+'px',fontStyle:'bold',color:col}).setOrigin(0.5).setDepth(60+idx);
+      this.myGroup.add(t);
+    } else {
+      // Top-left
+      var tr = this.add.text(4,3, c.r, txtStyle).setDepth(60+idx);
+      var ts = this.add.text(4,3+Math.round(cw*0.26)+1, c.s, suitStyle).setDepth(60+idx);
+      // Center big suit
+      var tc = this.add.text(cw/2, ch/2, c.s, bigSuitStyle).setOrigin(0.5,0.5).setDepth(60+idx);
+      // Bottom-right (inverted)
+      var tbl = this.add.text(cw-4,ch-3, c.r, txtStyle).setOrigin(1,1).setAngle(180).setDepth(60+idx);
+      var tbr = this.add.text(cw-4,ch-3-Math.round(cw*0.26)-1, c.s, suitStyle).setOrigin(1,1).setAngle(180).setDepth(60+idx);
+      this.myGroup.add(tr);this.myGroup.add(ts);this.myGroup.add(tc);this.myGroup.add(tbl);this.myGroup.add(tbr);
+    }
+    this.myGroup.add(g);
+
+    // Click event
+    var scene = this;
+    g.on('pointerdown', function() {
+      if(scene.gameOver || scene.curPlayer !== 0) return;
+      var idx2 = scene.selected.indexOf(c);
+      if(idx2>=0) scene.selected.splice(idx2,1);
+      else scene.selected.push(c);
+      scene.disableBtns();
+      if(scene.lastPlay && scene.lastPlayer!==0) document.getElementById('btnPass').disabled=false;
+      document.getElementById('btnPlay').disabled=false;
+      scene.syncView();
+    });
+  }
+
+  // ---- Draw center (last played cards) ----
+  drawCenter() {
+    this.centerGroup.clear(true,true);
+    if(!this.lastCards||!this.lastCards.length||this.lastPlayer<0) return;
+    var names=['你','AI-1','AI-2'];
+    this.lastLabel.setText(names[this.lastPlayer]+'出牌:');
+    this.lastLabel.setY(this.H*0.3);
+
+    var cw=Math.min(this.CW*0.7,48),ch=cw*1.4;
+    var totalW=this.lastCards.length*cw*0.4;
+    var sx=(this.W-totalW)/2, sy=this.H*0.33;
+    for(var i=0;i<this.lastCards.length;i++){
+      var cc=this.lastCards[i];
+      var x=sx+i*cw*0.4, y=sy;
+      var g = this.add.graphics().setDepth(80);
+      g.fillStyle(0xffffff,1); g.fillRoundedRect(x,y,cw,ch,4);
+      g.lineStyle(1,0xcccccc,0.3); g.strokeRoundedRect(x,y,cw,ch,4);
+      var col2=cc.s==='♥'||cc.s==='♦'?'#cc2244':'#222';
+      if(cc.s==='🃏'){col2=cc.v===14?'#e02444':'#3388ee';
+        var lbl2=cc.v===14?'大王':'小王';
+        var t=this.add.text(x+cw/2,y+ch/2-2,lbl2,{fontFamily:'system-ui',fontSize:Math.round(cw*0.2)+'px',fontStyle:'bold',color:col2}).setOrigin(0.5).setDepth(81);
+        this.centerGroup.add(t);
+      } else {
+        var t=this.add.text(x+cw/2,y+ch/2-2,cc.s+cc.r,{fontFamily:'system-ui',fontSize:Math.round(cw*0.26)+'px',fontStyle:'bold',color:col2}).setOrigin(0.5).setDepth(81);
+        this.centerGroup.add(t);
+      }
+      this.centerGroup.add(g);
+    }
+  }
+
+  // ---- Labels ----
+  drawLabels() {
+    // AI-1 label (above AI-1 cards)
+    this.ai1Label.setText('AI-1 ('+this.ai1.length+')');
+    this.ai1Label.setPosition(10, this.H*0.04);
+    this.ai2Label.setText('AI-2 ('+this.ai2.length+')');
+    this.ai2Label.setPosition(this.W-10, this.H*0.04).setOrigin(1,0);
+    this.myLabel.setText('你 ('+this.hand.length+')');
+    this.myLabel.setPosition(this.W/2, this.H-4).setOrigin(0.5,1);
+
+    // Landlord badge
+    var l = this.landlord;
+    var lName = l===0?'你':l===1?'AI-1':'AI-2';
+    var lY = l===0 ? this.H-this.CH-28 : this.H*0.04+30;
+    this.landlordT.setText('👑 '+lName).setPosition(10, lY);
+  }
+
+  // ---- Game actions ----
+  playCards() {
+    if(this.gameOver||this.lock) return; this.lock=true;
+    var play=parse(this.selected);
+    if(!play){this.msg('无效牌型！');this.lock=false;return}
+    if(this.lastPlay&&this.lastPlayer!==0&&!canBeat(play,this.lastPlay)){this.msg('打不过，换一组牌');this.lock=false;return}
+    var scene=this;
+    this.selected.forEach(function(c){var idx=scene.hand.indexOf(c);if(idx>=0)scene.hand.splice(idx,1)});
+    this.lastPlay=play;this.lastPlayer=0;this.lastCards=this.selected.slice();this.passCount=0;this.selected=[];
+    this.msg('出牌成功！手牌 '+this.hand.length+' 张');
+    this.syncView();
+    if(this.hand.length===0){this.gameOver=true;this.msg('🎉 你赢了！');this.disableBtns();this.lock=false;return}
+    this.disableBtns();
+    setTimeout(()=>this.nextTurn(),400);
+  }
+
+  passTurn() {
+    if(this.gameOver||this.lock) return;
+    if(!this.lastPlay||this.lastPlayer===0){this.msg('必须出牌！');return}
+    this.lock=true;this.selected=[];this.passCount++;
+    this.msg('你不出 ('+this.passCount+'人过)');
+    this.disableBtns();this.syncView();
+    setTimeout(()=>{
+      if(this.passCount>=2){this.lastPlay=null;this.lastPlayer=-1;this.lastCards=[];this.passCount=0;this.msg('新回合')}
+      this.nextTurn()
+    },300);
+  }
+
+  nextTurn() {
+    if(this.gameOver) return;
+    this.curPlayer=(this.curPlayer+1)%3;
+    if(this.curPlayer===0&&this.hand.length>0){this.lock=false;this.myTurn();return}
+    if(this.curPlayer===1&&!this.ai1.length||this.curPlayer===2&&!this.ai2.length){this.lock=false;this.nextTurn();return}
+    var h=this.curPlayer===1?this.ai1:this.ai2;
+    if(!h.length){this.lock=false;this.nextTurn();return}
+    this.lock=false;
+    setTimeout(()=>this.aiPlay(),500);
+  }
+
+  aiPlay() {
+    if(this.gameOver||this.lock) return; this.lock=true;
+    var h=this.curPlayer===1?this.ai1:this.ai2;
+    if(!h.length){this.lock=false;this.nextTurn();return}
+    var needBeat=this.lastPlay&&this.lastPlayer!==this.curPlayer?this.lastPlay:null;
+    sort(h);
+    var pick;
+    if(!needBeat){pick=[h[0]]}else{pick=findBest(h,needBeat)}
+    if(!pick){
+      this.passCount++;
+      this.msg('AI-'+(this.curPlayer)+' 不出 ('+this.passCount+'人过)');
+      this.syncView();
+      if(this.passCount>=2){this.lastPlay=null;this.lastPlayer=-1;this.lastCards=[];this.passCount=0;this.msg('新回合')}
+      this.lock=false;this.nextTurn();return}
+    var scene=this;
+    pick.forEach(function(c){var idx=h.indexOf(c);if(idx>=0)h.splice(idx,1)});
+    this.lastPlay=parse(pick);this.lastPlayer=this.curPlayer;this.lastCards=pick.slice();this.passCount=0;
+    this.msg('AI-'+(this.curPlayer)+' 出了 '+pick.length+' 张');
+    this.syncView();
+    if(!h.length){this.gameOver=true;var who=this.curPlayer===1?'AI-1':'AI-2';this.msg(who+' 赢了...😅');this.disableBtns();this.lock=false;return}
+    this.lock=false;this.nextTurn();
+  }
+
+  showHint() {
+    if(this.gameOver) return;
+    var need=this.lastPlay&&this.lastPlayer!==0?this.lastPlay:null;
+    if(!need||this.passCount>=2){this.selected=[this.hand[0]];this.syncView();if(this.lastPlay&&this.lastPlayer!==0)document.getElementById('btnPass').disabled=false;document.getElementById('btnPlay').disabled=false;return}
+    var best=findBest(this.hand.slice(),need);
+    if(best){this.selected=best;this.msg('试试这组')}else{this.selected=[];this.msg('打不过，点不出')}
+    this.syncView();if(this.lastPlay&&this.lastPlayer!==0)document.getElementById('btnPass').disabled=false;document.getElementById('btnPlay').disabled=!best;
+  }
+}
+
+// ===== START =====
+var config = {
+  type: Phaser.AUTO,
+  parent: 'game',
+  width: 640,
+  height: 480,
+  backgroundColor: '#0d5c2e',
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  },
+  scene: PokerScene
+};
+var game = new Phaser.Game(config);
+document.getElementById('msg').textContent = '加载中...';
 </script></html>
