@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🎮 游戏大厅</title>
+<title>🎮 游戏大厅</title><script src="/sfx.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -245,6 +245,107 @@
   .game-card.ready:hover .play-btn { display: block; }
   .game-card.ready:hover .content-bottom { filter: blur(2px); }
 
+  /* About page */
+  .about-page {
+    display: none;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 32px 64px;
+  }
+  .about-page.active { display: block; }
+  .game-grid.hidden { display: none; }
+
+  .about-page h2 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #f0f, #0ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .about-page .subtitle {
+    font-size: 16px;
+    color: #6666aa;
+    margin-bottom: 32px;
+  }
+
+  .about-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+
+  .about-card h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: #b388ff;
+  }
+
+  .about-card p, .about-card li {
+    font-size: 14px;
+    color: #8888bb;
+    line-height: 1.8;
+  }
+
+  .about-card ul { padding-left: 20px; }
+  .about-card li { margin-bottom: 4px; }
+
+  .about-card .stat-row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .about-card .stat-item {
+    text-align: center;
+    padding: 16px 24px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .about-card .stat-item .num {
+    font-size: 32px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #f0f, #0ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .about-card .stat-item .label {
+    font-size: 13px;
+    color: #6666aa;
+    margin-top: 4px;
+  }
+
+  .about-card .github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #b388ff;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .about-card .github-link:hover {
+    background: rgba(136,68,255,0.15);
+    border-color: #8844ff;
+  }
+
   /* Footer */
   footer {
     text-align: center;
@@ -272,10 +373,11 @@
 <header>
   <div class="logo">🎮 游戏大厅 <span>· mini games</span></div>
   <nav>
-    <a href="#" class="active">全部</a>
-    <a href="#">分类</a>
-    <a href="#">关于</a>
+    <a href="#" onclick="return switchView('grid',this)" class="active">全部</a>
+    <a href="#" onclick="return switchView('cat',this)">分类</a>
+    <a href="#" onclick="return switchView('about',this)">关于</a>
   </nav>
+  <button onclick="sfxToggle();this.textContent=sfxMuted?'🔇':'🔊'" style="position:fixed;bottom:16px;right:16px;z-index:999;width:40px;height:40px;border:none;border-radius:50%;background:rgba(255,255,255,0.06);color:#8888bb;font-size:18px;cursor:pointer">🔊</button>
 </header>
 
 <section class="search-section">
@@ -290,6 +392,80 @@
 </section>
 
 <section class="game-grid" id="gameGrid"></section>
+
+<section class="about-page" id="aboutPage">
+  <h2>关于 游戏大厅</h2>
+  <p class="subtitle">一个小而美的纯前端游戏合集，全部手工打造</p>
+
+  <div class="about-card">
+    <div class="stat-row">
+      <div class="stat-item">
+        <div class="num">16</div>
+        <div class="label">游戏总数</div>
+      </div>
+      <div class="stat-item">
+        <div class="num">0</div>
+        <div class="label">外部依赖</div>
+      </div>
+      <div class="stat-item">
+        <div class="num">100%</div>
+        <div class="label">纯前端</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="about-card">
+    <h3>📖 项目简介</h3>
+    <p>
+      游戏大厅是一个完全由 <strong style="color:#b388ff">纯手写 HTML + CSS + JavaScript</strong> 构建的网页游戏合集，
+      不依赖任何第三方游戏引擎或框架。每个游戏均为独立的单 HTML 文件，即开即玩。
+    </p>
+    <p style="margin-top:12px">
+      项目最初作为开发练习产生，逐步扩展为 16 款经典小游戏合集。
+      所有代码完全开源，放于 GitHub 供学习交流。
+    </p>
+  </div>
+
+  <div class="about-card">
+    <h3>🎮 游戏列表</h3>
+    <ul>
+      <li>🐍 贪吃蛇 · 🧱 俄罗斯方块 · 💣 扫雷 · 🔢 2048 · 🐦 Flappy Bird</li>
+      <li>👻 吃豆人 · 🔢 数独 · ⭕ 井字棋 · 🟡 四子棋 · 🃏 记忆翻牌</li>
+      <li>🔨 打地鼠 · 🧱 打砖块 · 🦘 涂鸦跳跃 · 🚀 太空射击 · ♟ 中国象棋 · 🃏 斗地主</li>
+    </ul>
+  </div>
+
+  <div class="about-card">
+    <h3>⚙️ 技术栈</h3>
+    <ul>
+      <li><strong style="color:#b388ff">HTML5 Canvas</strong> — 游戏渲染（贪吃蛇、俄罗斯方块、太空射击等）</li>
+      <li><strong style="color:#b388ff">Phaser 3</strong> — 斗地主、中国象棋（游戏引擎版）</li>
+      <li><strong style="color:#b388ff">Web Audio API</strong> — 音效系统，纯代码生成，零外部音频文件</li>
+      <li><strong style="color:#b388ff">响应式 + 触屏</strong> — 同时支持桌面键盘和手机触控操作</li>
+      <li><strong style="color:#b388ff">CSS 动画</strong> — 消行效果、粒子特效、UI 交互动画</li>
+    </ul>
+  </div>
+
+  <div class="about-card">
+    <h3>📦 开源</h3>
+    <p>
+      本项目已完全开源，采用 <strong style="color:#b388ff">MIT License</strong>。
+      欢迎 Star、Fork、学习、改进。
+    </p>
+    <a class="github-link" href="https://github.com/zhuzhuppx/web-game" target="_blank" rel="noopener">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      GitHub · zhuzhuppx/web-game
+    </a>
+  </div>
+
+  <div class="about-card">
+    <h3>💬 说明</h3>
+    <p>
+      项目处于持续完善中，欢迎反馈意见。<br>
+      部分游戏使用了 Phaser 3 引擎（CDN 加载），首次加载可能需要从 jsdelivr 拉取。
+    </p>
+  </div>
+</section>
 
 <footer>
   游戏大厅 · 慢慢填坑中 🚧
@@ -464,6 +640,29 @@ const GAMES = [
 const CATEGORIES = [...new Set(GAMES.map(g => g.category))];
 const CATEGORY_NAMES = { action: '🎮 动作', puzzle: '🧩 益智', strategy: '🧠 策略', card: '🃏 牌类' };
 
+function switchView(view, el) {
+  document.querySelectorAll('header nav a').forEach(a => a.classList.remove('active'));
+  el.classList.add('active');
+
+  const grid = document.getElementById('gameGrid');
+  const catSection = document.getElementById('categories');
+  const searchSection = document.querySelector('.search-section');
+  const aboutPage = document.getElementById('aboutPage');
+
+  grid.classList.toggle('hidden', view === 'about');
+  aboutPage.classList.toggle('active', view === 'about');
+  catSection.style.display = view === 'about' ? 'none' : '';
+  searchSection.style.display = view === 'about' ? 'none' : '';
+
+  if (view === 'cat') {
+    document.querySelectorAll('#categories button').forEach(b => b.classList.remove('active'));
+    document.querySelector('#categories button[data-cat="all"]').classList.add('active');
+    currentCategory = 'all';
+    filterGames();
+  }
+  return false;
+}
+
 function init() {
   const cats = document.getElementById('categories');
   CATEGORIES.forEach(c => {
@@ -521,7 +720,7 @@ function filterGames() {
 function playGame(id) {
   const game = GAMES.find(g => g.id === id);
   if (game.status === 'ready') {
-    window.open(`/${id}/`, '_blank');
+    window.open(`/${id}/`, '_self');
   } else {
     alert(`「${game.name}」还没开发呢，先填别的坑 🚧`);
   }
