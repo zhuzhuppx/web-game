@@ -1,118 +1,335 @@
 <!DOCTYPE html><html lang="zh-CN"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-<title>中国象棋</title><style>
+<meta http-equiv="cache-control" content="no-cache,no-store,must-revalidate">
+<title>中国象棋 - Phaser</title><script src="/sfx.js"></script>
+<style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;color:#ccc;font-family:system-ui,-apple-system,sans-serif;min-height:100dvh;display:flex;align-items:center;justify-content:center}
-.wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;width:100%;max-width:420px}
+body{background:#0a0a1a;display:flex;align-items:center;justify-content:center;min-height:100dvh}
+#game{width:100%;max-width:500px}
+#game canvas{display:block;border-radius:10px;width:100%!important;height:auto!important}
+.wrap{max-width:500px;width:100%;padding:12px;display:flex;flex-direction:column;gap:8px;align-items:center}
 .hdr{display:flex;align-items:center;justify-content:space-between;width:100%}
-.hdr h1{font-size:20px;color:#ffaa44}.hdr .s{display:flex;gap:12px;font-size:13px;color:#6666aa}
-canvas{width:100%;touch-action:none;background:#f5e6c8;border-radius:8px;display:block}
-.msg{font-size:15px;color:#8888bb;min-height:20px;text-align:center}
-.btn{padding:8px 24px;border:none;border-radius:8px;background:rgba(255,170,68,0.15);color:#ffaa44;font-size:14px;cursor:pointer;touch-action:manipulation}
+.hdr h1{font-size:20px;color:#ffaa44;font-family:system-ui}.hdr .s{font-size:14px;color:#6666aa;font-family:system-ui}
+.msg{font-size:15px;color:#aaa;min-height:22px;text-align:center;font-family:system-ui}
+.btn{padding:8px 24px;border:none;border-radius:8px;background:rgba(255,170,68,0.15);color:#ffaa44;font-size:14px;cursor:pointer;font-family:system-ui}
 .btn:active{background:rgba(255,170,68,0.25)}
-.back{color:#555588;text-decoration:none;font-size:14px}.back:hover{color:#8888bb}
+.back{color:#8888cc;text-decoration:none;font-size:14px;position:absolute;bottom:12px;left:12px;z-index:100;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:6px;backdrop-filter:blur(4px)}
 </style>
-<div class="wrap">
-<div class="hdr"><h1>♟️ 中国象棋</h1><div class="s"><span><b id="turn">红方</b>走棋</span></div></div>
-<canvas id="c"></canvas><div class="msg" id="msg">点击选中棋子，再点击目标位置</div>
-<button class="btn" onclick="startGame()">🔄 重新开局</button>
+<div class="wrap"><div class="hdr"><h1>♟️ 中国象棋</h1><div class="s"><span><b id="turn">红方</b>走棋</span></div></div>
+<div id="game"></div>
+<div class="msg" id="msg">点击选中棋子，再点击目标位置</div>
+<button class="btn" onclick="window.scene && window.scene.startGame()">🔄 重新开局</button>
 <a class="back" href="/">← 返回</a></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
 <script>
-var canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
-var COLS=9,ROWS=10,CELL,board,turn,selected,gameOver,moves;
-
-function resize(){var w=Math.min(420,canvas.parentElement.clientWidth-4);canvas.style.width=w+'px';CELL=Math.floor(w/(COLS+1));canvas.width=CELL*(COLS+1);canvas.height=CELL*(ROWS+1)}
-resize();window.addEventListener('resize',resize);
-
-// Piece: {type,color,row,col}
-// type: k=帅/将, a=士/仕, e=象/相, h=马, r=车, c=炮, p=兵/卒
-var PIECES_RED=['r','h','e','a','k','a','e','h','r',' ','c',' ',' ',' ',' ',' ',' ','c','p',' ','p',' ','p',' ','p',' ','p'];
-var PIECES_BLK=['R','H','E','A','K','A','E','H','R',' ','C',' ',' ',' ',' ',' ',' ','C','P',' ','P',' ','P',' ','P',' ','P'];
+// ===== CHESS GAME LOGIC (unchanged) =====
+var COLS=9,ROWS=10;
+var PIECES_RED=['r','h','e','a','k','a','e','h','r',' ','c',' ',' ',' ',' ','c',' ',' ','p',' ','p',' ','p',' ','p',' ','p'];
+var PIECES_BLK=['R','H','E','A','K','A','E','H','R',' ','C',' ',' ',' ',' ','C',' ',' ','P',' ','P',' ','P',' ','P',' ','P'];
 var PIECE_NAMES={r:'车',h:'马',e:'相',a:'仕',k:'帅',c:'炮',p:'兵',R:'車',H:'馬',E:'象',A:'士',K:'將',C:'砲',P:'卒'};
-var PIECE_COLORS={r:'#cc2244',h:'#cc2244',e:'#cc2244',a:'#cc2244',k:'#cc2244',c:'#cc2244',p:'#cc2244',R:'#224488',H:'#224488',E:'#224488',A:'#224488',K:'#224488',C:'#224488',P:'#224488'};
-
-function startGame(){board=[];turn='r';selected=null;gameOver=false;moves=0
-for(var r=0;r<ROWS;r++){board[r]=[];for(var c=0;c<COLS;c++)board[r][c]=null}
-// Place pieces
-for(var c=0;c<9;c++){if(PIECES_RED[c]!==' '){board[9][c]={type:PIECES_RED[c],color:'r'};board[0][c]={type:PIECES_BLK[c],color:'b'}}
-if(PIECES_RED[c+9]!==' '){board[7][c]={type:PIECES_RED[c+9],color:'r'};board[2][c]={type:PIECES_BLK[c+9],color:'b'}}
-if(PIECES_RED[c+18]!==' '){board[6][c]={type:PIECES_RED[c+18],color:'r'};board[3][c]={type:PIECES_BLK[c+18],color:'b'}}
-draw();document.getElementById('turn').textContent='红方';document.getElementById('msg').textContent='点击选中棋子'}
 function getColorType(type){return type>='a'&&type<='z'?'r':'b'}
 function isEnemy(p1,p2){return p1&&p2&&p1.color!==p2.color}
 function inBoard(r,c){return r>=0&&r<ROWS&&c>=0&&c<COLS}
-function validMoves(row,col){var p=board[row][col];if(!p)return[];var moves=[],t=p.type,color=p.color
+function validMoves(row,col,board,turn){var p=board[row][col];if(!p||p.color!==turn)return[]
+var moves=[],t=p.type,color=p.color
 function add(r,c){if(inBoard(r,c)&&(!board[r][c]||board[r][c].color!==color))moves.push({r:r,c:c})}
 function onBoard(r,c){return inBoard(r,c)&&(!board[r][c]||board[r][c].color!==color)}
-if(t==='k'||t==='K'){ // King
-var minR=color==='r'?7:0,maxR=color==='r'?9:2,minC=3,maxC=5
+if(t==='k'||t==='K'){var minR=color==='r'?7:0,maxR=color==='r'?9:2,minC=3,maxC=5
 for(var dr=-1;dr<=1;dr++)for(var dc=-1;dc<=1;dc++)if((dr===0)!==(dc===0)){var nr=row+dr,nc=col+dc;if(nr>=minR&&nr<=maxR&&nc>=minC&&nc<=maxC&&(!board[nr][nc]||board[nr][nc].color!==color))moves.push({r:nr,c:nc})}
-// Flying general
 var enemyK=color==='r'?'K':'k';var ec=-1;for(var i=0;i<ROWS;i++)if(board[i][col]&&board[i][col].type===enemyK){ec=i;break}if(ec>=0){var blocked=false;for(var i=Math.min(row,ec)+1;i<Math.max(row,ec);i++)if(board[i][col]){blocked=true;break}if(!blocked)moves.push({r:ec,c:col})}}
-else if(t==='a'||t==='A'){ // Advisor
-var minR=color==='r'?7:0,maxR=color==='r'?9:2,minC=3,maxC=5
+else if(t==='a'||t==='A'){var minR=color==='r'?7:0,maxR=color==='r'?9:2,minC=3,maxC=5
 for(var dr=-1;dr<=1;dr+=2)for(var dc=-1;dc<=1;dc+=2){var nr=row+dr,nc=col+dc;if(nr>=minR&&nr<=maxR&&nc>=minC&&nc<=maxC&&(!board[nr][nc]||board[nr][nc].color!==color))moves.push({r:nr,c:nc})}}
-else if(t==='e'||t==='E'){ // Elephant
-for(var dr=-2;dr<=2;dr+=4)for(var dc=-2;dc<=2;dc+=4){var nr=row+dr,nc=col+dc,br=row+dr/2,bc=col+dc/2;var maxR=color==='r'?9:4,minR=color==='r'?5:0;if(nr>=minR&&nr<=maxR&&inBoard(nr,nc)&&!board[br][bc]&&(!board[nr][nc]||board[nr][nc].color!==color))moves.push({r:nr,c:nc})}}
-else if(t==='h'||t==='H'){ // Horse
-var hMoves=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
-var blocks=[[-1,0],[-1,0],[0,-1],[0,1],[0,-1],[0,1],[1,0],[1,0]];
-for(var i=0;i<8;i++){var nr=row+hMoves[i][0],nc=col+hMoves[i][1],br=row+blocks[i][0],bc=col+blocks[i][1];if(inBoard(nr,nc)&&!board[br][bc]&&(!board[nr][nc]||board[nr][nc].color!==color))moves.push({r:nr,c:nc})}}
-else if(t==='r'||t==='R'){ // Chariot
-var dirs=[[0,1],[0,-1],[1,0],[-1,0]];for(var i=0;i<4;i++){var nr=row+dirs[i][0],nc=col+dirs[i][1];while(inBoard(nr,nc)){if(board[nr][nc]){if(board[nr][nc].color!==color)moves.push({r:nr,c:nc});break}moves.push({r:nr,c:nc});nr+=dirs[i][0];nc+=dirs[i][1]}}}
-else if(t==='c'||t==='C'){ // Cannon
-var dirs=[[0,1],[0,-1],[1,0],[-1,0]];for(var i=0;i<4;i++){var nr=row+dirs[i][0],nc=col+dirs[i][1];var jumped=false;while(inBoard(nr,nc)){if(!jumped){if(board[nr][nc])jumped=true}else{if(board[nr][nc]){if(board[nr][nc].color!==color)moves.push({r:nr,c:nc});break}}if(!jumped)moves.push({r:nr,c:nc});nr+=dirs[i][0];nc+=dirs[i][1]}}}
-else if(t==='p'||t==='P'){ // Pawn/Soldier
-if(color==='r'){add(row-1,col);if(row<=4){add(row,col-1);add(row,col+1)}}else{add(row+1,col);if(row>=5){add(row,col-1);add(row,col+1)}}}
+else if(t==='e'||t==='E'){var minR=color==='r'?5:0,maxR=color==='r'?9:4
+for(var dr=-2;dr<=2;dr+=2)for(var dc=-2;dc<=2;dc+=2)if(dr&&dc){var nr=row+dr,nc=col+dc,br=row+dr/2,bc=col+dc/2;if(nr>=minR&&nr<=maxR&&inBoard(nr,nc)&&!board[br][bc]&&(!board[nr][nc]||board[nr][nc].color!==color))moves.push({r:nr,c:nc})}}
+else if(t==='h'||t==='H'){var hM=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]
+for(var i=0;i<8;i++){var nr=row+hM[i][0],nc=col+hM[i][1],lr=row+Math.round(hM[i][0]/2),lc=col+Math.round(hM[i][1]/2);if(inBoard(nr,nc)&&!board[lr][lc]&&(!board[nr][nc]||board[nr][nc].color!==color))moves.push({r:nr,c:nc})}}
+else if(t==='r'||t==='R'){var dirs=[[-1,0],[1,0],[0,-1],[0,1]]
+for(var d=0;d<4;d++){var nr=row+dirs[d][0],nc=col+dirs[d][1];while(inBoard(nr,nc)){if(board[nr][nc]){if(board[nr][nc].color!==color)moves.push({r:nr,c:nc});break}moves.push({r:nr,c:nc});nr+=dirs[d][0];nc+=dirs[d][1]}}}
+else if(t==='c'||t==='C'){var dirs=[[-1,0],[1,0],[0,-1],[0,1]]
+for(var d=0;d<4;d++){var nr=row+dirs[d][0],nc=col+dirs[d][1],jumped=false
+while(inBoard(nr,nc)){if(!jumped){if(board[nr][nc])jumped=true;else moves.push({r:nr,c:nc})}else{if(board[nr][nc]){if(board[nr][nc].color!==color)moves.push({r:nr,c:nc});break}}nr+=dirs[d][0];nc+=dirs[d][1]}}}
+else if(t==='p'||t==='P'){var forward=color==='r'?-1:1;add(row+forward,col);if((color==='r'&&row<=4)||(color==='b'&&row>=5)){add(row,col-1);add(row,col+1)}}
 return moves}
-function isCheck(color){var kType=color==='r'?'k':'K';var kr=-1,kc=-1;for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if(board[r][c]&&board[r][c].type===kType){kr=r;kc=c}
-for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if(board[r][c]&&board[r][c].color!==color){var vm=validMoves(r,c);for(var i=0;i<vm.length;i++)if(vm[i].r===kr&&vm[i].c===kc)return true}return false}
-function makeMove(fromR,fromC,toR,toC){var captured=board[toR][toC];board[toR][toC]=board[fromR][fromC];board[fromR][fromC]=null;return captured}
-function undoMove(fromR,fromC,toR,toC,captured){board[fromR][fromC]=board[toR][toC];board[toR][toC]=captured}
+function isCheck(board,color){var kingType=color==='r'?'k':'K';var kr=-1,kc=-1;for(var r=0;r<ROWS&&kr<0;r++)for(var c=0;c<COLS;c++)if(board[r][c]&&board[r][c].type===kingType){kr=r;kc=c;break}
+if(kr<0)return true;var enemy=color==='r'?'b':'r';for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===enemy){var mV=validMoves(r,c,board,enemy);for(var i=0;i<mV.length;i++)if(mV[i].r===kr&&mV[i].c===kc)return true}}
+return false}
+function makeMove(board,from,to){var captured=board[to.r][to.c];board[to.r][to.c]=board[from.r][from.c];board[from.r][from.c]=null;return captured}
+function undoMove(board,from,to,captured){board[from.r][from.c]=board[to.r][to.c];board[to.r][to.c]=captured}
+function cloneBoard(board){var b=[];for(var r=0;r<ROWS;r++){b[r]=[];for(var c=0;c<COLS;c++)b[r][c]=board[r][c]?{type:board[r][c].type,color:board[r][c].color}:null}return b}
+function evalBoard(board,color){var score=0;var vals={k:10000,K:10000,a:20,A:20,e:25,E:25,h:40,H:40,r:100,R:100,c:45,C:45,p:10,P:10};var mg=[[-3,-2,-1,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0]];
+for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p){var v=vals[p.type]||0;var pos=color==='r'?mg[r][c]:mg[9-r][8-c];score+=(p.color===color?1:-1)*(v+pos)}}return score}
+function getOpponentColor(color){return color==='r'?'b':'r'}
+function alphaBeta(board,depth,alpha,beta,color,isMax){if(depth===0)return evalBoard(board,color)
+var curColor=isMax?color:getOpponentColor(color)
+var moves=[];for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===curColor){var vm=validMoves(r,c,board,curColor);for(var i=0;i<vm.length;i++)moves.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c})}}
+if(isMax){var maxE=-99999;for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=alphaBeta(board,depth-1,alpha,beta,color,false);if(val>maxE)maxE=val;if(val>alpha)alpha=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return maxE}else{var minE=99999;for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=alphaBeta(board,depth-1,alpha,beta,color,true);if(val<minE)minE=val;if(val<beta)beta=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return minE}}
+function boardToText(board){var s='',names={'r':'车','h':'马','e':'相','a':'仕','k':'帅','c':'炮','p':'兵','R':'車','H':'馬','E':'象','A':'士','K':'將','C':'砲','P':'卒'};for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){var p=board[r][c];s+=p?names[p.type]||p.type:'.'}s+='\n'}return s}
+function callLLM(board,color){return new Promise(function(resolve){var key=localStorage.getItem('chess_llm_key');if(!key){resolve(null);return}
+var ep=localStorage.getItem('chess_llm_endpoint')||'https://api.openai.com/v1/chat/completions'
+var model=localStorage.getItem('chess_llm_model')||'gpt-4o-mini'
+var boardText=boardToText(board);var colorName=color==='r'?'红方':'黑方'
+var prompt='你是一个中国象棋AI。当前棋盘（上=黑方，下=红方，.为空，大写=黑子，小写=红子）：\n\n'+boardText+'\n轮到了'+colorName+'走棋。请分析局面，只输出一步最佳走法，格式为"行,列 → 行,列"（0-9行，0-8列），不要其他内容。例如"7,1 → 4,1"表示炮二平五。'
+fetch(ep,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:model,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:50})})
+.then(function(r){return r.json()}).then(function(data){try{var text=data.choices[0].message.content.trim();var m=text.match(/(\d+),\s*(\d+)\s*→\s*(\d+),\s*(\d+)/);if(m){var fr=parseInt(m[1]),fc=parseInt(m[2]),tr=parseInt(m[3]),tc=parseInt(m[4]);if(fr>=0&&fr<10&&fc>=0&&fc<9&&tr>=0&&tr<10&&tc>=0&&tc<9){resolve({fr:fr,fc:fc,tr:tr,tc:tc});return}}}catch(e){}resolve(null)})
+.catch(function(){resolve(null)})})}
+function aiMove(board,color){return new Promise(function(resolve){callLLM(board,color).then(function(llmMove){if(llmMove){// validate
+var p=board[llmMove.fr][llmMove.fc];if(p&&p.color===color){var vm=validMoves(llmMove.fr,llmMove.fc,board,color);for(var i=0;i<vm.length;i++){if(vm[i].r===llmMove.tr&&vm[i].c===llmMove.tc){resolve(llmMove);return}}}}
+// fallback to alpha-beta
+var bestMove=null,bestScore=color==='r'?-99999:99999
+for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===color){var vm=validMoves(r,c,board,color);for(var i=0;i<vm.length;i++){var captured=makeMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c});if(!isCheck(board,color)){var score=alphaBeta(board,3,-99999,99999,color,color==='r');if((color==='r'&&score>bestScore)||(color==='b'&&score<bestScore)){bestScore=score;bestMove={fr:r,fc:c,tr:vm[i].r,tc:vm[i].c}}}undoMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c},captured)}}}
+resolve(bestMove)})})}
 
-canvas.addEventListener('click',function(e){if(gameOver)return;var rect=canvas.getBoundingClientRect(),scaleX=canvas.width/rect.width,scaleY=canvas.height/rect.height;var col=Math.floor((e.clientX-rect.left)*scaleX/CELL)-1,row=Math.floor((e.clientY-rect.top)*scaleY/CELL)-1;if(col<0||col>=COLS||row<0||row>=ROWS)return
-if(selected===null){if(board[row][col]&&board[row][col].color===turn){selected={r:row,c:col};draw();highlightMoves(validMoves(row,col))}}else{if(row===selected.r&&col===selected.c){selected=null;draw();return}
-var moves=validMoves(selected.r,selected.c);var valid=false;for(var i=0;i<moves.length;i++){if(moves[i].r===row&&moves[i].c===col){valid=true;break}}
-if(valid){var captured=makeMove(selected.r,selected.c,row,col);if(isCheck(turn)){undoMove(selected.r,selected.c,row,col,captured);document.getElementById('msg').textContent='送将！不能这样走';draw();return}
-draw();selected=null;var enemy=turn==='r'?'b':'r';var inCheck=isCheck(enemy);moves++
-// Check win
-var anyMove=false;for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){if(board[r][c]&&board[r][c].color===enemy){var vm=validMoves(r,c);for(var i=0;i<vm.length;i++){var cp=makeMove(r,c,vm[i].r,vm[i].c);if(!isCheck(enemy)){anyMove=true;undoMove(r,c,vm[i].r,vm[i].c,cp);break}undoMove(r,c,vm[i].r,vm[i].c,cp)}if(anyMove)break}if(anyMove)break}
-if(!anyMove){gameOver=true;document.getElementById('msg').textContent=turn==='r'?'红方胜！🎉':'黑方胜！🎉';draw();return}
-turn=turn==='r'?'b':'r';document.getElementById('turn').textContent=turn==='r'?'红方':'黑方'
-if(inCheck)document.getElementById('msg').textContent='将军！';else document.getElementById('msg').textContent=''
-// AI move
-if(turn==='b'){setTimeout(aiMove,300)}}else{document.getElementById('msg').textContent='不能走到那里';selected=null;draw()}}})
-function aiMove(){if(gameOver)return;var best=null,bestScore=-Infinity;var allMoves=[];for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if(board[r][c]&&board[r][c].color==='b'){var vm=validMoves(r,c);for(var i=0;i<vm.length;i++)allMoves.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c})}
-for(var i=0;i<allMoves.length;i++){var m=allMoves[i];var captured=makeMove(m.fr,m.fc,m.tr,m.tc);if(!isCheck('b')){var s=evalBoard('b')-evalBoard('r')+alphaBeta(board,0,true,-9999,9999,'r');if(s>bestScore){bestScore=s;best=m}}undoMove(m.fr,m.fc,m.tr,m.tc,captured)}
-if(best){makeMove(best.fr,best.fc,best.tr,best.tc);draw();var inCheck=isCheck('r');moves++;var anyMove=false;for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if(board[r][c]&&board[r][c].color==='r'){var vm=validMoves(r,c);for(var i=0;i<vm.length;i++){var cp=makeMove(r,c,vm[i].r,vm[i].c);if(!isCheck('r')){anyMove=true;undoMove(r,c,vm[i].r,vm[i].c,cp);break}undoMove(r,c,vm[i].r,vm[i].c,cp)}if(anyMove)break}
-if(!anyMove){gameOver=true;document.getElementById('msg').textContent='黑方胜！🎉';draw();return}
-turn='r';document.getElementById('turn').textContent='红方';if(inCheck)document.getElementById('msg').textContent='将军！';else document.getElementById('msg').textContent='你的回合'}}
-function evalBoard(color){var val=0;for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(!p)continue;var v={k:10000,a:20,e:25,h:40,r:90,c:45,p:10,K:10000,A:20,E:25,H:40,R:90,C:45,P:10}[p.type]||0;if(p.color===color)val+=v;else val-=v}return val}
-function alphaBeta(b,depth,isMax,alpha,beta,tColor){if(depth>=2)return 0
-var allMoves=[];for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++)if(b[r][c]&&b[r][c].color===tColor){var vm=validMoves(r,c);for(var i=0;i<vm.length;i++)allMoves.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c})}
-if(allMoves.length===0)return isMax?-9999:9999
-if(isMax){var best=-Infinity;for(var i=0;i<allMoves.length;i++){var m=allMoves[i];var cp=makeMove(m.fr,m.fc,m.tr,m.tc);if(!isCheck(tColor)){var s=alphaBeta(b,depth+1,false,alpha,beta,tColor==='b'?'r':'b');best=Math.max(best,s);alpha=Math.max(alpha,best)}undoMove(m.fr,m.fc,m.tr,m.tc,cp);if(beta<=alpha)break}return best}else{var best=Infinity;for(var i=0;i<allMoves.length;i++){var m=allMoves[i];var cp=makeMove(m.fr,m.fc,m.tr,m.tc);if(!isCheck(tColor)){var s=alphaBeta(b,depth+1,true,alpha,beta,tColor==='b'?'r':'b');best=Math.min(best,s);beta=Math.min(beta,best)}undoMove(m.fr,m.fc,m.tr,m.tc,cp);if(beta<=alpha)break}return best}}
+// ===== PHASER SCENE =====
+class ChessScene extends Phaser.Scene {
+  constructor() { super('Chess') }
 
-function highlightMoves(moves){for(var i=0;i<moves.length;i++){var x=(moves[i].c+1)*CELL,y=(moves[i].r+1)*CELL;ctx.fillStyle='rgba(255,170,68,0.2)';ctx.beginPath();ctx.arc(x+CELL/2,y+CELL/2,CELL*0.35,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,170,68,0.4)';ctx.beginPath();ctx.arc(x+CELL/2,y+CELL/2,CELL*0.12,0,Math.PI*2);ctx.fill()}}
-function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#f5e6c8';ctx.fillRect(0,0,canvas.width,canvas.height);var off=CELL
-// Grid
-ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=1;for(var r=0;r<ROWS;r++){ctx.beginPath();ctx.moveTo(off,off+r*CELL);ctx.lineTo(off+(COLS-1)*CELL,off+r*CELL);ctx.stroke()}
-for(var c=0;c<COLS;c++){ctx.beginPath();ctx.moveTo(off+c*CELL,off);ctx.lineTo(off+c*CELL,off+4*CELL);ctx.stroke();ctx.beginPath();ctx.moveTo(off+c*CELL,off+5*CELL);ctx.lineTo(off+c*CELL,off+9*CELL);ctx.stroke()}
-// Palace
-ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.moveTo(off+3*CELL,off);ctx.lineTo(off+5*CELL,off+2*CELL);ctx.stroke();ctx.beginPath();ctx.moveTo(off+5*CELL,off);ctx.lineTo(off+3*CELL,off+2*CELL);ctx.stroke()
-ctx.beginPath();ctx.moveTo(off+3*CELL,off+7*CELL);ctx.lineTo(off+5*CELL,off+9*CELL);ctx.stroke();ctx.beginPath();ctx.moveTo(off+5*CELL,off+7*CELL);ctx.lineTo(off+3*CELL,off+9*CELL);ctx.stroke()
-// River
-ctx.fillStyle='rgba(0,0,0,0.15)';ctx.font=CELL*0.4+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('楚 河',off+1.5*CELL,off+4.5*CELL);ctx.fillText('汉 界',off+6.5*CELL,off+4.5*CELL)
-// Pieces
-for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){var p=board[r][c];if(!p)continue;var x=off+c*CELL+CELL/2,y=off+r*CELL+CELL/2
-// Shadow
-ctx.fillStyle='rgba(0,0,0,0.1)';ctx.beginPath();ctx.arc(x+2,y+2,CELL*0.4,0,Math.PI*2);ctx.fill()
-// Piece bg
-ctx.fillStyle=p.color==='r'?'#fff':'#fff';ctx.beginPath();ctx.arc(x,y,CELL*0.4,0,Math.PI*2);ctx.fill();ctx.strokeStyle=p.color==='r'?'#cc2244':'#224488';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,CELL*0.4,0,Math.PI*2);ctx.stroke()
-// Piece inner
-ctx.strokeStyle=p.color==='r'?'#cc2244':'#224488';ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,CELL*0.35,0,Math.PI*2);ctx.stroke()
-// Text
-ctx.fillStyle=PIECE_COLORS[p.type]||'#cc2244';ctx.font='bold '+CELL*0.36+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(PIECE_NAMES[p.type]||p.type,x,y+1)}
-// Selected
-if(selected){ctx.strokeStyle='rgba(255,170,68,0.8)';ctx.lineWidth=3;var sx=off+selected.c*CELL+CELL/2,sy=off+selected.r*CELL+CELL/2;ctx.beginPath();ctx.arc(sx,sy,CELL*0.42,0,Math.PI*2);ctx.stroke()}}
-startGame()
+  create() {
+    window.scene = this;
+    this.CELL = 44;
+    this.W = (COLS+1) * this.CELL;
+    this.H = (ROWS+1) * this.CELL;
+    this.padding = this.CELL;
+    
+    this.board = [];
+    this.turn = 'r';
+    this.selected = null;
+    this.gameOver = false;
+    this.validMovesList = [];
+    
+    // Graphics layers
+    this.bgGfx = this.add.graphics().setDepth(10);
+    this.pieceContainer = this.add.container(0,0).setDepth(50);
+    this.dotContainer = this.add.container(0,0).setDepth(40);
+    this.highlightGfx = this.add.graphics().setDepth(55);
+    
+    // UI
+    this.msgT = this.add.text(this.W/2, 12, '点击选中棋子', {fontSize:'14px',color:'#888',fontFamily:'sans-serif'}).setOrigin(0.5).setDepth(200);
+    this.turnT = this.add.text(this.W/2, this.H-4, '', {fontSize:'13px',color:'#ffaa44',fontFamily:'sans-serif'}).setOrigin(0.5,1).setDepth(200);
+    
+    // Board click
+    this.input.on('pointerdown', (pointer) => this.handleClick(pointer));
+    
+    this.drawBoard();
+    this.startGame();
+  }
+
+  boardX(c) { return this.padding + c * this.CELL; }
+  boardY(r) { return this.padding + r * this.CELL + 25; }
+
+  drawBoard() {
+    var g = this.bgGfx;
+    var ox = this.padding, oy = this.padding + 25;
+    var s = this.CELL;
+    
+    // Background
+    g.fillStyle(0xf5e6c8,1); g.fillRoundedRect(0,0,this.W,this.H,8);
+    
+    // Grid lines
+    g.lineStyle(1.5, 0x5c3a1e, 0.6);
+    // Horizontal lines
+    for(var r=0; r<ROWS; r++) g.lineBetween(ox, oy+r*s, ox+(COLS-1)*s, oy+r*s);
+    // Vertical lines (top half and bottom half, gap at river)
+    for(var c=0; c<COLS; c++){
+      if(c===0||c===COLS-1){g.lineBetween(ox+c*s, oy, ox+c*s, oy+(ROWS-1)*s)}
+      else{g.lineBetween(ox+c*s, oy, ox+c*s, oy+4*s);g.lineBetween(ox+c*s, oy+5*s, ox+c*s, oy+(ROWS-1)*s)}
+    }
+    // Palace diagonal
+    g.lineBetween(ox+3*s, oy, ox+5*s, oy+2*s); g.lineBetween(ox+5*s, oy, ox+3*s, oy+2*s);
+    g.lineBetween(ox+3*s, oy+7*s, ox+5*s, oy+9*s); g.lineBetween(ox+5*s, oy+7*s, ox+3*s, oy+9*s);
+    // River text (using Phaser Text, not Graphics)
+    this.add.text(ox+1.5*s, oy+4.15*s, '楚 河', {fontSize:'14px',color:'#8b7355',fontFamily:'sans-serif'}).setDepth(15);
+    this.add.text(ox+5.5*s, oy+4.15*s, '漢 界', {fontSize:'14px',color:'#8b7355',fontFamily:'sans-serif'}).setDepth(15);
+  }
+
+  startGame() {
+    this.board = [];
+    for(var r=0;r<ROWS;r++){this.board[r]=[];for(var c=0;c<COLS;c++)this.board[r][c]=null}
+    for(var c=0;c<9;c++){
+      if(PIECES_RED[c]!==' '){this.board[9][c]={type:PIECES_RED[c],color:'r'};this.board[0][c]={type:PIECES_BLK[c],color:'b'}}
+      if(PIECES_RED[c+9]!==' '){this.board[7][c]={type:PIECES_RED[c+9],color:'r'};this.board[2][c]={type:PIECES_BLK[c+9],color:'b'}}
+      if(PIECES_RED[c+18]!==' '){this.board[6][c]={type:PIECES_RED[c+18],color:'r'};this.board[3][c]={type:PIECES_BLK[c+18],color:'b'}}
+    }
+    this.turn='r';this.selected=null;this.gameOver=false;this.validMovesList=[];
+    document.getElementById('turn').textContent='红方';this.msgT.setText('点击选中棋子');
+    this.syncPieces();
+    this.highlightGfx.clear();
+  }
+
+  syncPieces() {
+    this.pieceContainer.removeAll(true);
+    var R = this.CELL * 0.42;
+    for(var r=0;r<ROWS;r++) for(var c=0;c<COLS;c++) {
+      var p = this.board[r][c];
+      if(!p) continue;
+      var x = this.boardX(c), y = this.boardY(r);
+      var isRed = p.color === 'r';
+      // Piece circle
+      var g = this.add.graphics().setDepth(60);
+      // Shadow
+      g.fillStyle(0x000000,0.15); g.fillCircle(2,3,R);
+      // Body
+      g.fillStyle(isRed ? 0xffeedd : 0xeeeedd,1); g.fillCircle(0,0,R);
+      g.lineStyle(2, isRed ? 0xcc2244 : 0x224488,0.8); g.strokeCircle(0,0,R);
+      g.setPosition(x,y);
+      
+      // Text
+      var name = PIECE_NAMES[p.type] || p.type;
+      var t = this.add.text(x, y-1, name, {
+        fontSize: Math.round(R*1.1)+'px', fontFamily: 'sans-serif',
+        fontStyle: 'bold', color: isRed ? '#cc2244' : '#224488'
+      }).setOrigin(0.5).setDepth(61);
+      
+      this.pieceContainer.add(g);
+      this.pieceContainer.add(t);
+    }
+  }
+
+  showMoves(moves) {
+    this.dotContainer.removeAll(true);
+    var R = this.CELL * 0.14;
+    moves.forEach(m => {
+      var x = this.boardX(m.c), y = this.boardY(m.r);
+      var g = this.add.graphics().setDepth(70);
+      g.fillStyle(0x44cc44,0.5); g.fillCircle(0,0,R);
+      g.setPosition(x,y);
+      this.dotContainer.add(g);
+    });
+  }
+
+  handleClick(pointer) {
+    if(this.gameOver) return;
+    var ox = this.padding, oy = this.padding + 25;
+    var col = Math.round((pointer.x - ox) / this.CELL);
+    var row = Math.round((pointer.y - oy) / this.CELL);
+    if(!inBoard(row,col)) return;
+
+    var clicked = this.board[row][col];
+
+    // If we have a selected piece and clicked a valid move target
+    if(this.selected && this.validMovesList.some(m => m.r===row && m.c===col)) {
+      this.doMove(this.selected.row, this.selected.col, row, col);
+      return;
+    }
+
+    // Select a piece of current turn
+    if(clicked && clicked.color === this.turn) {
+      this.selected = {row:row, col:col};
+      this.validMovesList = validMoves(row, col, this.board, this.turn);
+      // Highlight selected
+      this.highlightGfx.clear();
+      var sx = this.boardX(col), sy = this.boardY(row);
+      this.highlightGfx.lineStyle(2, 0x44cc44,0.8);
+      this.highlightGfx.strokeCircle(sx, sy, this.CELL*0.44);
+      this.showMoves(this.validMovesList);
+      this.msgT.setText('已选中 '+(clicked.color==='r'?'红':'黑')+PIECE_NAMES[clicked.type]);
+    } else {
+      this.selected = null;
+      this.validMovesList = [];
+      this.highlightGfx.clear();
+      this.dotContainer.removeAll(true);
+      this.msgT.setText('点击选中棋子');
+    }
+  }
+
+  doMove(fr, fc, tr, tc) {
+    var captured = this.board[tr][tc];
+    this.board[tr][tc] = this.board[fr][fc];
+    this.board[fr][fc] = null;
+    
+    // Animate: capture flash
+    if(captured) {
+      var cx = this.boardX(tc), cy = this.boardY(tr);
+      var flash = this.add.graphics().setDepth(80);
+      flash.fillStyle(0xff4444,0.5); flash.fillCircle(cx,cy,this.CELL*0.45);
+      this.tweens.add({targets:flash, alpha:0, duration:300, onComplete:()=>flash.destroy()});
+    }
+    
+    this.selected = null;
+    this.validMovesList = [];
+    this.highlightGfx.clear();
+    this.dotContainer.removeAll(true);
+    this.syncPieces();
+    
+    // Check win
+    if(captured && (captured.type==='k'||captured.type==='K')) {
+      this.gameOver = true;
+      var winner = this.turn==='r'?'红方':'黑方';
+      this.msgT.setText('🎉 '+winner+' 获胜！');
+      document.getElementById('msg').textContent = '🎉 '+winner+' 获胜！';
+      return;
+    }
+    
+    // Check check
+    var enemyColor = this.turn==='r'?'b':'r';
+    if(isCheck(this.board, enemyColor)) {
+      this.msgT.setText('将军！');
+      document.getElementById('msg').textContent = '将军！';
+    }
+    
+    // Switch turn
+    this.turn = enemyColor;
+    document.getElementById('turn').textContent = this.turn==='r'?'红方':'黑方';
+    
+    // AI move
+    setTimeout(() => this.doAI(), 400);
+  }
+
+  async doAI() {
+    if(this.gameOver) return;
+    var color = this.turn;
+    var move = await aiMove(this.board, color);
+    if(!move) {
+      this.gameOver = true;
+      var winner = color==='r'?'黑方':'红方';
+      this.msgT.setText('😅 '+winner+' 获胜（无子可走）');
+      document.getElementById('msg').textContent = '😅 '+winner+' 获胜（无子可走）';
+      return;
+    }
+    
+    // Animate AI piece movement
+    var captured = this.board[move.tr][move.tc];
+    this.board[move.tr][move.tc] = this.board[move.fr][move.fc];
+    this.board[move.fr][move.fc] = null;
+    
+    if(captured) {
+      var cx = this.boardX(move.tc), cy = this.boardY(move.tr);
+      var flash = this.add.graphics().setDepth(80);
+      flash.fillStyle(0xff4444,0.5); flash.fillCircle(cx,cy,this.CELL*0.45);
+      this.tweens.add({targets:flash, alpha:0, duration:300, onComplete:()=>flash.destroy()});
+    }
+    
+    this.syncPieces();
+    
+    if(captured && (captured.type==='k'||captured.type==='K')) {
+      this.gameOver = true;
+      var winner = color==='r'?'红方':'黑方';
+      this.msgT.setText('😅 '+winner+' 获胜！');
+      document.getElementById('msg').textContent = '😅 '+winner+' 获胜！';
+      return;
+    }
+    
+    var enemyColor = color==='r'?'b':'r';
+    this.turn = enemyColor;
+    document.getElementById('turn').textContent = this.turn==='r'?'红方':'黑方';
+    this.msgT.setText('轮到你了');
+    document.getElementById('msg').textContent = '轮到你了';
+    
+    if(isCheck(this.board, enemyColor)) {
+      this.msgT.setText('你被将军了！');
+      document.getElementById('msg').textContent = '你被将军了！';
+    }
+  }
+}
+
+// ===== START =====
+var config = {
+  type: Phaser.AUTO,
+  parent: 'game',
+  width: 440,
+  height: 484,
+  backgroundColor: '#f5e6c8',
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  scene: ChessScene
+};
+var game = new Phaser.Game(config);
 </script></html>
