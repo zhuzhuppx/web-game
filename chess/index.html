@@ -123,29 +123,21 @@ var PST={
   [2,3,4,5,6,5,4,3,2],[1,1,2,3,3,3,2,1,1],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0]]
 };
 
-// Opening book: first N plies, format [fr,fc,tr,tc] 
+// Opening book: each entry is a flat [fr,fc,tr,tc, fr,fc,tr,tc, ...] sequence
 var OPENINGS=[
- //====== 中炮对屏风马 (主流)======
- [[7,1,7,4],[2,1,2,4]],  //炮二平五 马8进7
- [[9,7,7,6],[0,7,0,0]],  //马二进三 车9平8
- [[8,0,8,2],[0,1,0,3]],  //车一平二 马2进3
- [[6,6,5,6],[2,6,1,6]],  //兵七进一 卒7进1
- [[9,1,7,2],[0,6,0,5]],  //马八进七 象3进5
- [[7,7,7,1],[1,0,3,0]],  //炮八平九 OR 炮八进二
- //====== 中炮对顺炮 ======
- [[7,1,7,4],[2,7,2,4]],  //炮二平五 炮8平5
- [[9,7,7,6],[1,7,3,6]],  //马二进三 马8进7
- [[8,0,8,2],[0,7,0,0]],  //车一平二 车9平8
- [[6,6,5,6],[1,2,3,2]],  //兵七进一 卒7进1...不对，卒3进1
- //====== 仙人指路 ======
- [[6,6,5,6],[2,6,1,6]],  //兵七进一 卒7进1
- [[9,1,7,2],[0,6,0,5]],  //马八进七 象3进5
- [[7,1,7,4],[2,1,2,4]],  //炮二平五 马8进7
- [[8,0,8,2],[0,7,0,0]]   //车一平二 车9平8
+ //中炮过河车对屏风马 (经典变例)
+ [7,1,7,4, 2,1,2,4, 9,7,7,6, 0,7,0,0, 8,0,8,2, 0,1,0,3, 6,6,5,6, 2,6,1,6, 9,1,7,2, 0,6,0,5, 7,7,7,1, 1,0,3,0, 8,2,8,8],
+ //中炮对顺手炮
+ [7,1,7,4, 2,7,2,4, 9,7,7,6, 1,7,3,6, 8,0,8,2, 0,7,0,0, 6,6,5,6, 2,3,3,3],
+ //仙人指路转中炮
+ [6,6,5,6, 2,6,1,6, 9,1,7,2, 0,6,0,5, 7,1,7,4, 2,1,2,4, 8,0,8,2, 0,7,0,0, 9,7,7,6],
+ //中炮进三兵对屏风马
+ [7,1,7,4, 2,1,2,4, 9,7,7,6, 0,7,0,0, 8,2,8,8, 0,1,0,3, 6,5,5,5, 2,6,1,6, 9,1,7,2],
+ //起马局
+ [9,7,7,6, 2,7,2,6, 8,0,8,2, 0,7,0,0, 6,6,5,6, 2,6,1,6, 9,1,7,2, 0,6,0,5, 7,1,7,4]
 ];
 
 // Check if board matches opening at given plies index
-function matchOpening(board,ply){var idx=ply%2===1?1:0;for(var i=0;i<OPENINGS.length;i+=2){if(ply>=i+2)continue;var ok=true;for(var j=0;j<ply;j++){if(ply>=OPENINGS[i].length){ok=false;break}var m=OPENINGS[i][j];if(!m||!board[m[0]]||!board[m[0]][m[1]]){ok=false;break}}if(ok&&ply<OPENINGS[i].length){var m=OPENINGS[i][ply];if(m&&board[m[0]]&&board[m[0]][m[1]]){var p=board[m[0]][m[1]];if(p&&p.color===(ply%2===0?'r':'b')&&board[m[0]][m[1]].type){var vm=validMoves(m[0],m[1],board,p.color);for(var k=0;k<vm.length;k++){if(vm[k].r===m[2]&&vm[k].c===m[3])return{m:OPENINGS[i],ply:ply}}}}}}return null}
 
 function evalBoard(board,color){var score=0;var vals={k:10000,K:10000,a:20,A:20,e:25,E:25,h:45,H:45,r:110,R:110,c:50,C:50,p:12,P:12}
 for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p){var v=vals[p.type]||0;var posTable=PST[p.type.toLowerCase()];var pos=posTable?posTable[p.color==='r'?r:9-r][p.color==='r'?c:8-c]:0;score+=(p.color===color?1:-1)*(v+pos)}}return score}
@@ -172,7 +164,7 @@ function refreshAIBadge(){var badge=document.getElementById('aiBadge');badge.sty
 function isAIEnabled(){return localStorage.getItem('chess_ai_enabled')==='true'&&!!localStorage.getItem('chess_llm_key')}
 async function aiMove(board,color){
   // Opening book: check if current position matches a known opening
-  if(g_ply<20){for(var oi=0;oi<OPENINGS.length;oi++){var line=OPENINGS[oi];if(g_ply<line.length){var match=true;for(var pi=0;pi<g_ply;pi++){var m=line[pi];var gm=g_moves[pi];if(!gm||m[0]!==gm.fr||m[1]!==gm.fc||m[2]!==gm.tr||m[3]!==gm.tc){match=false;break}}if(match){var nm=line[g_ply];if(nm&&pMatch(board,nm[0],nm[1],color)){var vm=validMoves(nm[0],nm[1],board,color);for(var vi=0;vi<vm.length;vi++){if(vm[vi].r===nm[2]&&vm[vi].c===nm[3]){console.log('开局:',g_ply,'→',nm);return{fr:nm[0],fc:nm[1],tr:nm[2],tc:nm[3]}}}}}}}}
+  if(g_ply<24){for(var oi=0;oi<OPENINGS.length;oi++){var line=OPENINGS[oi];var totalMoves=line.length/4;if(g_ply<totalMoves){var match=true;for(var pi=0;pi<g_ply;pi++){var idx=pi*4;if(line[idx]!==g_moves[pi].fr||line[idx+1]!==g_moves[pi].fc||line[idx+2]!==g_moves[pi].tr||line[idx+3]!==g_moves[pi].tc){match=false;break}}if(match){var ni=g_ply*4;var nm=[line[ni],line[ni+1],line[ni+2],line[ni+3]];if(pMatch(board,nm[0],nm[1],color)){var vm=validMoves(nm[0],nm[1],board,color);for(var vi=0;vi<vm.length;vi++){if(vm[vi].r===nm[2]&&vm[vi].c===nm[3]){console.log('♟️ 棋谱走法 ply'+g_ply+':',nm);return{fr:nm[0],fc:nm[1],tr:nm[2],tc:nm[3]}}}}}}}}
   
   // Show thinking message
   document.getElementById('msg').textContent = '🤔 AI 思考中…';
