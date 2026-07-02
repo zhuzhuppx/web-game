@@ -143,10 +143,16 @@ var OPENINGS=[
 function evalBoard(board,color){var score=0;var vals={k:10000,K:10000,a:20,A:20,e:25,E:25,h:45,H:45,r:110,R:110,c:50,C:50,p:12,P:12}
 for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p){var v=vals[p.type]||0;var posTable=PST[p.type.toLowerCase()];var pos=posTable?posTable[p.color==='r'?r:9-r][p.color==='r'?c:8-c]:0;score+=(p.color===color?1:-1)*(v+pos)}}return score}
 function getOpponentColor(color){return color==='r'?'b':'r'}
-function alphaBeta(board,depth,alpha,beta,color,isMax){if(depth===0)return evalBoard(board,color)
+// Quiescence: search captures until quiet (stops horizon effect / 送吃)
+function quiescence(board,alpha,beta,color,isMax){var standPat=evalBoard(board,color)
+if(isMax){if(standPat>=beta)return beta;if(standPat>alpha)alpha=standPat}else{if(standPat<=alpha)return alpha;if(standPat<beta)beta=standPat}
+var curColor=isMax?color:getOpponentColor(color)
+var moves=[];for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===curColor){var vm=validMoves(r,c,board,curColor);for(var i=0;i<vm.length;i++){if(board[vm[i].r][vm[i].c])moves.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,capVal:board[vm[i].r][vm[i].c]?100-(board[vm[i].r][vm[i].c].type.charCodeAt(0)%32):0})}}}
+moves.sort(function(a,b){return b.capVal-a.capVal})
+if(isMax){for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=quiescence(board,alpha,beta,color,false);if(val>alpha)alpha=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return alpha}else{for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=quiescence(board,alpha,beta,color,true);if(val<beta)beta=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return beta}}
+function alphaBeta(board,depth,alpha,beta,color,isMax){if(depth===0)return quiescence(board,alpha,beta,color,isMax)
 var curColor=isMax?color:getOpponentColor(color)
 var moves=[];for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===curColor){var vm=validMoves(r,c,board,curColor);for(var i=0;i<vm.length;i++)moves.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,cap:board[vm[i].r][vm[i].c]?1:0})}}
-// Move ordering: captures first (better pruning)
 moves.sort(function(a,b){return b.cap-a.cap})
 if(isMax){var maxE=-99999;for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=alphaBeta(board,depth-1,alpha,beta,color,false);if(val>maxE)maxE=val;if(val>alpha)alpha=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return maxE}else{var minE=99999;for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=alphaBeta(board,depth-1,alpha,beta,color,true);if(val<minE)minE=val;if(val<beta)beta=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return minE}}
 // AI config modal
@@ -177,7 +183,7 @@ async function aiMove(board,color){
   for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===color){var vm=validMoves(r,c,board,color);
     // Sort: captures first
     vm.sort(function(a,b){var ca=board[a.r][a.c]?1:0;var cb=board[b.r][b.c]?1:0;return cb-ca});
-    for(var i=0;i<vm.length;i++){var captured=makeMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c});if(!isCheck(board,color)){var score=alphaBeta(board,3,-99999,99999,color,color==='r');if((color==='r'&&score>bestScore)||(color==='b'&&score<bestScore)){bestScore=score;candidates.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,score:score});candidates.sort(function(a,b){return color==='r'?b.score-a.score:a.score-b.score});if(candidates.length>6)candidates.pop()}}undoMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c},captured)}
+    for(var i=0;i<vm.length;i++){var captured=makeMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c});if(!isCheck(board,color)){var score=alphaBeta(board,4,-99999,99999,color,color==='r');if((color==='r'&&score>bestScore)||(color==='b'&&score<bestScore)){bestScore=score;candidates.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,score:score});candidates.sort(function(a,b){return color==='r'?b.score-a.score:a.score-b.score});if(candidates.length>6)candidates.pop()}}undoMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c},captured)}
     // Yield to event loop so audio/BGM keeps playing
     await new Promise(r=>setTimeout(r,0));
   }}}
