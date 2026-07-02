@@ -100,7 +100,9 @@ for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p){var v=val
 function getOpponentColor(color){return color==='r'?'b':'r'}
 function alphaBeta(board,depth,alpha,beta,color,isMax){if(depth===0)return evalBoard(board,color)
 var curColor=isMax?color:getOpponentColor(color)
-var moves=[];for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===curColor){var vm=validMoves(r,c,board,curColor);for(var i=0;i<vm.length;i++)moves.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c})}}
+var moves=[];for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===curColor){var vm=validMoves(r,c,board,curColor);for(var i=0;i<vm.length;i++)moves.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,cap:board[vm[i].r][vm[i].c]?1:0})}}
+// Move ordering: captures first (better pruning)
+moves.sort(function(a,b){return b.cap-a.cap})
 if(isMax){var maxE=-99999;for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=alphaBeta(board,depth-1,alpha,beta,color,false);if(val>maxE)maxE=val;if(val>alpha)alpha=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return maxE}else{var minE=99999;for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=alphaBeta(board,depth-1,alpha,beta,color,true);if(val<minE)minE=val;if(val<beta)beta=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return minE}}
 // AI config modal
 function showAIModal(){document.getElementById('aiModal').classList.add('show')
@@ -116,20 +118,30 @@ closeAIModal();var badge=document.getElementById('aiBadge');badge.style.display=
 if(window.scene)window.scene.startGame()}
 function refreshAIBadge(){var badge=document.getElementById('aiBadge');badge.style.display=isAIEnabled()?'inline':'none'}
 function isAIEnabled(){return localStorage.getItem('chess_ai_enabled')==='true'&&!!localStorage.getItem('chess_llm_key')}
-function aiMove(board,color){return new Promise(function(resolve){
-  // Step 1: Alpha-beta depth 4 to find top candidates
+async function aiMove(board,color){
+  // Show thinking message
+  document.getElementById('msg').textContent = '🤔 AI 思考中…';
+  if(window.scene && window.scene.msgT) window.scene.msgT.setText('🤔 AI 思考中…');
+  
+  // Step 1: Alpha-beta depth 3+ordering to find top candidates (yield between pieces for audio)
   var candidates=[];
   var bestScore=color==='r'?-99999:99999;
-  var topScore=bestScore;
-  for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===color){var vm=validMoves(r,c,board,color);for(var i=0;i<vm.length;i++){var captured=makeMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c});if(!isCheck(board,color)){var score=alphaBeta(board,4,-99999,99999,color,color==='r');if((color==='r'&&score>bestScore)||(color==='b'&&score<bestScore)){bestScore=score;candidates.unshift({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,score:score});if(candidates.length>6)candidates.pop()}}undoMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c},captured)}}}
+  for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===color){var vm=validMoves(r,c,board,color);
+    // Sort: captures first
+    vm.sort(function(a,b){var ca=board[a.r][a.c]?1:0;var cb=board[b.r][b.c]?1:0;return cb-ca});
+    for(var i=0;i<vm.length;i++){var captured=makeMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c});if(!isCheck(board,color)){var score=alphaBeta(board,3,-99999,99999,color,color==='r');if((color==='r'&&score>bestScore)||(color==='b'&&score<bestScore)){bestScore=score;candidates.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,score:score});candidates.sort(function(a,b){return color==='r'?b.score-a.score:a.score-b.score});if(candidates.length>6)candidates.pop()}}undoMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c},captured)}
+    // Yield to event loop so audio/BGM keeps playing
+    await new Promise(r=>setTimeout(r,0));
+  }}}
   
   // Step 2: Try LLM to pick best among candidates
-  callLLM(board,color,candidates).then(function(llmMove){
-    if(llmMove){resolve(llmMove);return}
-    // Fallback: best alpha-beta move
-    resolve(candidates.length>0?candidates[0]:null)
+  return new Promise(function(resolve){
+    callLLM(board,color,candidates).then(function(llmMove){
+      if(llmMove){resolve(llmMove);return}
+      resolve(candidates.length>0?candidates[0]:null)
+    })
   })
-})}
+}
 
 function pieceName(p){var n={r:'车',h:'马',e:'相',a:'仕',k:'帅',c:'炮',p:'兵',R:'車',H:'馬',E:'象',A:'士',K:'將',C:'砲',P:'卒'};return n[p.type]||p.type}
 function coordDesc(fr,fc,tr,tc,color){var dir=color==='r'?'进':'退';var rDiff=tr-fr;if(rDiff===0)dir='平';else if((color==='r'&&rDiff<0)||(color==='b'&&rDiff>0))dir='退';var cDist=Math.abs(tc-fc);return '('+(8-fc+1)+')'+(cDist>0?'平':'')+'('+(8-tc+1)+')'}
