@@ -67,8 +67,8 @@ draw()}
 canvas.onclick=function(e){if(gameOver)return;disableBtns()
 var rect=canvas.getBoundingClientRect(),sx=canvas.width/rect.width,sy=canvas.height/rect.height
 var x=(e.clientX-rect.left)*sx,y=(e.clientY-rect.top)*sy
-var start=(W-hand.length*CARD_W*0.3)/2
-for(var i=0;i<hand.length;i++){var cx=start+i*CARD_W*0.3,cy=H-CARD_H-8
+var start=(W-hand.length*CARD_W*0.28)/2
+for(var i=0;i<hand.length;i++){var cx=start+i*CARD_W*0.28,cy=H-CARD_H-8
 if(x>=cx&&x<=cx+CARD_W&&y>=cy&&y<=cy+CARD_H){var idx=selected.indexOf(hand[i])
 if(idx>=0)selected.splice(idx,1);else selected.push(hand[i])
 draw()
