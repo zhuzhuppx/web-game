@@ -79,11 +79,11 @@ if(player.cooldown===0){
   player.cooldown=player.cooldownMax;sfxShoot()
 }
 // Bullets
-for(var i=bullets.length-1;i>=0;i--){bullets[i].y+=bullets[i].dy;if(bullets[i].y<-20)bullets.splice(i,1)}
+for(var i=bullets.length-1;i>=0;i--){var bl=bullets[i];bl.x+=bl.dx||0;bl.y+=bl.dy;if(bl.y<-20||bl.y>H+20)bullets.splice(i,1)}
 // Enemies
 for(var i=enemies.length-1;i>=0;i--){var e=enemies[i];e.y+=e.vy;if(e.vx){e.x+=e.vx;if(e.x<0||e.x+e.w>W)e.vx=-e.vx}
-// Enemy shoots
-e.shootTimer--;if(e.shootTimer<=0){var eb={x:e.x+e.w/2-2,y:e.y+e.h,dx:(player.x+player.w/2-(e.x+e.w/2))*0.01,dy:2};bullets.push(eb);e.shootTimer=60+Math.random()*120}
+// Enemy shoots (only large+/elite/boss, smaller ones don't)
+e.shootTimer--;if(e.shootTimer<=0&&(e.type==='large'||e.type==='boss'||e.type==='elite')){var aim=(player.x+player.w/2-(e.x+e.w/2))*0.03;var spd=2+wave*0.05;var eb={x:e.x+e.w/2-2,y:e.y+e.h,w:4,h:8,dx:aim,dy:spd};bullets.push(eb);e.shootTimer=e.type==='elite'?15+Math.random()*30:e.type==='boss'?25+Math.random()*40:40+Math.random()*60}
 // Collision with bullets
 for(var j=bullets.length-1;j>=0;j--){var b=bullets[j];if(b.dy<0&&b.x<e.x+e.w&&b.x+b.w>e.x&&b.y<e.y+e.h&&b.y+b.h>e.y){e.hp--;bullets.splice(j,1);if(e.hp<=0){var isBoss=e.type==='boss',isElite=e.type==='elite',isLarge=e.type==='large';var r=isElite?0.4:isBoss?0.35:isLarge?0.15:0.06;var ps=isElite?30:isBoss?20:isLarge?15:12;addExplosion(e.x+e.w/2,e.y+e.h/2,'#ff8844',ps,4,25);addExplosion(e.x+e.w/2,e.y+e.h/2,'#ffdd44',Math.floor(ps*0.7),2,20);addExplosion(e.x+e.w/2,e.y+e.h/2,'#fff',Math.floor(ps*0.3),6,12);score+=(isElite?100:isBoss?50:isLarge?30:10)*wave+10||10;document.getElementById('sc').textContent=score;function mkpu(x,y,vy,k){return{x:x,y:y,w:16,h:16,vy:vy||1.2,life:300,kind:k||'up'}};if(Math.random()<r&&powerups.length<3){var k=Math.random()<0.35?'down':'up';powerups.push(mkpu(e.x+e.w/2-8,e.y+e.h/2,1.2,k))}if(isBoss&&Math.random()<0.5){powerups.push(mkpu(e.x+e.w/2-8-20,e.y+e.h/2-10,0.8,Math.random()<0.4?'down':'up'));powerups.push(mkpu(e.x+e.w/2-8+20,e.y+e.h/2-10,0.8,Math.random()<0.4?'down':'up'))}if(isElite&&Math.random()<0.6){for(var pi=0;pi<2;pi++)powerups.push(mkpu(e.x+e.w/2-8+(pi-0.5)*30,e.y+e.h/2-10,0.6,Math.random()<0.3?'down':'up'));addExplosion(e.x+e.w/2,e.y+e.h/2,'#ff00ff',40,8,50)}enemies.splice(i,1)}break}}
 // Collision with player
@@ -180,7 +180,7 @@ ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fillRect(8,8,90,22);ctx.fillStyle='#88ddff';
 // Enemies
 for(var i=0;i<enemies.length;i++)drawAlien(enemies[i])
 // Bullets
-for(var i=0;i<bullets.length;i++){var b=bullets[i];ctx.fillStyle=b.dy<0?'#ffdd44':'#ff4466';ctx.shadowColor=b.dy<0?'#ffdd44':'#ff4466';ctx.shadowBlur=4;ctx.fillRect(b.x,b.y,b.w,b.h);ctx.shadowBlur=0}}
+for(var i=0;i<bullets.length;i++){var b=bullets[i];b.x+=b.dx||0;b.y+=b.dy||(b.dy<0?-4:2);var isEnemy=b.dy>0;ctx.fillStyle=isEnemy?'#ff4466':'#ffdd44';ctx.shadowColor=isEnemy?'#ff4466':'#ffdd44';ctx.shadowBlur=isEnemy?8:4;ctx.fillRect(b.x,b.y,b.w||4,b.h||8);ctx.shadowBlur=0}}
 
 function drawGameOver(){draw();ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#44ddff';ctx.font='bold 30px sans-serif';ctx.textAlign='center';ctx.fillText('GAME OVER',W/2,H/2-15);ctx.fillStyle='#8888bb';ctx.font='16px sans-serif';ctx.fillText('得分: '+score+' | 波次: '+wave,W/2,H/2+25)}
 
