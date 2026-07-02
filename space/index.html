@@ -40,13 +40,13 @@ var delay=0;
 for(var i=0;i<seq.length;i++){(function(t,d){setTimeout(function(){if(gameOver)return;
 var e;var wv=wave||1;
 if(t==='small')e={x:Math.random()*(W-20),y:-30,w:24,h:24,hp:3,vy:0.5+wv*0.1,shootTimer:90+Math.random()*120,type:'small'}
-else if(t==='medium')e={x:Math.random()*(W-32),y:-50,w:40,h:40,hp:8+Math.floor(wv),vy:0.3+wv*0.08,shootTimer:60+Math.random()*120,type:'medium'}
-else if(t==='large')e={x:Math.random()*(W-44),y:-70,w:56,h:56,hp:15+Math.floor(wv),vy:0.2+wv*0.06,shootTimer:40+Math.random()*100,type:'large'}
-else if(t==='boss')e={x:Math.random()*(W-64),y:-100,w:80,h:80,hp:30+Math.floor(wv*2),vy:0.1+wv*0.04,shootTimer:20+Math.random()*80,type:'boss'}
-else if(t==='elite')e={x:Math.random()*(W-80),y:-120,w:100,h:100,hp:60+Math.floor(wv*4),vy:0.06+wv*0.02,shootTimer:10+Math.random()*60,type:'elite',spawned:false}
+else if(t==='medium')e={x:Math.random()*(W-32),y:-50,w:40,h:40,hp:8+Math.floor(wv),vy:0.3+wv*0.08,vx:(Math.random()-0.5)*1.2,shootTimer:60+Math.random()*120,type:'medium'}
+else if(t==='large')e={x:Math.random()*(W-44),y:-70,w:56,h:56,hp:15+Math.floor(wv),vy:0.2+wv*0.06,vx:(Math.random()-0.5)*0.8,shootTimer:40+Math.random()*100,type:'large'}
+else if(t==='boss')e={x:Math.random()*(W-64),y:-100,w:80,h:80,hp:30+Math.floor(wv*2),vy:0.1+wv*0.04,vx:(Math.random()-0.5)*0.6,shootTimer:20+Math.random()*80,type:'boss'}
+else if(t==='elite')e={x:Math.random()*(W-80),y:-120,w:100,h:100,hp:60+Math.floor(wv*4),vy:0.06+wv*0.02,vx:(Math.random()-0.5)*0.4,shootTimer:10+Math.random()*60,type:'elite',spawned:false}
 enemies.push(e)
 // Elite spawns mini-waves of small enemies
-if(t==='elite'){var iv=setInterval(function(){if(gameOver||!enemies.some(function(en){return en.type==='elite'})){clearInterval(iv);return}enemies.push({x:Math.random()*(W-28),y:-40,w:32,h:32,hp:4+Math.floor(wv/2),vy:0.6+wv*0.1,shootTimer:50+Math.random()*80,type:'medium'})},1500)}
+if(t==='elite'){var iv=setInterval(function(){if(gameOver||!enemies.some(function(en){return en.type==='elite'})){clearInterval(iv);return}enemies.push({x:Math.random()*(W-28),y:-40,w:32,h:32,hp:4+Math.floor(wv/2),vy:0.6+wv*0.1,vx:(Math.random()-0.5)*1.5,shootTimer:50+Math.random()*80,type:'medium'})},1500)}
 },d)})(seq[i],delay);delay+=seq[i]==='elite'?1000:seq[i]==='boss'?800:250}}
 
 function addExplosion(x,y,color,count,speed,life){
@@ -81,7 +81,7 @@ if(player.cooldown===0){
 // Bullets
 for(var i=bullets.length-1;i>=0;i--){bullets[i].y+=bullets[i].dy;if(bullets[i].y<-20)bullets.splice(i,1)}
 // Enemies
-for(var i=enemies.length-1;i>=0;i--){var e=enemies[i];e.y+=e.vy
+for(var i=enemies.length-1;i>=0;i--){var e=enemies[i];e.y+=e.vy;if(e.vx){e.x+=e.vx;if(e.x<0||e.x+e.w>W)e.vx=-e.vx}
 // Enemy shoots
 e.shootTimer--;if(e.shootTimer<=0){var eb={x:e.x+e.w/2-2,y:e.y+e.h,dx:(player.x+player.w/2-(e.x+e.w/2))*0.01,dy:2};bullets.push(eb);e.shootTimer=60+Math.random()*120}
 // Collision with bullets
