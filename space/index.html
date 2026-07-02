@@ -46,7 +46,7 @@ else if(t==='boss')e={x:Math.random()*(W-64),y:-100,w:80,h:80,hp:30+Math.floor(w
 else if(t==='elite')e={x:Math.random()*(W-80),y:-120,w:100,h:100,hp:60+Math.floor(wv*4),vy:0.06+wv*0.02,shootTimer:10+Math.random()*60,type:'elite',spawned:false}
 enemies.push(e)
 // Elite spawns mini-waves of small enemies
-if(t==='elite'){var iv=setInterval(function(){if(gameOver||!enemies.some(function(en){return en.type==='elite'})){clearInterval(iv);return}enemies.push({x:Math.random()*(W-20),y:-30,w:24,h:24,hp:1,vy:0.8+wv*0.1,shootTimer:60+Math.random()*80,type:'small'})},1500)}
+if(t==='elite'){var iv=setInterval(function(){if(gameOver||!enemies.some(function(en){return en.type==='elite'})){clearInterval(iv);return}enemies.push({x:Math.random()*(W-28),y:-40,w:32,h:32,hp:4+Math.floor(wv/2),vy:0.6+wv*0.1,shootTimer:50+Math.random()*80,type:'medium'})},1500)}
 },d)})(seq[i],delay);delay+=seq[i]==='elite'?1000:seq[i]==='boss'?800:250}}
 
 function addExplosion(x,y,color,count,speed,life){
