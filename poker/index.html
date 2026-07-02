@@ -2,7 +2,7 @@
 <title>斗地主</title><style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;color:#ccc;font-family:system-ui,-apple-system,sans-serif;min-height:100dvh;display:flex;align-items:center;justify-content:center}
-.wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;width:100%;max-width:480px}
+.wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;width:100%;max-width:640px}
 .hdr{display:flex;align-items:center;justify-content:space-between;width:100%}
 .hdr h1{font-size:20px;color:#ff8844}.hdr .s{font-size:14px;color:#6666aa}
 canvas{width:100%;touch-action:none;background:#0d5c2e;border-radius:8px;display:block}
@@ -33,7 +33,7 @@ var W,H,CARD_W,CARD_H,hand=[],ai1=[],ai2=[],selected=[];
 var landlord,curPlayer,lastPlay,lastPlayer,passCount,gameOver,lock;
 var SUITS=['♠','♥','♣','♦'],RANKS=['3','4','5','6','7','8','9','10','J','Q','K','A','2'];
 
-function resize(){var w=Math.min(480,canvas.parentElement.clientWidth-4);canvas.style.width=w+'px';W=Math.floor(w*0.95);H=Math.floor(W*0.85);canvas.width=W;canvas.height=H;CARD_W=Math.floor(W/10);CARD_H=Math.floor(CARD_W*1.4)}
+function resize(){var w=Math.min(600,canvas.parentElement.clientWidth-4);canvas.style.width=w+'px';W=Math.floor(w*0.98);H=Math.floor(W*0.75);canvas.width=W;canvas.height=H;CARD_W=Math.min(Math.floor(W/8),80);CARD_H=Math.floor(CARD_W*1.45)}
 resize();window.addEventListener('resize',resize);
 
 function deck(){var d=[];for(var s=0;s<4;s++)for(var r=0;r<13;r++)d.push({r:RANKS[r],s:SUITS[s],v:r});d.push({r:'S',s:'🃏',v:13},{r:'B',s:'🃏',v:14});return d}
@@ -190,7 +190,7 @@ var best=findBest(hand.slice(),need)
 if(best){selected=best;msg('试试这组')}else{selected=[];msg('打不过，点不出')}
 draw();if(lastPlay&&lastPlayer!==0)document.getElementById('btnPass').disabled=false;document.getElementById('btnPlay').disabled=!best}
 
-function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#0d5c2e';ctx.fillRect(0,0,W,H)
+function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle='#0d5c2e';ctx.fillRect(0,0,W,H);ctx.textBaseline='alphabetic'
 // AI cards (back)
 for(var i=0;i<ai1.length;i++){drawBack(10+i*16,12)}
 for(var i=0;i<ai2.length;i++){drawBack(W-10-ai2.length*16+i*16,12)}
@@ -203,15 +203,25 @@ ctx.fillText('👑 '+(landlord===0?'你':landlord===1?'AI-1':'AI-2'),10,landlord
 // Last play info
 if(lastPlay&&lastPlayer>=0){var names=['你','AI-1','AI-2'];ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText(names[lastPlayer]+'出牌',W/2,H/2-25)}
 // My hand
-var start=(W-hand.length*CARD_W*0.3)/2
-for(var i=0;i<hand.length;i++){var c=hand[i];var x=start+i*CARD_W*0.3,y=H-CARD_H-8;var up=selected.includes(c)
-if(up)y-=10
-ctx.fillStyle='#fff';ctx.shadowColor='rgba(0,0,0,0.3)';ctx.shadowBlur=3;ctx.fillRect(x,y,CARD_W,CARD_H);ctx.shadowBlur=0
-ctx.strokeStyle='rgba(0,0,0,0.1)';ctx.lineWidth=1;ctx.strokeRect(x,y,CARD_W,CARD_H)
-if(c.s==='🃏'){ctx.fillStyle=c.v===14?'#e02444':'#3388ee';ctx.font='bold '+(CARD_W*0.18)+'px sans-serif';ctx.textAlign='center';ctx.fillText(c.v===14?'大王':'小王',x+CARD_W/2,y+CARD_H/2+3)}else{ctx.fillStyle=c.s==='♥'||c.s==='♦'?'#cc2244':'#222';ctx.font='bold '+(CARD_W*0.2)+'px sans-serif';ctx.textAlign='center';ctx.fillText(c.s+c.r,x+CARD_W/2,y+CARD_H/2+3)}
-// Top-left small suit
-ctx.font=(CARD_W*0.12)+'px sans-serif';ctx.textAlign='left';ctx.fillStyle=c.s==='♥'||c.s==='♦'?'#cc2244':'#222'
-ctx.fillText(c.s,x+3,y+CARD_H*0.18)}}
+var start=(W-hand.length*CARD_W*0.28)/2
+for(var i=0;i<hand.length;i++){var c=hand[i];var x=start+i*CARD_W*0.28,y=H-CARD_H-8;var up=selected.includes(c)
+if(up)y-=12
+// Card shadow
+ctx.shadowColor='rgba(0,0,0,0.3)';ctx.shadowBlur=4
+// Card body
+ctx.fillStyle='#fff';ctx.fillRect(x,y,CARD_W,CARD_H);ctx.shadowBlur=0
+ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=1;ctx.strokeRect(x,y,CARD_W,CARD_H)
+// Suit color
+var col=c.s==='♥'||c.s==='♦'?'#cc2244':'#222'
+if(c.s==='🃏'){var col=c.v===14?'#e02444':'#3388ee'}
+// Top-left suit + rank
+ctx.fillStyle=col;ctx.font='bold '+(CARD_W*0.28)+'px sans-serif';ctx.textAlign='left';ctx.textBaseline='top'
+if(c.s==='🃏'){ctx.font='bold '+(CARD_W*0.2)+'px sans-serif';ctx.fillText(c.v===14?'大王':'小王',x+4,y+4)}else{ctx.fillText(c.r,x+4,y+3);ctx.font=(CARD_W*0.18)+'px sans-serif';ctx.fillText(c.s,x+4,y+3+CARD_W*0.28+1)}
+// Center big suit
+if(c.s!=='🃏'){ctx.font=(CARD_W*0.5)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=col;ctx.fillText(c.s,x+CARD_W/2,y+CARD_H/2)}
+// Bottom-right suit + rank (inverted)
+if(c.s!=='🃏'){ctx.save();ctx.translate(x+CARD_W,y+CARD_H);ctx.rotate(Math.PI);ctx.fillStyle=col;ctx.font='bold '+(CARD_W*0.28)+'px sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(c.r,4,3);ctx.font=(CARD_W*0.18)+'px sans-serif';ctx.fillText(c.s,4,3+CARD_W*0.28+1);ctx.restore()}}
+ctx.textBaseline='alphabetic'}
 function drawBack(x,y){ctx.fillStyle='#1a4a7a';ctx.shadowColor='rgba(0,0,0,0.2)';ctx.shadowBlur=2;ctx.fillRect(x,y,CARD_W,CARD_H);ctx.shadowBlur=0
 ctx.fillStyle='rgba(255,255,255,0.06)';ctx.font='20px sans-serif';ctx.textAlign='center';ctx.fillText('🃏',x+CARD_W/2,y+CARD_H/2+3)}
 
