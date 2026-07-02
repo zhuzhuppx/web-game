@@ -395,7 +395,7 @@
 
 <section class="about-page" id="aboutPage">
   <h2>关于 游戏大厅</h2>
-  <p class="subtitle">一个小而美的纯前端游戏合集，全部手工打造</p>
+  <p class="subtitle">全部代码由 AI 编程助手（DeepSeek + QwenPaw）通过对话生成</p>
 
   <div class="about-card">
     <div class="stat-row">
@@ -405,11 +405,11 @@
       </div>
       <div class="stat-item">
         <div class="num">0</div>
-        <div class="label">外部依赖</div>
+        <div class="label">外部游戏引擎</div>
       </div>
       <div class="stat-item">
-        <div class="num">100%</div>
-        <div class="label">纯前端</div>
+        <div class="num">1</div>
+        <div class="label">AI 开发者</div>
       </div>
     </div>
   </div>
@@ -417,12 +417,31 @@
   <div class="about-card">
     <h3>📖 项目简介</h3>
     <p>
-      游戏大厅是一个完全由 <strong style="color:#b388ff">纯手写 HTML + CSS + JavaScript</strong> 构建的网页游戏合集，
-      不依赖任何第三方游戏引擎或框架。每个游戏均为独立的单 HTML 文件，即开即玩。
+      这个游戏大厅的全部代码由 AI 编程助手（代号 <strong style="color:#b388ff">代码助手</strong>，Agent ID: D2GPcF）
+      基于 <strong style="color:#b388ff">DeepSeek</strong> 模型、运行在 <strong style="color:#b388ff">QwenPaw</strong> 多智能体平台上，
+      通过自然语言对话完成开发。所有游戏代码均为纯手写 HTML + CSS + JavaScript，零游戏引擎依赖，即开即玩。
     </p>
     <p style="margin-top:12px">
-      项目最初作为开发练习产生，逐步扩展为 16 款经典小游戏合集。
-      所有代码完全开源，放于 GitHub 供学习交流。
+      从最初几个经典游戏开始，通过多次迭代对话逐步扩展为 16 款小游戏合集，
+      包括音效系统、BGM、Phaser 引擎迁移、武器升级系统等完整功能。
+      全部代码已开源到 GitHub（MIT License）。
+    </p>
+  </div>
+
+  <div class="about-card">
+    <h3>🤖 开发方式</h3>
+    <p>
+      你说需求，我写代码。每一款游戏都是一个自然语言对话的产物。
+    </p>
+    <ul style="margin-top:8px">
+      <li>「写个贪吃蛇」→ 10 分钟生成可玩版本</li>
+      <li>「加音效」→ 注入 Web Audio API 通用音效库</li>
+      <li>「太简单了加武器升级」→ 4 级火力系统 + 掉落机制</li>
+      <li>「用游戏引擎重写」→ 迁移到 Phaser 3</li>
+      <li>「怪物太好打了」→ 加精英 Boss、弹幕、水平移动</li>
+    </ul>
+    <p style="margin-top:12px;color:#6666aa;font-size:13px">
+      所有需求→实现→修复的完整过程记录在项目的 Git 提交历史中。
     </p>
   </div>
 
@@ -438,11 +457,12 @@
   <div class="about-card">
     <h3>⚙️ 技术栈</h3>
     <ul>
+      <li><strong style="color:#b388ff">DeepSeek</strong> — 底层大语言模型，理解需求并生成全部代码</li>
+      <li><strong style="color:#b388ff">QwenPaw</strong> — 多智能体运行平台，管理 Agent、工具、会话</li>
       <li><strong style="color:#b388ff">HTML5 Canvas</strong> — 游戏渲染（贪吃蛇、俄罗斯方块、太空射击等）</li>
       <li><strong style="color:#b388ff">Phaser 3</strong> — 斗地主、中国象棋（游戏引擎版）</li>
       <li><strong style="color:#b388ff">Web Audio API</strong> — 音效系统，纯代码生成，零外部音频文件</li>
       <li><strong style="color:#b388ff">响应式 + 触屏</strong> — 同时支持桌面键盘和手机触控操作</li>
-      <li><strong style="color:#b388ff">CSS 动画</strong> — 消行效果、粒子特效、UI 交互动画</li>
     </ul>
   </div>
 
@@ -461,14 +481,15 @@
   <div class="about-card">
     <h3>💬 说明</h3>
     <p>
-      项目处于持续完善中，欢迎反馈意见。<br>
+      这是 AI 编程的一次实践——验证大语言模型能否通过纯对话协作完成完整游戏开发。<br>
+      结果证明：16 款游戏、音效系统、BGM、Phaser 迁移、武器升级……全部对话搞定。<br>
       部分游戏使用了 Phaser 3 引擎（CDN 加载），首次加载可能需要从 jsdelivr 拉取。
     </p>
   </div>
 </section>
 
 <footer>
-  游戏大厅 · 慢慢填坑中 🚧
+  由 AI 编程助手生成 · <a href="https://github.com/zhuzhuppx/web-game" style="color:#555588;text-decoration:none">GitHub</a>
 </footer>
 
 <script>
