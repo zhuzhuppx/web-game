@@ -29,21 +29,21 @@ loop()}
 
 function spawnWave(){wave++;document.getElementById('wave').textContent=wave
 var seq=[];
-// Build enemy sequence by wave. Higher wave = bigger enemies
+// Build enemy sequence by wave. Higher wave = bigger enemies. No smalls after wave 4.
 if(wave<=2){for(var i=0;i<4+wave*2;i++)seq.push('small');if(wave>=2)seq.push('medium')}
 else if(wave<=4){for(var i=0;i<wave+2;i++)seq.push('small');for(var i=0;i<wave-1;i++)seq.push('medium');seq.push('large')}
-else if(wave<=6){for(var i=0;i<4;i++)seq.push('small');for(var i=0;i<wave-1;i++)seq.push('medium');for(var i=0;i<wave-3;i++)seq.push('large');seq.push('boss')}
-else if(wave<=9){for(var i=0;i<4;i++)seq.push('small');for(var i=0;i<wave;i++)seq.push('medium');for(var i=0;i<wave-4;i++)seq.push('large');seq.push('elite');seq.push('boss')}
-else{for(var i=0;i<wave;i++)seq.push('medium');for(var i=0;i<wave-4;i++)seq.push('large');seq.push('elite');for(var i=0;i<2;i++)seq.push('boss')}
+else if(wave<=5){for(var i=0;i<wave+1;i++)seq.push('medium');for(var i=0;i<wave-3;i++)seq.push('large');seq.push('boss')}
+else if(wave<=8){for(var i=0;i<wave+1;i++)seq.push('medium');for(var i=0;i<wave-3;i++)seq.push('large');seq.push('elite');seq.push('boss')}
+else{for(var i=0;i<wave+1;i++)seq.push('medium');for(var i=0;i<wave-3;i++)seq.push('large');seq.push('elite');for(var i=0;i<2;i++)seq.push('boss')}
 // Spawn sequentially with staggered delays
 var delay=0;
 for(var i=0;i<seq.length;i++){(function(t,d){setTimeout(function(){if(gameOver)return;
 var e;var wv=wave||1;
-if(t==='small')e={x:Math.random()*(W-20),y:-30,w:24,h:24,hp:1,vy:0.5+wv*0.1,shootTimer:90+Math.random()*120,type:'small'}
-else if(t==='medium')e={x:Math.random()*(W-32),y:-50,w:40,h:40,hp:3+Math.floor(wv/2),vy:0.3+wv*0.08,shootTimer:60+Math.random()*120,type:'medium'}
-else if(t==='large')e={x:Math.random()*(W-44),y:-70,w:56,h:56,hp:6+Math.floor(wv/2),vy:0.2+wv*0.06,shootTimer:40+Math.random()*100,type:'large'}
-else if(t==='boss')e={x:Math.random()*(W-64),y:-100,w:80,h:80,hp:12+wv,vy:0.1+wv*0.04,shootTimer:20+Math.random()*80,type:'boss'}
-else if(t==='elite')e={x:Math.random()*(W-80),y:-120,w:100,h:100,hp:25+wv*2,vy:0.06+wv*0.02,shootTimer:10+Math.random()*60,type:'elite',spawned:false}
+if(t==='small')e={x:Math.random()*(W-20),y:-30,w:24,h:24,hp:3,vy:0.5+wv*0.1,shootTimer:90+Math.random()*120,type:'small'}
+else if(t==='medium')e={x:Math.random()*(W-32),y:-50,w:40,h:40,hp:8+Math.floor(wv),vy:0.3+wv*0.08,shootTimer:60+Math.random()*120,type:'medium'}
+else if(t==='large')e={x:Math.random()*(W-44),y:-70,w:56,h:56,hp:15+Math.floor(wv),vy:0.2+wv*0.06,shootTimer:40+Math.random()*100,type:'large'}
+else if(t==='boss')e={x:Math.random()*(W-64),y:-100,w:80,h:80,hp:30+Math.floor(wv*2),vy:0.1+wv*0.04,shootTimer:20+Math.random()*80,type:'boss'}
+else if(t==='elite')e={x:Math.random()*(W-80),y:-120,w:100,h:100,hp:60+Math.floor(wv*4),vy:0.06+wv*0.02,shootTimer:10+Math.random()*60,type:'elite',spawned:false}
 enemies.push(e)
 // Elite spawns mini-waves of small enemies
 if(t==='elite'){var iv=setInterval(function(){if(gameOver||!enemies.some(function(en){return en.type==='elite'})){clearInterval(iv);return}enemies.push({x:Math.random()*(W-20),y:-30,w:24,h:24,hp:1,vy:0.8+wv*0.1,shootTimer:60+Math.random()*80,type:'small'})},1500)}
@@ -161,7 +161,7 @@ function drawAlien(e){
   if(e.type==='large'||e.type==='boss'){ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.shadowBlur=2;for(var ti=-1;ti<=1;ti+=2){ctx.beginPath();ctx.moveTo(ti*6*s,6*s);ctx.lineTo(ti*10*s,10*s);ctx.stroke();ctx.beginPath();ctx.moveTo(ti*3*s,7*s);ctx.lineTo(ti*7*s,11*s);ctx.stroke()}}
   ctx.shadowBlur=0;
   // HP bar for non-small enemies
-  if(hps>1&&e.type!=='small'){var bw=e.w*0.6,bh=3;var maxHp={'medium':3,'large':6,'boss':12,'elite':25}[e.type]||6;var pct=Math.min(1,hps/maxHp);ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(-bw/2,-e.h/2-bh-4,bw,bh);ctx.fillStyle=pct>0.3?'#44ff88':'#ff4466';ctx.fillRect(-bw/2,-e.h/2-bh-4,bw*pct,bh)}
+  if(hps>1&&e.type!=='small'){var bw=e.w*0.6,bh=3;var maxHp={'medium':8,'large':15,'boss':30,'elite':60}[e.type]||6;var pct=Math.min(1,hps/maxHp);ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(-bw/2,-e.h/2-bh-4,bw,bh);ctx.fillStyle=pct>0.3?'#44ff88':'#ff4466';ctx.fillRect(-bw/2,-e.h/2-bh-4,bw*pct,bh)}
   ctx.restore();
 }
 
