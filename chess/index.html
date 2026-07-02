@@ -13,12 +13,51 @@ body{background:#0a0a1a;display:flex;align-items:center;justify-content:center;m
 .btn{padding:8px 24px;border:none;border-radius:8px;background:rgba(255,170,68,0.15);color:#ffaa44;font-size:14px;cursor:pointer;font-family:system-ui}
 .btn:active{background:rgba(255,170,68,0.25)}
 .back{color:#8888cc;text-decoration:none;font-size:14px;position:absolute;bottom:12px;left:12px;z-index:100;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:6px;backdrop-filter:blur(4px)}
+/* AI Settings Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;max-width:380px;width:90%;color:#ccc}
+.modal h2{font-size:18px;color:#ffaa44;margin-bottom:16px}
+.modal label{display:block;font-size:14px;color:#aaa;margin-bottom:4px;margin-top:12px}
+.modal input[type=text]{width:100%;padding:10px 14px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.04);color:#fff;font-size:14px;outline:none}
+.modal input[type=text]:focus{border-color:#ffaa44}
+.modal .hint{font-size:12px;color:#666;margin-top:4px}
+.modal .btns{display:flex;gap:8px;margin-top:20px}
+.modal .btns button{flex:1;padding:10px;border:none;border-radius:8px;font-size:14px;cursor:pointer}
+.modal .btns .ok{background:#ffaa44;color:#1a1a2e;font-weight:600}
+.modal .btns .ok:hover{background:#ffbb55}
+.modal .btns .no{background:rgba(255,255,255,0.06);color:#888}
+.modal .btns .no:hover{background:rgba(255,255,255,0.1)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.toggle-row span{font-size:14px;color:#ccc}
+.toggle{width:44px;height:24px;border-radius:12px;background:#444;cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0}
+.toggle.on{background:#ffaa44}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform 0.2s}
+.toggle.on::after{transform:translateX(20px)}
+.aiset{display:none}.aiset.show{display:block}
 </style>
-<div class="wrap"><div class="hdr"><h1>♟️ 中国象棋</h1><div class="s"><span><b id="turn">红方</b>走棋</span></div></div>
+<div class="wrap"><div class="hdr"><h1>♟️ 中国象棋</h1><div class="s"><span><b id="turn">红方</b>走棋</span><span id="aiBadge" style="margin-left:8px;font-size:11px;background:rgba(255,170,68,0.15);color:#ffaa44;padding:2px 6px;border-radius:4px;display:none">AI</span></div></div>
 <div id="game"></div>
 <div class="msg" id="msg">点击选中棋子，再点击目标位置</div>
 <button class="btn" onclick="window.scene && window.scene.startGame()">🔄 重新开局</button>
+<button class="btn" onclick="showAIModal()" style="background:rgba(255,255,255,0.04);color:#8888bb">🤖 AI设置</button>
 <a class="back" href="/">← 返回</a></div>
+
+<!-- AI Settings Modal -->
+<div class="modal-overlay" id="aiModal">
+<div class="modal">
+<h2>🤖 AI 对手设置</h2>
+<div class="toggle-row"><span>使用超级 AI（大模型下棋）</span><div class="toggle" id="aiToggle" onclick="toggleAI()"></div></div>
+<div class="aiset" id="aiSet">
+<label>DeepSeek API Key</label>
+<input type="text" id="apiKey" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+<div class="hint">提供 DeepSeek Key 后 AI 会用大模型思考棋路，否则使用系统算法</div>
+</div>
+<div class="btns">
+<button class="ok" onclick="saveAISettings()">确定</button>
+<button class="no" onclick="closeAIModal()">不用超级AI</button>
+</div>
+</div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
 <script>
@@ -63,10 +102,24 @@ function alphaBeta(board,depth,alpha,beta,color,isMax){if(depth===0)return evalB
 var curColor=isMax?color:getOpponentColor(color)
 var moves=[];for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===curColor){var vm=validMoves(r,c,board,curColor);for(var i=0;i<vm.length;i++)moves.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c})}}
 if(isMax){var maxE=-99999;for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=alphaBeta(board,depth-1,alpha,beta,color,false);if(val>maxE)maxE=val;if(val>alpha)alpha=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return maxE}else{var minE=99999;for(var i=0;i<moves.length;i++){var captured=makeMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc});if(!isCheck(board,curColor)){var val=alphaBeta(board,depth-1,alpha,beta,color,true);if(val<minE)minE=val;if(val<beta)beta=val}undoMove(board,{r:moves[i].fr,c:moves[i].fc},{r:moves[i].tr,c:moves[i].tc},captured);if(beta<=alpha)break}return minE}}
+// AI config modal
+function showAIModal(){document.getElementById('aiModal').classList.add('show')
+var enabled=localStorage.getItem('chess_ai_enabled')==='true';var key=localStorage.getItem('chess_llm_key')||''
+document.getElementById('aiToggle').classList.toggle('on',enabled);document.getElementById('aiSet').classList.toggle('show',enabled)
+document.getElementById('apiKey').value=key}
+function closeAIModal(){document.getElementById('aiModal').classList.remove('show')}
+function toggleAI(){var el=document.getElementById('aiToggle');var on=el.classList.toggle('on');document.getElementById('aiSet').classList.toggle('show',on)}
+function saveAISettings(){var enabled=document.getElementById('aiToggle').classList.contains('on');var key=document.getElementById('apiKey').value.trim()
+localStorage.setItem('chess_ai_enabled',enabled?'true':'false')
+if(key)localStorage.setItem('chess_llm_key',key);else localStorage.removeItem('chess_llm_key')
+closeAIModal();var badge=document.getElementById('aiBadge');badge.style.display=(enabled&&key)?'inline':'none'
+if(window.scene)window.scene.startGame()}
+function refreshAIBadge(){var badge=document.getElementById('aiBadge');badge.style.display=isAIEnabled()?'inline':'none'}
+function isAIEnabled(){return localStorage.getItem('chess_ai_enabled')==='true'&&!!localStorage.getItem('chess_llm_key')}
 function boardToText(board){var s='',names={'r':'车','h':'马','e':'相','a':'仕','k':'帅','c':'炮','p':'兵','R':'車','H':'馬','E':'象','A':'士','K':'將','C':'砲','P':'卒'};for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){var p=board[r][c];s+=p?names[p.type]||p.type:'.'}s+='\n'}return s}
-function callLLM(board,color){return new Promise(function(resolve){var key=localStorage.getItem('chess_llm_key');if(!key){resolve(null);return}
-var ep=localStorage.getItem('chess_llm_endpoint')||'https://api.openai.com/v1/chat/completions'
-var model=localStorage.getItem('chess_llm_model')||'gpt-4o-mini'
+function callLLM(board,color){return new Promise(function(resolve){var key=localStorage.getItem('chess_llm_key');if(!key||localStorage.getItem('chess_ai_enabled')!=='true'){resolve(null);return}
+var ep=localStorage.getItem('chess_llm_endpoint')||'https://api.deepseek.com/v1/chat/completions'
+var model=localStorage.getItem('chess_llm_model')||'deepseek-chat'
 var boardText=boardToText(board);var colorName=color==='r'?'红方':'黑方'
 var prompt='你是一个中国象棋AI。当前棋盘（上=黑方，下=红方，.为空，大写=黑子，小写=红子）：\n\n'+boardText+'\n轮到了'+colorName+'走棋。请分析局面，只输出一步最佳走法，格式为"行,列 → 行,列"（0-9行，0-8列），不要其他内容。例如"7,1 → 4,1"表示炮二平五。'
 fetch(ep,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:model,messages:[{role:'user',content:prompt}],temperature:0.3,max_tokens:50})})
@@ -111,6 +164,7 @@ class ChessScene extends Phaser.Scene {
     
     this.drawBoard();
     this.startGame();
+    setTimeout(() => { showAIModal(); refreshAIBadge(); }, 200);
   }
 
   boardX(c) { return this.padding + c * this.CELL; }
