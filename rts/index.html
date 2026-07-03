@@ -204,7 +204,7 @@ function _tick(){
     if(u.st==='moving'){var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d<0.3){u.st='idle'}else{moveToward(u,{x:u.tx,y:u.ty})}}
     else if(u.st==='attacking'){
       // Always try to attack first if ready
-      if(u.cd<=0){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){var wasAlive=t.hpRef.hp>0;t.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=t.x-u.x;u.dy=t.y-u.y;u.tx=t.x;u.ty=t.y;var m=muzzlePos(u);if(typeof sfxPew==='function')sfxPew();spawnBullet(m.x,m.y,t.x*TS,t.y*TS,'#ffff88');if(wasAlive&&t.hpRef.hp<=0)grantXp(u,t.hpRef.t==='tank'?15:8)}}
+      if(u.cd<=0){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){var wasAlive=t.hpRef.hp>0;t.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=t.x-u.x;u.dy=t.y-u.y;u.tx=t.x;u.ty=t.y;var m=muzzlePos(u);if(typeof sfxPew==='function')sfxPew(u.lv);spawnBullet(m.x,m.y,t.x*TS,t.y*TS,'#ffff88');if(wasAlive&&t.hpRef.hp<=0)grantXp(u,t.hpRef.t==='tank'?15:8)}}
       // Then move toward target
       var d=Math.hypot(u.tx-u.x,u.ty-u.y);
       if(d>0.2)moveToward(u,{x:u.tx,y:u.ty})
@@ -274,13 +274,13 @@ function _tick(){
       continue;
     }
     var et=nearUnit(u,cachedE)||near(u,cachedE);
-    if(et){if(u.cd<=0){var wa=et.hpRef.hp>0;et.hpRef.hp-=u.atk;u.cd=u.rate;var m=muzzlePos(u);if(typeof sfxPew==='function')sfxPew();spawnBullet(m.x,m.y,et.x*TS,et.y*TS,'#ff6666');if(wa&&et.hpRef.hp<=0)grantXp(u,et.hpRef.t==='tank'?15:8)}}
+    if(et){if(u.cd<=0){var wa=et.hpRef.hp>0;et.hpRef.hp-=u.atk;u.cd=u.rate;var m=muzzlePos(u);if(typeof sfxPew==='function')sfxPew(u.lv);spawnBullet(m.x,m.y,et.x*TS,et.y*TS,'#ff6666');if(wa&&et.hpRef.hp<=0)grantXp(u,et.hpRef.t==='tank'?15:8)}}
     
     if(must_defend&&ehq){
       var intruders=cachedE.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5});
       if(intruders.length){
         // Attack if cd ready, always chase intruders
-        if(u.cd<=0){var ct=nearUnit(u,intruders)||near(u,intruders);if(ct){var wa2=ct.hpRef.hp>0;ct.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=ct.x-u.x;u.dy=ct.y-u.y;var m=muzzlePos(u);if(typeof sfxPew==='function')sfxPew();spawnBullet(m.x,m.y,ct.x*TS,ct.y*TS,'#ff6666');if(wa2&&ct.hpRef.hp<=0)grantXp(u,ct.hpRef.t==='tank'?15:8)}}
+        if(u.cd<=0){var ct=nearUnit(u,intruders)||near(u,intruders);if(ct){var wa2=ct.hpRef.hp>0;ct.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=ct.x-u.x;u.dy=ct.y-u.y;var m=muzzlePos(u);if(typeof sfxPew==='function')sfxPew(u.lv);spawnBullet(m.x,m.y,ct.x*TS,ct.y*TS,'#ff6666');if(wa2&&ct.hpRef.hp<=0)grantXp(u,ct.hpRef.t==='tank'?15:8)}}
         if(!u.cd||u.cd>0)moveToward(u,closest(u,intruders))
       }else{
         var distHome=Math.hypot(ehq.x+0.5-u.x,ehq.y+0.5-u.y);
