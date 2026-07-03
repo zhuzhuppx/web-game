@@ -417,12 +417,8 @@ function draw(){
   for(var i=0;i<P.blds.length;i++)drawBld(P.blds[i],'#3355aa','#2244cc','#5588ff');
   for(var i=0;i<E.blds.length;i++)drawBld(E.blds[i],'#aa3333','#cc2222','#ff4444');
   // Units
-  for(var i=0;i<P.units.length;i++){var u=P.units[i];
-    if(u._spawn||u._toRef){ctx.globalAlpha=0.4+Math.sin(frame*0.3)*0.3}
-    drawUnit(P.units[i],'#4488ff','#2266dd');ctx.globalAlpha=1}
-  for(var i=0;i<E.units.length;i++){var u=E.units[i];
-    if(u._spawn||u._toRef){ctx.globalAlpha=0.4+Math.sin(frame*0.3)*0.3}
-    drawUnit(E.units[i],'#ff5544','#dd3322');ctx.globalAlpha=1}
+  for(var i=0;i<P.units.length;i++)drawUnit(P.units[i],'#4488ff','#2266dd');
+  for(var i=0;i<E.units.length;i++)drawUnit(E.units[i],'#ff5544','#dd3322');
   
   // Particlez
   for(var i=fx.length-1;i>=0;i--){var p=fx[i];p.life--;if(p.life<=0){fx.splice(i,1);continue}
