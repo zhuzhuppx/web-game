@@ -87,8 +87,8 @@ function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   // check buildings (allow leaving own tile)
   var ox=Math.floor(self?self.x:gx),oy=Math.floor(self?self.y:gy);
   var all=P.blds.concat(E.blds);for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;if(ix===all[i].x&&iy===all[i].y&&!(self&&ix===ox&&iy===oy&&all[i].o===self.o))return false}
-  // check units (all sides, skip self)
-  var allu=P.units.concat(E.units);for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
+  // check units (all sides, skip self and friendly harvesters)
+  var allu=P.units.concat(E.units);for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(ou.t==='harvester'&&self&&self.t==='harvester'&&ou.o===self.o)continue;if(Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
   return true}
 function spawnFx(x,y,color,n){if(fx.length>200)return;for(var i=0;i<(n||8);i++){fx.push({x:x,y:y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3-1,life:20+Math.random()*15,c:color||'#ff8844',s:2+Math.random()*3})}}
 function spawnBldFx(b){if(fx.length>200)return;for(var i=0;i<14;i++){fx.push({x:(b.x+0.5)*TS,y:(b.y+0.5)*TS,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-2,life:25+Math.random()*15,c:b.o==='p'?'#66aaff':'#ff6644',s:3+Math.random()*4})}}
@@ -163,7 +163,7 @@ function cmd(a){
       if(nx<0||nx>=GW||ny<0||ny>=GH)continue;
       var occ=P.blds.concat(E.blds).some(function(b){return b.x===nx&&b.y===ny});
       if(occ)continue;
-      P.gold-=250;var refB=addBld('refinery',nx,ny,350,'p');addUnit('harvester',nx+0.5,ny+0.5,'p');msg('✅ 精炼厂建成，附赠矿车',2000);upd();return}
+      P.gold-=250;addBld('refinery',nx,ny,350,'p');addUnit('harvester',nx+0.5,ny+0.5,'p');msg('✅ 精炼厂建成，附赠矿车',2000);upd();return}
     msg('❌ HQ旁无空地',1500)}
   if(a==='harvester'){
     if(!hasB(P,'refinery')){msg('❌ 需要先建造精炼厂',1500);return}
