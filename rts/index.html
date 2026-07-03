@@ -43,7 +43,7 @@ map[GH-3][GW-2]=0;map[GH-2][GW-3]=0;map[GH-3][GW-3]=0; // enemy spawn
 // === GAME STATE ===
 var uid=0,frame=0,sel=null,over=false;
 var P={gold:1200,units:[],blds:[]};
-var E={gold:1000,units:[],blds:[],aiCd:0,wave:0};
+var E={gold:1000,units:[],blds:[],aiCd:0,wave:0,attackReady:false};
 
 function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};(o==='p'?P.blds:E.blds).push(b);return b}
 function addUnit(t,x,y,o){var s=t==='tank'?{hp:150,atk:28,rng:1.8,spd:0.015,rate:50}:{hp:65,atk:12,rng:1.4,spd:0.028,rate:32};
@@ -154,17 +154,23 @@ function tick(){
   }
   // Enemy AI
   var ehq=hqOf(E);var e_base_threat=ehq?cachedE.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5}).length:0;
-  var must_defend=e_base_threat>=2; // defend only when player units near base
+  var must_defend=e_base_threat>=2;
   if(must_defend&&!E._defending){E._defending=true;msg('🛡️ 敌军回防！',2000)}
   if(!must_defend)E._defending=false;
   
+  // Group attack logic: gather 5+ then strike
+  var e_alive=E.units.filter(function(u){return u.hp>0}).length;
+  if(!must_defend){
+    if(!E.attackReady&&e_alive>=5){E.attackReady=true;msg('⚔️ 敌军集结完毕，发起进攻！',2000)}
+    if(E.attackReady&&e_alive<2){E.attackReady=false;msg('💨 敌军败退，重新集结…',2000)}
+  }
+  
   for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){E.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
-    var et=nearUnit(u,cachedE)||near(u,cachedE); // prioritize player units over buildings
-    if(et){if(u.cd<=0){et.hpRef.hp-=u.atk;u.cd=u.rate}} // fire!
+    var et=nearUnit(u,cachedE)||near(u,cachedE);
+    if(et){if(u.cd<=0){et.hpRef.hp-=u.atk;u.cd=u.rate}}
     
     if(must_defend&&ehq){
-      // DEFEND: move toward home base, attack intruders
       var intruders=cachedE.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5});
       if(intruders.length&&u.cd<=0){
         var ct=nearUnit(u,intruders)||near(u,intruders);if(ct){ct.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=ct.x-u.x;u.dy=ct.y-u.y;}
@@ -173,10 +179,13 @@ function tick(){
         var distHome=Math.hypot(ehq.x+0.5-u.x,ehq.y+0.5-u.y);
         if(distHome>4)moveToward(u,{x:ehq.x+0.5+Math.random()-0.5,y:ehq.y+0.5+Math.random()-0.5})
       }
-    }else{
-      // ATTACK: push toward player HQ
+    }else if(E.attackReady){
+      // Attack wave: push toward player HQ
       var hq=hqOf(P);
       if(!et&&hq){var d=Math.hypot(hq.x+0.5-u.x,hq.y+0.5-u.y);if(d>1.5)moveToward(u,{x:hq.x+0.5,y:hq.y+0.5})}
+    }else{
+      // Gathering: hang around HQ
+      if(!et&&ehq){var dh=Math.hypot(ehq.x+0.5-u.x,ehq.y+0.5-u.y);if(dh>3)moveToward(u,{x:ehq.x+0.5+Math.random()-0.5,y:ehq.y+0.5+Math.random()-0.5})}
     }
   }
   // AI spawn
