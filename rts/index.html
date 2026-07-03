@@ -115,23 +115,25 @@ function upd(){
 }
 
 // === UPDATE ===
+var cachedP=null,cachedE=null;
 function tick(){
-  if(over)return;frame++;
-  var dt=1;
+  if(over||tick.running)return;tick.running=true;
+  frame++;var dt=1;
+  cachedP=allTargets('p');cachedE=allTargets('e');
   // Player units
   for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
     if(u.st==='moving'){var ex=u.tx-u.x,ey=u.ty-u.y,d=Math.hypot(ex,ey);if(d<0.3){u.st='idle'}else{u.x+=(ex/d)*u.spd*dt;u.y+=(ey/d)*u.spd*dt}}
-    else if(u.st==='idle'&&u.cd<=0){var t=near(u,allTargets('p'));if(t){u.st='attacking';u.tx=t.x;u.ty=t.y}}
-    else if(u.st==='attacking'){var t=allTargets('p').find(function(v){return v.x===u.tx&&v.y===u.ty});
-      if(!t||t.hpRef.hp<=0){u.st='idle'}else{var d=Math.hypot(t.x-u.x,t.y-u.y);
-        if(d>u.rng){u.x+=(u.tx-u.x)/d*u.spd*dt;u.y+=(u.ty-u.y)/d*u.spd*dt}else{if(u.cd<=0){t.hpRef.hp-=u.atk;u.cd=u.rate;if(typeof sfxHit==='function')sfxHit()}}}}
+    else if(u.st==='idle'&&u.cd<=0){var t=near(u,cachedP);if(t){u.st='attacking';u.tx=t.x;u.ty=t.y}}
+    else if(u.st==='attacking'){
+      if(u.cd<=0){var t=near(u,cachedP);if(t){t.hpRef.hp-=u.atk;u.cd=u.rate;if(typeof sfxHit==='function')sfxHit()}else{u.st='idle'}}
+      else{var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d>u.rng){u.x+=(u.tx-u.x)/d*u.spd*dt;u.y+=(u.ty-u.y)/d*u.spd*dt}}
+    }
   }
   // Enemy units
   for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){E.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
-    var et=near(u,allTargets('e'));
-    if(et){if(u.cd<=0){et.hpRef.hp-=u.atk;u.cd=u.rate}}else{
+    if(u.cd<=0){var et=near(u,cachedE);if(et){et.hpRef.hp-=u.atk;u.cd=u.rate}}else{
       var hq=hqOf(P);if(hq){var dx=hq.x+0.5-u.x,dy=hq.y+0.5-u.y,d=Math.hypot(dx,dy);if(d>1.5){u.x+=(dx/d)*u.spd*dt;u.y+=(dy/d)*u.spd*dt}}}
   }
   // AI spawn
@@ -211,6 +213,13 @@ function click(gx,gy){
 }
 
 // === START ===
-draw();upd();setInterval(tick,1000/30);
+draw();upd();
+var lastTick=0;
+function loop(t){
+  if(!over){if(t-lastTick>=33){lastTick=t;tick.running=false;tick()}}
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 </script>
 </html>
