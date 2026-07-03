@@ -66,6 +66,46 @@ function sfxFreqSweep(f1, f2, dur, type, vol) {
 function sfxClick()   { sfxTone(800, 0.05, 'square', 0.05); }
 function sfxMove()    { sfxTone(600, 0.05, 'square', 0.05); }
 function sfxTankMove(){ sfxNoise(0.12, 0.08); sfxFreqSweep(80, 40, 0.15, 'sawtooth', 0.06); }
+
+// ---- 坦克履带连续音效 ----
+var tankSoundNodes = [];
+function sfxTankStart() {
+  try {
+    sfxInit(); sfxResume();
+    var now = sfxCtx.currentTime;
+    // Low rumble oscillator (continuous)
+    var o = sfxCtx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(55, now);
+    var g = sfxCtx.createGain();
+    g.gain.setValueAtTime(0.06, now);
+    o.connect(g); g.connect(sfxGain); o.start();
+    // Noise layer for tread grinding
+    var buf = sfxCtx.createBuffer(1, sfxCtx.sampleRate * 0.3, sfxCtx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
+    var ns = sfxCtx.createBufferSource(); ns.buffer = buf; ns.loop = true;
+    var ng = sfxCtx.createGain();
+    ng.gain.setValueAtTime(0.04, now);
+    // Filter to make it sound mechanical
+    var bp = sfxCtx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 200; bp.Q.value = 1;
+    ns.connect(bp); bp.connect(ng); ng.connect(sfxGain); ns.start();
+    tankSoundNodes = [o, ns, g, ng, bp];
+  } catch(e) {}
+}
+function sfxTankStop() {
+  try {
+    if (!tankSoundNodes.length) return;
+    var now = sfxCtx.currentTime;
+    tankSoundNodes[2].gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    tankSoundNodes[3].gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    setTimeout(function() {
+      try { tankSoundNodes[0].stop(); tankSoundNodes[1].stop(); } catch(e) {}
+      tankSoundNodes = [];
+    }, 400);
+  } catch(e) {}
+}
 function sfxSelect()  { sfxTone(1000, 0.08, 'sine', 0.07); setTimeout(function() { sfxTone(1200, 0.08, 'sine', 0.05); }, 60); }
 function sfxBlip()    { sfxTone(880, 0.06, 'triangle', 0.07); }
 function sfxEat()     { sfxFreqSweep(400, 800, 0.1, 'sine', 0.08); }

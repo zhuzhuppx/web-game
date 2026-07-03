@@ -227,12 +227,15 @@ function tick(){
   if(!pAlive){over=true;msg('💀 失败！所有建筑被摧毁',99999)}
   if(!eAlive){over=true;msg('🎉 胜利！敌方全灭',99999)}
   // Movement sound
-  moveSoundCd-=dt;if(moveSoundCd<=0){var inf=false,tank=false;
-    for(var i=0;i<P.units.length;i++){var u=P.units[i];if(u._moved){u._moved=false;u.t==='tank'?tank=true:inf=true}}
-    for(var i=0;i<E.units.length;i++){var u=E.units[i];if(u._moved){u._moved=false;u.t==='tank'?tank=true:inf=true}}
-    if(tank&&typeof sfxTankMove==='function')sfxTankMove();
-    else if(inf&&typeof sfxMove==='function')sfxMove();
-    if(tank||inf)moveSoundCd=tank?22:15}
+  moveSoundCd-=dt;
+  var anyTank=false,anyInf=false;
+  for(var i=0;i<P.units.length;i++){var u=P.units[i];if(u._moved){u._moved=false;u.t==='tank'?anyTank=true:anyInf=true}}
+  for(var i=0;i<E.units.length;i++){var u=E.units[i];if(u._moved){u._moved=false;u.t==='tank'?anyTank=true:anyInf=true}}
+  // Continuous tank tread sound
+  if(anyTank){if(!tankSoundNodes.length&&typeof sfxTankStart==='function')sfxTankStart()}
+  else{if(tankSoundNodes.length&&typeof sfxTankStop==='function')sfxTankStop()}
+  // Infantry footstep (periodic)
+  if(moveSoundCd<=0&&anyInf&&typeof sfxMove==='function'){sfxMove();moveSoundCd=12}
   
   if(frame%8===0)draw();
 }
