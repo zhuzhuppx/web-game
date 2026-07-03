@@ -67,7 +67,16 @@ function uName(t){return{rifle:'🔫',tank:'🛡️'}[t]||t}
 function near(u,list){
   var b=null,bd=999;for(var i=0;i<list.length;i++){var t=list[i];var d=Math.hypot(t.x-u.x,t.y-u.y);if(d<=u.rng&&d<bd){bd=d;b=t}}return b}
 function closest(u,list){var b=null,bd=999;for(var i=0;i<list.length;i++){var t=list[i];var d=Math.hypot(t.x-u.x,t.y-u.y);if(d<bd){bd=d;b=t}}return b}
-function moveToward(u,t,spd){var dx=t.x-u.x,dy=t.y-u.y,d=Math.hypot(dx,dy);if(d>0.2){u.x+=(dx/d)*(spd||u.spd);u.y+=(dy/d)*(spd||u.spd);u.dx=dx;u.dy=dy}}
+function moveToward(u,t,spd){var dx=t.x-u.x,dy=t.y-u.y,d=Math.hypot(dx,dy);if(d>0.2){
+  var s=spd||u.spd;var nx=u.x+(dx/d)*s,ny=u.y+(dy/d)*s;
+  // wall slide: try straight first, then axis-aligned
+  if(canPass(nx,ny,u)){u.x=nx;u.y=ny}else if(canPass(u.x,ny,u)){u.y=ny}else if(canPass(nx,u.y,u)){u.x=nx}
+  u.dx=dx;u.dy=dy}}
+function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
+  if(ix<0||ix>=GW||iy<0||iy>=GH)return false;if(map[iy][ix]===1)return false;
+  // check buildings
+  var all=P.blds.concat(E.blds);for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;if(all[i].x===ix&&all[i].y===iy)return false}
+  return true}
 
 function allTargets(o){var r=[];var src=o==='p'?E:P;
   for(var i=0;i<src.blds.length;i++){var b=src.blds[i];if(b.hp>0)r.push({x:b.x+0.5,y:b.y+0.5,hpRef:b})}
@@ -95,8 +104,9 @@ function cmd(a){
     if(!hasB(P,a==='tank'?'factory':'barracks')){msg('❌ 需要先建造对应建筑',1500);return}
     if(P.units.length>=40){msg('👥 人口已满！',1500);return}
     var hq=hqOf(P);if(!hq)return;
-    // Spawn near HQ but with slight offset so they don't stack
-    var sx=hq.x+0.5+Math.random()*2-1,sy=hq.y+1.2+Math.random();
+    // Spawn near HQ, avoid obstacles
+    var sx=hq.x+0.5,sy=hq.y+1.5;var offs=[{x:0.5,y:1.5},{x:-0.5,y:1.5},{x:0.5,y:2.5},{x:-0.5,y:2.5},{x:1.5,y:0.5},{x:1.5,y:1.5},{x:-1.5,y:1.5}];
+    for(var oi=0;oi<offs.length;oi++){sx=hq.x+offs[oi].x;sy=hq.y+offs[oi].y;if(canPass(sx,sy))break}
     addUnit(a,sx,sy,'p');P.gold-=cost;
     msg('✅ '+uName(a)+' 训练完成',2000);if(typeof sfxBlip==='function')sfxBlip();upd();return}
   if(a==='rush'){
@@ -125,11 +135,11 @@ function tick(){
   // Player units
   for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
-    if(u.st==='moving'){var ex=u.tx-u.x,ey=u.ty-u.y,d=Math.hypot(ex,ey);if(d<0.3){u.st='idle'}else{u.x+=(ex/d)*u.spd*dt;u.y+=(ey/d)*u.spd*dt;u.dx=ex;u.dy=ey}}
+    if(u.st==='moving'){var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d<0.3){u.st='idle'}else{moveToward(u,{x:u.tx,y:u.ty})}}
     else if(u.st==='idle'&&u.cd<=0){var t=near(u,cachedP);if(t){u.st='attacking';u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
     else if(u.st==='attacking'){
       if(u.cd<=0){var t=near(u,cachedP);if(t){t.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=t.x-u.x;u.dy=t.y-u.y;if(typeof sfxHit==='function')sfxHit()}else{u.st='idle'}}
-      else{var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d>u.rng){u.x+=(u.tx-u.x)/d*u.spd*dt;u.y+=(u.ty-u.y)/d*u.spd*dt;u.dx=u.tx-u.x;u.dy=u.ty-u.y}}
+      else{var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d>u.rng){moveToward(u,{x:u.tx,y:u.ty})}}
     }
   }
   // Enemy AI
@@ -157,7 +167,7 @@ function tick(){
     }else{
       // ATTACK: push toward player HQ
       var hq=hqOf(P);
-      if(!et&&hq){var dx=hq.x+0.5-u.x,dy=hq.y+0.5-u.y,d=Math.hypot(dx,dy);if(d>1.5){u.x+=(dx/d)*u.spd*dt;u.y+=(dy/d)*u.spd*dt;u.dx=dx;u.dy=dy}}
+      if(!et&&hq){var d=Math.hypot(hq.x+0.5-u.x,hq.y+0.5-u.y);if(d>1.5)moveToward(u,{x:hq.x+0.5,y:hq.y+0.5})}
     }
   }
   // AI spawn
