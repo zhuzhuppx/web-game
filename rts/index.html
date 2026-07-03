@@ -150,7 +150,7 @@ function cmd(a){
     var tg=allTargets('p');if(!tg.length)return;
     var cx=0,cy=0;for(var i=0;i<tg.length;i++){cx+=tg[i].x;cy+=tg[i].y}
     cx/=tg.length;cy/=tg.length;
-    for(var i=0;i<P.units.length;i++){var u=P.units[i];if(u.hp<=0||u.t==='harvester')continue;u.st='moving';u.tx=cx+Math.random()*4-2;u.ty=cy+Math.random()*2-1;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
+    for(var i=0;i<P.units.length;i++){var u=P.units[i];if(u.hp<=0||u.t==='harvester')continue;u.st='moving';u._rt=0;u.tx=cx+Math.random()*4-2;u.ty=cy+Math.random()*2-1;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
     msg('⚔️ 全军出击！',1500)}
   if(a==='retreat'){
     var hq=hqOf(P);if(!hq){msg('❌ 基地已毁！',1500);return}
