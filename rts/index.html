@@ -101,8 +101,8 @@ function grantXp(u,amount){
     if(typeof sfxPowerUp==='function')sfxPowerUp()
     need=u.lv*20}
 }
-function muzzlePos(u){var cx=u.x*TS,cy=u.y*TS,angle=u.dx||u.dy?Math.atan2(u.dy,u.dx):(u.o==='p'?0:Math.PI);
-  var barrelLen=u.t==='tank'?TS*0.35:TS*0.15;
+function muzzlePos(u){var cx=u.x*TS+TS/2,cy=u.y*TS+TS/2,angle=u.dx||u.dy?Math.atan2(u.dy,u.dx):(u.o==='p'?0:Math.PI);
+  var barrelLen=u.t==='tank'?TS*0.4:TS*0.22;
   return{x:cx+Math.cos(angle)*barrelLen,y:cy+Math.sin(angle)*barrelLen}}
 function spawnBullet(fx2,fy2,tx,ty,c){if(fx.length>200)return;var dx=tx-fx2,dy=ty-fy2,d=Math.hypot(dx,dy);if(d<0.01)return;
   fx.push({x:fx2,y:fy2,vx:(dx/d)*8,vy:(dy/d)*8,life:Math.ceil(d/8)+1,c:c||'#ffff44',s:1.5,tx:tx,ty:ty})}
