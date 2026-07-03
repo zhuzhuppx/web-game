@@ -199,7 +199,11 @@ function cmd(a){
     if(fac)for(var ei=0;ei<exits.length;ei++){var ex=fac.x+exits[ei][0],ey=fac.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}}
     if(fac)fac._spark=45;
     addUnit('harvester',sx,sy,'p');P.gold-=150;
-    var hv=P.units[P.units.length-1];hv._toRef={x:ref2.x+0.5,y:ref2.y+0.5};
+    var hv=P.units[P.units.length-1];
+    var nearestRef=null,nrDist=999;
+    var allRefs=P.blds.filter(function(b){return b.t==='refinery'&&b.hp>0});
+    for(var ri2=0;ri2<allRefs.length;ri2++){var dr=Math.hypot(allRefs[ri2].x+0.5-sx,allRefs[ri2].y+0.5-sy);if(dr<nrDist){nrDist=dr;nearestRef=allRefs[ri2]}}
+    if(nearestRef)hv._toRef={x:nearestRef.x+0.5,y:nearestRef.y+0.5};else hv._hs='go';
     msg('✅ 矿车出动',2000);upd()}
 }
 
@@ -375,7 +379,12 @@ function _tick(){
           var exits=[[-0.5,-1.5],[0.5,-1.5],[-1.5,-0.5],[-0.5,-0.5],[-0.5,-2.5],[0.5,-2.5],[-1.5,-1.5],[0.5,0.5],[-2.5,-0.5],[-2.5,-1.5],[-1.5,-2.5],[0.5,-3.5]]; // red exits up
           if(efac)for(var ei=0;ei<exits.length;ei++){var ex=efac.x+exits[ei][0],ey=efac.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}}
           if(efac)efac._spark=45;
-          E.gold-=150;addUnit('harvester',sx,sy,'e');E.units[E.units.length-1]._toRef={x:ref.x+0.5,y:ref.y+0.5}}
+          E.gold-=150;addUnit('harvester',sx,sy,'e');
+          // Find nearest refinery for _toRef
+          var nearestRef=null,nrDist=999;
+          var allRefs=E.blds.filter(function(b){return b.t==='refinery'&&b.hp>0});
+          for(var ri2=0;ri2<allRefs.length;ri2++){var dr=Math.hypot(allRefs[ri2].x+0.5-sx,allRefs[ri2].y+0.5-sy);if(dr<nrDist){nrDist=dr;nearestRef=allRefs[ri2]}}
+          if(nearestRef)E.units[E.units.length-1]._toRef={x:nearestRef.x+0.5,y:nearestRef.y+0.5};else E.units[E.units.length-1]._hs='go'}
       // Priority 2: if under threat, build combat units
       }else if(threat>=2&&hasF&&E.gold>=200){E.gold-=200;eSpawn('tank')}
       else if(threat>=2&&!hasF&&E.gold>=100){E.gold-=100;eSpawn('rifle')}
