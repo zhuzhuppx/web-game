@@ -44,7 +44,7 @@ map[GH-3][GW-2]=0;map[GH-2][GW-3]=0;map[GH-3][GW-3]=0; // enemy spawn
 var uid=0,frame=0,sel=null,over=false;
 var fx=[]; // death particles
 var P={gold:1500,units:[],blds:[]};
-var E={gold:1500,units:[],blds:[],aiCd:0,attackReady:false};
+var E={gold:1500,units:[],blds:[],aiCd:50,attackReady:false};
 var moveSoundCd=0; // throttle movement sfx
 
 function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};(o==='p'?P.blds:E.blds).push(b);return b}
@@ -217,15 +217,15 @@ function _tick(){
     }
   }
   // AI build/train (same rules as player)
-  E.aiCd+=dt;if(E.aiCd>180){E.aiCd=0;
+  E.aiCd+=dt;if(E.aiCd>100){E.aiCd=0;
     var ehq2=hqOf(E);if(!ehq2)return;
     // Build priority: barracks > factory > train
     if(!hasB(E,'barracks')&&E.gold>=200){
       var bx=ehq2.x+1,by=ehq2.y;if(canPass(bx,by)){E.gold-=200;addBld('barracks',bx,by,300,'e')}
-      else{E.aiCd=-100} // retry sooner
+      else{E.aiCd=-50} // retry sooner
     }else if(!hasB(E,'factory')&&E.gold>=400){
       var fx=ehq2.x-1,fy=ehq2.y;if(canPass(fx,fy)){E.gold-=400;addBld('factory',fx,fy,400,'e')}
-      else{E.aiCd=-100}
+      else{E.aiCd=-50}
     }else if(E.units.length<40&&hasB(E,'barracks')){
       var hasF=hasB(E,'factory');
       if(hasF&&E.gold>=200){E.gold-=200;eSpawn('tank')}
