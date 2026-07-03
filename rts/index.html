@@ -43,7 +43,7 @@ map[GH-3][GW-2]=0;map[GH-2][GW-3]=0;map[GH-3][GW-3]=0; // enemy spawn
 // === GAME STATE ===
 var uid=0,frame=0,sel=null,over=false;
 var P={gold:1200,units:[],blds:[]};
-var E={gold:1000,units:[],blds:[],aiCd:0,wave:0,attackReady:false};
+var E={gold:1000,units:[],blds:[],aiCd:300,wave:0,attackReady:false};
 
 function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};(o==='p'?P.blds:E.blds).push(b);return b}
 function addUnit(t,x,y,o){var s=t==='tank'?{hp:150,atk:28,rng:1.8,spd:0.015,rate:50}:{hp:65,atk:12,rng:1.4,spd:0.028,rate:32};
@@ -189,8 +189,8 @@ function tick(){
     }
   }
   // AI spawn
-  E.aiCd+=dt;if(E.aiCd>700){E.aiCd=0;E.wave++;
-    var count=1+Math.floor(E.wave/3);if(E.wave>5)count+=1;
+  E.aiCd+=dt;if(E.aiCd>400){E.aiCd=0;E.wave++;
+    var count=2+Math.floor(E.wave/2);if(E.wave>4)count+=1;
     for(var j=0;j<count;j++){if(E.units.length<40&&E.gold>=80){E.gold-=80;
       // Find empty spot near enemy HQ, avoid buildings
       var eh=E.blds.find(function(b){return b.t==='hq'});if(!eh)continue;
@@ -199,7 +199,7 @@ function tick(){
       addUnit(E.gold>300?'tank':'rifle',sx,sy,'e')}}
     msg('⚠️ 第'+E.wave+'波敌军来袭！',3000)}
   // Resources
-  if(frame%50===0){P.gold+=5;E.gold+=5}
+  if(frame%50===0){P.gold+=5;E.gold+=8}
   // Win/lose — check HQ per side directly
   var phq=P.blds.find(function(b){return b.t==='hq'});
   var eq=E.blds.find(function(b){return b.t==='hq'});
