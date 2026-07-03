@@ -147,7 +147,7 @@ function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   var all=allBuildings();for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;
     if(ix===all[i].x&&iy===all[i].y){
       if(!self)return false;
-      if(self.t==='harvester'&&all[i].o===self.o&&all[i].t==='refinery')continue;
+      if(self.t==='harvester'&&all[i].o===self.o)continue;
       if(!(ix===ox&&iy===oy&&all[i].o===self.o))return false}}
   // only enemy units at target tile block movement
   if(!self)return true;
