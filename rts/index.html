@@ -76,6 +76,8 @@ function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   if(ix<0||ix>=GW||iy<0||iy>=GH)return false;if(map[iy][ix]===1)return false;
   // check buildings
   var all=P.blds.concat(E.blds);for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;if(all[i].x===ix&&all[i].y===iy)return false}
+  // check units (all sides, skip self)
+  var allu=P.units.concat(E.units);for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
   return true}
 
 function allTargets(o){var r=[];var src=o==='p'?E:P;
