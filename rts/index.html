@@ -199,8 +199,8 @@ function _tick(){
   // Player units
   for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ffaa22':'#ff8844',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
-    // Auto-acquire target while moving or idle
-    if(u.cd<=0&&u.t!=='harvester'&&(u.st==='moving'||u.st==='idle')){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){u.st='attacking';u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
+    // Auto-acquire target while moving, idle, or marching in attacking state
+    if(u.t!=='harvester'){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){if(u.st!=='attacking'){u.st='attacking';if(u.cd<=0)u.cd=1}u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
     if(u.st==='moving'){var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d<0.3){u.st='idle'}else{moveToward(u,{x:u.tx,y:u.ty})}}
     else if(u.st==='attacking'){
       var d=Math.hypot(u.tx-u.x,u.ty-u.y);
