@@ -395,7 +395,7 @@ function _tick(){
   // Infantry footstep (periodic)
   if(moveSoundCd<=0&&anyInf&&typeof sfxMove==='function'){sfxMove();moveSoundCd=12}
   
-  if(frame%8===0)draw();
+  if(frame%8===0)try{draw()}catch(e){}
 }
 
 // === RENDER ===
@@ -482,7 +482,8 @@ function drawBld(b,wall,roof,accent){
 
 function drawUnit(u,col,accent){
   if(u.hp<=0)return;
-  if(!isFinite(u.x)||!isFinite(u.y)||u.x<0||u.y<0||u.x>GW||u.y>GH)return; // skip offscreen/broken unitsvar cx=u.x*TS,cy=u.y*TS,r=TS*0.3;
+  if(!isFinite(u.x)||!isFinite(u.y)||u.x<0||u.y<0||u.x>GW||u.y>GH)return;
+  var cx=u.x*TS,cy=u.y*TS,r=TS*0.3;
   // Level upgrades appearance (different per faction)
   if(u.lv>=3){col='#ffaa22';accent='#ff8800'} // gold legendary at lv3+
   else if(u.lv>=2){col=u.o==='p'?'#88ccff':'#ff8844';accent=u.o==='p'?'#4488ff':'#cc4400'} // elite
@@ -544,6 +545,7 @@ document.addEventListener('visibilitychange',function(){
 });
 function loop(t){
   if(!over){
+    try{
     var dt2=t-lastTick;
     if(dt2>5000)lastTick=t;
     if(dt2>=33){lastTick=t;tick()}
@@ -553,8 +555,9 @@ function loop(t){
     for(var i=0;i<E.blds.length;i++)if(E.blds[i].hp>0)e2++;
     if(p2===0){over=true;msg('💀 失败！所有建筑被摧毁',99999)}
     if(e2===0){over=true;msg('🎉 胜利！敌方全灭',99999)}
+    }catch(e){console.error(e)}
   }
-  draw();
+  try{draw()}catch(e){console.error(e)}
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
