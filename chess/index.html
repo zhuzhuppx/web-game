@@ -177,22 +177,32 @@ async function aiMove(board,color){
   document.getElementById('msg').textContent = '🤔 AI 思考中…';
   if(window.scene && window.scene.msgT) window.scene.msgT.setText('🤔 AI 思考中…');
   
-  // Step 1: Alpha-beta depth 3+ordering to find top candidates (yield between pieces for audio)
-  var candidates=[];
-  var bestScore=color==='r'?-99999:99999;
-  for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===color){var vm=validMoves(r,c,board,color);
-    // Sort: captures first
-    vm.sort(function(a,b){var ca=board[a.r][a.c]?1:0;var cb=board[b.r][b.c]?1:0;return cb-ca});
-    for(var i=0;i<vm.length;i++){var captured=makeMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c});if(!isCheck(board,color)){var score=alphaBeta(board,3,-99999,99999,color,color==='r');if((color==='r'&&score>bestScore)||(color==='b'&&score<bestScore)){bestScore=score;candidates.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,score:score});candidates.sort(function(a,b){return color==='r'?b.score-a.score:a.score-b.score});if(candidates.length>6)candidates.pop()}}undoMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c},captured)}
-    // Yield to event loop so audio/BGM keeps playing
-    await new Promise(r=>setTimeout(r,0));
-  }}}
+  // Step 1: Iterative Deepening - search as deep as time allows (max 2.5s)
+  var startMs=Date.now(),timeLimit=2500;
+  var finalCandidates=[],prevCandidates=[];
+  for(var searchDepth=2;searchDepth<=5;searchDepth++){
+    var candidates=[];
+    var bestScore=color==='r'?-99999:99999;
+    var foundAny=false;
+    outer:for(var r=0;r<ROWS;r++){for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===color){var vm=validMoves(r,c,board,color);
+      vm.sort(function(a,b){var ca=board[a.r][a.c]?1:0;var cb=board[b.r][b.c]?1:0;return cb-ca});
+      for(var i=0;i<vm.length;i++){if(Date.now()-startMs>timeLimit){break outer}
+        var captured=makeMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c});if(!isCheck(board,color)){var score=alphaBeta(board,searchDepth,-99999,99999,color,color==='r');if((color==='r'&&score>bestScore)||(color==='b'&&score<bestScore)){bestScore=score;candidates.push({fr:r,fc:c,tr:vm[i].r,tc:vm[i].c,score:score});candidates.sort(function(a,b){return color==='r'?b.score-a.score:a.score-b.score});if(candidates.length>6)candidates.pop()}}undoMove(board,{r:r,c:c},{r:vm[i].r,c:vm[i].c},captured)
+      }
+      foundAny=true;
+      await new Promise(r=>setTimeout(r,0));
+    }}}
+    if(foundAny&&candidates.length>0){finalCandidates=candidates.slice();prevCandidates=candidates}
+    if(Date.now()-startMs>timeLimit)break
+  }
+  // Fallback: use last completed depth's candidates
+  if(finalCandidates.length===0&&prevCandidates.length>0)finalCandidates=prevCandidates;
   
   // Step 2: Try LLM to pick best among candidates
   return new Promise(function(resolve){
-    callLLM(board,color,candidates).then(function(llmMove){
+    callLLM(board,color,finalCandidates).then(function(llmMove){
       if(llmMove){resolve(llmMove);return}
-      resolve(candidates.length>0?candidates[0]:null)
+      resolve(finalCandidates.length>0?finalCandidates[0]:null)
     })
   })
 }
