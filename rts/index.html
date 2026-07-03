@@ -42,8 +42,10 @@ map[GH-3][GW-2]=0;map[GH-2][GW-3]=0;map[GH-3][GW-3]=0; // enemy spawn
 
 // === GAME STATE ===
 var uid=0,frame=0,sel=null,over=false;
+var fx=[]; // death particles
 var P={gold:1200,units:[],blds:[]};
 var E={gold:1000,units:[],blds:[],aiCd:300,wave:0,attackReady:false};
+var moveSoundCd=0; // throttle movement sfx
 
 function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};(o==='p'?P.blds:E.blds).push(b);return b}
 function addUnit(t,x,y,o){var s=t==='tank'?{hp:150,atk:28,rng:1.8,spd:0.015,rate:50}:{hp:65,atk:12,rng:1.4,spd:0.028,rate:32};
@@ -71,8 +73,10 @@ function near(u,list){
 function closest(u,list){var b=null,bd=999;for(var i=0;i<list.length;i++){var t=list[i];var d=Math.hypot(t.x-u.x,t.y-u.y);if(d<bd){bd=d;b=t}}return b}
 function moveToward(u,t,spd){var dx=t.x-u.x,dy=t.y-u.y,d=Math.hypot(dx,dy);if(d>0.2){
   var s=spd||u.spd;var nx=u.x+(dx/d)*s,ny=u.y+(dy/d)*s;
+  var ox=u.x,oy=u.y;
   // wall slide: try straight first, then axis-aligned
   if(canPass(nx,ny,u)){u.x=nx;u.y=ny}else if(canPass(u.x,ny,u)){u.y=ny}else if(canPass(nx,u.y,u)){u.x=nx}
+  if(u.x!==ox||u.y!==oy)u._moved=true;
   u.dx=dx;u.dy=dy}}
 function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   if(ix<0||ix>=GW||iy<0||iy>=GH)return false;if(map[iy][ix]===1)return false;
@@ -81,6 +85,8 @@ function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   // check units (all sides, skip self)
   var allu=P.units.concat(E.units);for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
   return true}
+function spawnFx(x,y,color,n){for(var i=0;i<(n||8);i++){fx.push({x:x,y:y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3-1,life:20+Math.random()*15,c:color||'#ff8844',s:2+Math.random()*3})}}
+function spawnBldFx(b){for(var i=0;i<14;i++){fx.push({x:(b.x+0.5)*TS,y:(b.y+0.5)*TS,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-2,life:25+Math.random()*15,c:b.o==='p'?'#66aaff':'#ff6644',s:3+Math.random()*4})}}
 
 function allTargets(o){var r=[];var src=o==='p'?E:P;
   for(var i=0;i<src.blds.length;i++){var b=src.blds[i];if(b.hp>0)r.push({x:b.x+0.5,y:b.y+0.5,hpRef:b,isBld:true})}
@@ -142,7 +148,7 @@ function tick(){
   frame++;var dt=1;
   cachedP=allTargets('p');cachedE=allTargets('e');
   // Player units
-  for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){P.units.splice(i,1);continue}
+  for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,'#ffaa44',6);P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
     // Auto-acquire target while moving or idle
     if(u.cd<=0&&(u.st==='moving'||u.st==='idle')){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){u.st='attacking';u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
@@ -165,7 +171,7 @@ function tick(){
     if(E.attackReady&&e_alive<2){E.attackReady=false;msg('💨 敌军败退，重新集结…',2000)}
   }
   
-  for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){E.units.splice(i,1);continue}
+  for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,'#ff6644',6);E.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
     var et=nearUnit(u,cachedE)||near(u,cachedE);
     if(et){if(u.cd<=0){et.hpRef.hp-=u.atk;u.cd=u.rate}}
@@ -200,11 +206,19 @@ function tick(){
     msg('⚠️ 第'+E.wave+'波敌军来袭！',3000)}
   // Resources
   if(frame%50===0){P.gold+=5;E.gold+=8}
-  // Win/lose — all buildings must be destroyed
+  // Win/lose + building death fx
+  for(var i=P.blds.length-1;i>=0;i--){var b=P.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
+  for(var i=E.blds.length-1;i>=0;i--){var b=E.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
   var pAlive=P.blds.some(function(b){return b.hp>0});
   var eAlive=E.blds.some(function(b){return b.hp>0});
   if(!pAlive){over=true;msg('💀 失败！所有建筑被摧毁',99999)}
   if(!eAlive){over=true;msg('🎉 胜利！敌方全灭',99999)}
+  // Movement sound
+  moveSoundCd-=dt;if(moveSoundCd<=0){var any=false;
+    for(var i=0;i<P.units.length;i++){if(P.units[i]._moved){any=true;P.units[i]._moved=false}}
+    for(var i=0;i<E.units.length;i++){if(E.units[i]._moved){any=true;E.units[i]._moved=false}}
+    if(any&&typeof sfxMove==='function'){sfxMove();moveSoundCd=18}}
+  
   if(frame%8===0)draw();
 }
 
@@ -236,6 +250,12 @@ function draw(){
   // Units
   for(var i=0;i<P.units.length;i++)drawUnit(P.units[i],'#4488ff','#2266dd');
   for(var i=0;i<E.units.length;i++)drawUnit(E.units[i],'#ff5544','#dd3322');
+  
+  // Particlez
+  for(var i=fx.length-1;i>=0;i--){var p=fx[i];p.life--;if(p.life<=0){fx.splice(i,1);continue}
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.08;var a=p.life/35;
+    ctx.fillStyle=p.c;ctx.globalAlpha=a;ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,Math.PI*2);ctx.fill()}
+  ctx.globalAlpha=1;
   
   // Selection
   if(sel){ctx.strokeStyle='#ffdd44';ctx.lineWidth=2.5;
