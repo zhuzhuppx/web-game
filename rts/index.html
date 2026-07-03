@@ -200,7 +200,7 @@ function _tick(){
   for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ffaa22':'#ff8844',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
     // Auto-acquire target (skip if retreating)
-    if(u.t!=='harvester'&&!u._rt){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){if(u.st!=='attacking'){u.st='attacking'}u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
+    if(u.t!=='harvester'&&!u._rt){var t=(u.st==='idle'||u.st==='moving')?closest(u,cachedP):nearUnit(u,cachedP)||near(u,cachedP);if(t){if(u.st!=='attacking'){u.st='attacking'}u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
     if(u.st==='moving'){var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d<0.3){u.st='idle';u._rt=0}else{moveToward(u,{x:u.tx,y:u.ty})}}
     else if(u.st==='attacking'){
       // Always try to attack first if ready
