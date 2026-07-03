@@ -436,11 +436,11 @@ function _tick(){
   // Building death FX
   for(var i=P.blds.length-1;i>=0;i--){var b=P.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
   for(var i=E.blds.length-1;i>=0;i--){var b=E.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
-  // AI difficulty: periodic free units (scales with game time)
-  E._waveCd=(E._waveCd||1800)+1;
-  if(E._waveCd>=1800){E._waveCd=0; // every 60 seconds
+  // AI difficulty: periodic free units after 3 minutes (scales with game time)
+  E._waveCd=(E._waveCd||0)+1;
+  if(frame>5400&&E._waveCd>=1800){E._waveCd=0; // every 60s, after 180s delay
     var eh=hqOf(E);if(eh&&hasB(E,'barracks')){
-      var n=2+Math.floor(frame/1800); // more over time
+      var n=1+Math.floor((frame-5400)/3600); // 1 at 3min, +1 every 2min
       if(hasB(E,'factory')){for(var wi=0;wi<n;wi++)eSpawn(Math.random()<0.5?'tank':'rifle')}
       else{for(var wi=0;wi<n;wi++)eSpawn('rifle')}
     }}
