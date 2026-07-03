@@ -239,6 +239,14 @@ class ChessScene extends Phaser.Scene {
     this.turn='r';this.selected=null;this.gameOver=false;this.validMovesList=[];
     g_ply=0;g_moves=[];document.getElementById('turn').textContent='红方';this.msgT.setText('点击选中棋子');
     this.syncPieces();
+    
+    // Show move trace (origin + destination)
+    var fromX = this.boardX(fc), fromY = this.boardY(fr);
+    var toX = this.boardX(tc), toY = this.boardY(tr);
+    var ht = this.add.graphics().setDepth(75);
+    ht.lineStyle(2, 0x44cc44, 0.35); ht.strokeCircle(fromX, fromY, this.CELL*0.44);
+    ht.lineStyle(3, 0x44cc44, 0.7); ht.strokeCircle(toX, toY, this.CELL*0.48);
+    this.tweens.add({targets:ht, alpha:0, duration:1000, delay:200, onComplete:()=>ht.destroy()});
     this.highlightGfx.clear();
   }
 
@@ -337,6 +345,14 @@ class ChessScene extends Phaser.Scene {
     this.dotContainer.removeAll(true);
     this.syncPieces();
     
+    // Show move trace (origin + destination)
+    var fromX = this.boardX(fc), fromY = this.boardY(fr);
+    var toX = this.boardX(tc), toY = this.boardY(tr);
+    var ht = this.add.graphics().setDepth(75);
+    ht.lineStyle(2, 0x44cc44, 0.35); ht.strokeCircle(fromX, fromY, this.CELL*0.44);
+    ht.lineStyle(3, 0x44cc44, 0.7); ht.strokeCircle(toX, toY, this.CELL*0.48);
+    this.tweens.add({targets:ht, alpha:0, duration:1000, delay:200, onComplete:()=>ht.destroy()});
+    
     // Check win
     if(captured && (captured.type==='k'||captured.type==='K')) {
       this.gameOver = true;
@@ -387,6 +403,14 @@ class ChessScene extends Phaser.Scene {
     }
     
     this.syncPieces();
+    
+    // Show move trace (origin + destination)
+    var fromX = this.boardX(fc), fromY = this.boardY(fr);
+    var toX = this.boardX(tc), toY = this.boardY(tr);
+    var ht = this.add.graphics().setDepth(75);
+    ht.lineStyle(2, 0x44cc44, 0.35); ht.strokeCircle(fromX, fromY, this.CELL*0.44);
+    ht.lineStyle(3, 0x44cc44, 0.7); ht.strokeCircle(toX, toY, this.CELL*0.48);
+    this.tweens.add({targets:ht, alpha:0, duration:1000, delay:200, onComplete:()=>ht.destroy()});
     
     // Highlight AI's destination
     var dx = this.boardX(move.tc), dy = this.boardY(move.tr);
