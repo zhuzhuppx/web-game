@@ -221,7 +221,7 @@ function _tick(){
     if(u.t==='harvester'&&u.hp>0){
       if(u._mineTime>0){u._mineTime-=dt;if(u._mineTime<=0){
         var ref=P.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
-        if(ref){u.st='moving';u.tx=ref.x+0.5;u.ty=ref.y+0.5;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
+        if(ref){u.st='moving';u.tx=ref.x+0.5;u.ty=ref.y+0.5;u.dx=u.tx-u.x;u.dy=u.ty-u.y;u._returning=true}
       }}
       else if(u.st==='idle'){
         var nearestOre=null,bestD=999;
@@ -230,16 +230,19 @@ function _tick(){
         if(nearestOre){
           var dd=Math.hypot(nearestOre.x-u.x,nearestOre.y-u.y);
           if(dd<0.3){u._mineTime=90;u.st='idle'}
-          else{u.st='moving';u.tx=nearestOre.x;u.ty=nearestOre.y;u.dx=u.tx-u.x;u.dy=u.ty-u.y;moveToward(u,{x:nearestOre.x,y:nearestOre.y})}
+          else{u.st='moving';u.tx=nearestOre.x;u.ty=nearestOre.y;u.dx=u.tx-u.x;u.dy=u.ty-u.y;u._returning=false;moveToward(u,{x:nearestOre.x,y:nearestOre.y})}
         }
       }
-      else if(u.st==='moving'&&(!u._mineTime||u._mineTime<=0)){
+      else if(u.st==='moving'&&u._returning){
         var ref=P.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
         if(ref){
           var dd2=Math.hypot(ref.x+0.5-u.x,ref.y+0.5-u.y);
-          if(dd2<0.5){P.gold+=100;u.st='idle';upd()}
+          if(dd2<0.5){P.gold+=100;u.st='idle';u._returning=false;upd()}
           else{moveToward(u,{x:ref.x+0.5,y:ref.y+0.5})}
         }
+      }
+      else if(u.st==='moving'&&!u._returning){
+        moveToward(u,{x:u.tx,y:u.ty})
       }
       continue;
     }
@@ -263,7 +266,7 @@ function _tick(){
     if(u.t==='harvester'&&u.hp>0){
       if(u._mineTime>0){u._mineTime-=dt;if(u._mineTime<=0){
         var refE=E.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
-        if(refE){u.st='moving';u.tx=refE.x+0.5;u.ty=refE.y+0.5;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
+        if(refE){u.st='moving';u.tx=refE.x+0.5;u.ty=refE.y+0.5;u.dx=u.tx-u.x;u.dy=u.ty-u.y;u._returning=true}
       }}
       else if(u.st==='idle'){
         var nearestOreE=null,bestDE=999;
@@ -272,16 +275,19 @@ function _tick(){
         if(nearestOreE){
           var ddE=Math.hypot(nearestOreE.x-u.x,nearestOreE.y-u.y);
           if(ddE<0.3){u._mineTime=90;u.st='idle'}
-          else{u.st='moving';u.tx=nearestOreE.x;u.ty=nearestOreE.y;u.dx=u.tx-u.x;u.dy=u.ty-u.y;moveToward(u,{x:nearestOreE.x,y:nearestOreE.y})}
+          else{u.st='moving';u.tx=nearestOreE.x;u.ty=nearestOreE.y;u.dx=u.tx-u.x;u.dy=u.ty-u.y;u._returning=false;moveToward(u,{x:nearestOreE.x,y:nearestOreE.y})}
         }
       }
-      else if(u.st==='moving'&&(!u._mineTime||u._mineTime<=0)){
+      else if(u.st==='moving'&&u._returning){
         var refE=E.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
         if(refE){
           var ddE2=Math.hypot(refE.x+0.5-u.x,refE.y+0.5-u.y);
-          if(ddE2<0.5){E.gold+=100;u.st='idle'}
+          if(ddE2<0.5){E.gold+=100;u.st='idle';u._returning=false}
           else{moveToward(u,{x:refE.x+0.5,y:refE.y+0.5})}
         }
+      }
+      else if(u.st==='moving'&&!u._returning){
+        moveToward(u,{x:u.tx,y:u.ty})
       }
       continue;
     }
