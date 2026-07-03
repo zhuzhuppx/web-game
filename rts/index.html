@@ -436,11 +436,15 @@ function drawBld(b,wall,roof,accent){
     ctx.fillStyle='#555';ctx.beginPath();ctx.arc(x+s*0.42,y+s*0.12,4,0,Math.PI*2);ctx.fill()}
   else if(b.t==='refinery'){
     ctx.fillStyle='#666';ctx.fillRect(x+s*0.3,y+s*0.25,s*0.4,s*0.5);
-    ctx.fillStyle='#888';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,7,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#888';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,8,0,Math.PI*2);ctx.fill();
     // Pulsing glow when unloading
     var src=b.o==='p'?P:E;var unloading=src.units.some(function(u){return u.t==='harvester'&&u._hs==='unload'&&Math.hypot(u.x-b.x-0.5,u.y-b.y-0.5)<1});
-    var pulse=unloading?(3+Math.sin(frame*0.35)*2):3;
-    ctx.fillStyle=unloading?'#ffcc00':'#ffaa00';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,pulse,0,Math.PI*2);ctx.fill()}
+    if(unloading){
+      var pulse=6+Math.sin(frame*0.3)*4;
+      ctx.fillStyle='rgba(255,200,0,0.3)';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,pulse+4,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#ffcc00';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,pulse,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,3+Math.sin(frame*0.5)*1,0,Math.PI*2);ctx.fill()
+    }else{ctx.fillStyle='#ffaa00';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,4,0,Math.PI*2);ctx.fill()}}
   // HP bar
   var pct=b.hp/b.mhp;
   ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(x+1,y+s-6,s-2,4);
