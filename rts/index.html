@@ -86,7 +86,7 @@ function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   if(ix<0||ix>=GW||iy<0||iy>=GH)return false;
   // check buildings (allow leaving own tile)
   var ox=Math.floor(self?self.x:gx),oy=Math.floor(self?self.y:gy);
-  var all=P.blds.concat(E.blds);for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;if(ix===all[i].x&&iy===all[i].y&&!(ix===ox&&iy===oy&&all[i].o===self.o))return false}
+  var all=P.blds.concat(E.blds);for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;if(ix===all[i].x&&iy===all[i].y&&!(self&&ix===ox&&iy===oy&&all[i].o===self.o))return false}
   // check units (all sides, skip self)
   var allu=P.units.concat(E.units);for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
   return true}
