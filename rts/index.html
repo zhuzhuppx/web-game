@@ -183,7 +183,12 @@ function cmd(a){
     if(!hasB(P,'factory')){msg('❌ 需要先建造工厂',1500);return}
     if(P.gold<150){msg('💰 金币不足！',1500);return}
     var ref2=P.blds.find(function(b){return b.t==='refinery'&&b.hp>0});if(!ref2)return;
-    addUnit('harvester',ref2.x+0.5,ref2.y+0.5,'p');P.gold-=150;msg('✅ 矿车出动',2000);upd()}
+    // Spawn at factory, drive to refinery
+    var fac=P.blds.find(function(b){return b.t==='factory'&&b.hp>0});
+    var sx=fac?fac.x+0.5:ref2.x+0.5,sy=fac?fac.y+0.5:ref2.y+0.5;
+    addUnit('harvester',sx,sy,'p');P.gold-=150;
+    var hv=P.units[P.units.length-1];hv._toRef={x:ref2.x+0.5,y:ref2.y+0.5};
+    msg('✅ 矿车出动',2000);upd()}
 }
 
 function upd(){
@@ -240,6 +245,8 @@ function _tick(){
     }}}
     // Harvester mining logic
     if(u.t==='harvester'&&u.hp>0){
+      // First trip: drive to refinery, then start mining
+      if(u._toRef){var d1=Math.hypot(u._toRef.x-u.x,u._toRef.y-u.y);if(d1<0.35){u._toRef=0;u._hs='go'}else moveToward(u,u._toRef);continue}
       if(!u._hs)u._hs='go';
       if(u._hs==='mine'){u._mt=(u._mt||90)-dt;if(u._mt<=0){u._hs='back';u._mt=0}}
       else if(u._hs==='unload'){u._mt=(u._mt||45)-dt;if(u._mt<=0){P.gold+=100;u._hs='go';u._mt=0;upd()}}
@@ -281,6 +288,7 @@ function _tick(){
     if(u.lv>=3&&u.hp<u.mhp){u._rgCd=(u._rgCd||0)+1;if(u._rgCd>=90){u.hp=Math.min(u.mhp,u.hp+1);u._rgCd=0}}
     // Enemy harvester
     if(u.t==='harvester'&&u.hp>0){
+      if(u._toRef){var d1=Math.hypot(u._toRef.x-u.x,u._toRef.y-u.y);if(d1<0.35){u._toRef=0;u._hs='go'}else moveToward(u,u._toRef);continue}
       if(!u._hs)u._hs='go';
       if(u._hs==='mine'){u._mt=(u._mt||90)-dt;if(u._mt<=0){u._hs='back';u._mt=0}}
       else if(u._hs==='unload'){u._mt=(u._mt||45)-dt;if(u._mt<=0){E.gold+=100;u._hs='go';u._mt=0}}
@@ -344,7 +352,9 @@ function _tick(){
       // Train harvesters first, then combat units
       if(hasB(E,'refinery')&&E.gold>=150&&E.units.filter(function(u){return u.t==='harvester'&&u.hp>0}).length<3){
         var ref=E.blds.find(function(b){return b.t==='refinery'&&b.hp>0});if(ref){
-          E.gold-=150;addUnit('harvester',ref.x+0.5,ref.y+0.5,'e')}
+          var efac=E.blds.find(function(b){return b.t==='factory'&&b.hp>0});
+          var sx=efac?efac.x+0.5:ref.x+0.5,sy=efac?efac.y+0.5:ref.y+0.5;
+          E.gold-=150;addUnit('harvester',sx,sy,'e');E.units[E.units.length-1]._toRef={x:ref.x+0.5,y:ref.y+0.5}}
       }else if(hasF&&E.gold>=200){E.gold-=200;eSpawn('tank')}
       else if(!hasF&&E.gold>=100){E.gold-=100;eSpawn('rifle')}
       else if(hasF&&E.gold>=100&&E.units.length<3){E.gold-=100;eSpawn('rifle')}
