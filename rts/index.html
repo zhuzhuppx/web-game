@@ -359,20 +359,27 @@ function _tick(){
       for(var fi=0;fi<offF.length;fi++){var fx=ehq2.x+offF[fi][0],fy=ehq2.y+offF[fi][1];
         if(canPass(fx,fy)){E.gold-=400;addBld('factory',fx,fy,400,'e');placed=true;break}}
       if(!placed)E.aiCd=-50
-    }else if(E.units.length<40&&hasB(E,'barracks')){
-      var hasF=hasB(E,'factory');
-      // Train harvesters first, then combat units
-      if(hasB(E,'refinery')&&E.gold>=150&&E.units.filter(function(u){return u.t==='harvester'&&u.hp>0}).length<3){
+    }else if(E.units.length<40&&(hasB(E,'barracks')||hasB(E,'factory'))){
+      var hasF=hasB(E,'factory'),hasR=hasB(E,'refinery');
+      var aliveH=E.units.filter(function(u){return u.t==='harvester'&&u.hp>0}).length;
+      var threat=cachedE.filter(function(t){var eh=hqOf(E);return eh&&Math.hypot(t.x-eh.x-0.5,t.y-eh.y-0.5)<5}).length;
+      // Priority 1: harvesters — always keep 5, build if low gold even skipping other things
+      if(hasR&&hasF&&E.gold>=150&&aliveH<5){
         var ref=E.blds.find(function(b){return b.t==='refinery'&&b.hp>0});if(ref){
           var efac=E.blds.find(function(b){return b.t==='factory'&&b.hp>0});
           var sx=efac?efac.x-1:ref.x-0.5,sy=efac?efac.y-0.5:ref.y-0.5;
-          var exits=[[1,0.5],[-0.5,0.5],[0.5,1.5],[0.5,-0.5],[2,0.5],[-1.5,0.5],[0.5,2.5],[0.5,-1.5],[1.5,1.5],[-0.5,1.5],[1.5,-0.5],[-0.5,-0.5]];
+          var exits=[[-1,0.5],[0.5,-0.5],[-0.5,0.5],[0.5,1.5],[-2,0.5],[-1.5,0.5],[0.5,2.5],[0.5,-1.5],[-1.5,1.5],[-0.5,1.5],[-1.5,-0.5],[-0.5,-0.5]];
           if(efac)for(var ei=0;ei<exits.length;ei++){var ex=efac.x+exits[ei][0],ey=efac.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}}
           if(efac)efac._spark=45;
           E.gold-=150;addUnit('harvester',sx,sy,'e');E.units[E.units.length-1]._toRef={x:ref.x+0.5,y:ref.y+0.5}}
-      }else if(hasF&&E.gold>=200){E.gold-=200;eSpawn('tank')}
-      else if(!hasF&&E.gold>=100){E.gold-=100;eSpawn('rifle')}
-      else if(hasF&&E.gold>=100&&E.units.length<3){E.gold-=100;eSpawn('rifle')}
+      // Priority 2: if under threat, build combat units
+      }else if(threat>=2&&hasF&&E.gold>=200){E.gold-=200;eSpawn('tank')}
+      else if(threat>=2&&!hasF&&E.gold>=100){E.gold-=100;eSpawn('rifle')}
+      // Priority 3: build economy foundation — save for refinery/factory first if missing
+      // Priority 4: once economy is stable (gold>300 or harvesters>=3), build army
+      else if(E.gold>=400&&hasF&&aliveH>=2){E.gold-=200;eSpawn('tank')}
+      else if(E.gold>=300&&!hasF&&aliveH>=1){E.gold-=100;eSpawn('rifle')}
+      else if(hasF&&E.gold>=300&&E.units.filter(function(u){return u.t!=='harvester'}).length<2){E.gold-=100;eSpawn('rifle')}
     }
   }
   // Resources (no auto-gold, mining only)
