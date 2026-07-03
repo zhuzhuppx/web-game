@@ -31,7 +31,7 @@ var g_ply=0,g_moves=[];
 function getColorType(type){return type>='a'&&type<='z'?'r':'b'}
 function isEnemy(p1,p2){return p1&&p2&&p1.color!==p2.color}
 function inBoard(r,c){return r>=0&&r<ROWS&&c>=0&&c<COLS}
-function validMoves(row,col,board,turn){var p=board[row][col];if(!p||p.color!==turn)return[]
+function validMovesRaw(row,col,board,turn){var p=board[row][col];if(!p||p.color!==turn)return[]
 var moves=[],t=p.type,color=p.color
 function add(r,c){if(inBoard(r,c)&&(!board[r][c]||board[r][c].color!==color))moves.push({r:r,c:c})}
 function onBoard(r,c){return inBoard(r,c)&&(!board[r][c]||board[r][c].color!==color)}
@@ -52,8 +52,9 @@ while(inBoard(nr,nc)){if(!jumped){if(board[nr][nc])jumped=true;else moves.push({
 else if(t==='p'||t==='P'){var forward=color==='r'?-1:1;add(row+forward,col);if((color==='r'&&row<=4)||(color==='b'&&row>=5)){add(row,col-1);add(row,col+1)}}
 return moves}
 function isCheck(board,color){var kingType=color==='r'?'k':'K';var kr=-1,kc=-1;for(var r=0;r<ROWS&&kr<0;r++)for(var c=0;c<COLS;c++)if(board[r][c]&&board[r][c].type===kingType){kr=r;kc=c;break}
-if(kr<0)return true;var enemy=color==='r'?'b':'r';for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===enemy){var mV=validMoves(r,c,board,enemy);for(var i=0;i<mV.length;i++)if(mV[i].r===kr&&mV[i].c===kc)return true}}
+if(kr<0)return true;var enemy=color==='r'?'b':'r';for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){var p=board[r][c];if(p&&p.color===enemy){var mV=validMovesRaw(r,c,board,enemy);for(var i=0;i<mV.length;i++)if(mV[i].r===kr&&mV[i].c===kc)return true}}
 return false}
+function validMoves(row,col,board,turn){var raw=validMovesRaw(row,col,board,turn);if(!raw.length)return raw;var filtered=[];for(var i=0;i<raw.length;i++){var captured=makeMove(board,{r:row,c:col},{r:raw[i].r,c:raw[i].c});if(!isCheck(board,turn))filtered.push(raw[i]);undoMove(board,{r:row,c:col},{r:raw[i].r,c:raw[i].c},captured)}return filtered}
 function makeMove(board,from,to){var captured=board[to.r][to.c];board[to.r][to.c]=board[from.r][from.c];board[from.r][from.c]=null;return captured}
 function undoMove(board,from,to,captured){board[from.r][from.c]=board[to.r][to.c];board[to.r][to.c]=captured}
 function cloneBoard(board){var b=[];for(var r=0;r<ROWS;r++){b[r]=[];for(var c=0;c<COLS;c++)b[r][c]=board[r][c]?{type:board[r][c].type,color:board[r][c].color}:null}return b}
