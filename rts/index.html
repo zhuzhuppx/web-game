@@ -70,7 +70,7 @@ function eSpawn(type){var eh=hqOf(E);if(!eh)return;
   var bType=type==='tank'?'factory':'barracks';
   var fb=E.blds.find(function(b){return b.t===bType&&b.hp>0});
   var sx=fb?fb.x-1:eh.x+0.5,sy=fb?fb.y-0.5:eh.y-0.5;
-  var exits=[[1,0.5],[-0.5,0.5],[0.5,1.5],[0.5,-0.5],[2,0.5],[-1.5,0.5],[0.5,2.5],[0.5,-1.5],[1.5,1.5],[-0.5,1.5],[1.5,-0.5],[-0.5,-0.5]];
+  var exits=[[-0.5,-1.5],[0.5,-1.5],[-1.5,-0.5],[-0.5,-0.5],[-0.5,-2.5],[0.5,-2.5],[-1.5,-1.5],[0.5,0.5],[-2.5,-0.5],[-2.5,-1.5],[-1.5,-2.5],[0.5,-3.5]]; // red exits up
   if(fb){for(var ei=0;ei<exits.length;ei++){var ex=fb.x+exits[ei][0],ey=fb.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}};fb._spark=45}
   addUnit(type,sx,sy,'e');
   var nu=E.units[E.units.length-1];
@@ -153,9 +153,9 @@ function cmd(a){
     var bType=a==='tank'?'factory':'barracks';
     var fb=P.blds.find(function(b){return b.t===bType&&b.hp>0});
     var hq=hqOf(P);
-    var sx=fb?fb.x+1:0.5,sy=fb?fb.y+0.5:0.5;
+    var sx=fb?fb.x+0.5:2.5,sy=fb?fb.y+1:2.5;
     // Try positions around building, prefer above/below/left/right
-    var exits=[[1,0.5],[-0.5,0.5],[0.5,1.5],[0.5,-0.5],[2,0.5],[-1.5,0.5],[0.5,2.5],[0.5,-1.5],[1.5,1.5],[-0.5,1.5],[1.5,-0.5],[-0.5,-0.5]];
+    var exits=[[0.5,1.5],[-0.5,1.5],[1.5,0.5],[-0.5,0.5],[0.5,2.5],[-0.5,2.5],[1.5,1.5],[-0.5,-0.5],[2.5,0.5],[2.5,1.5],[1.5,2.5],[-0.5,3.5]]; // blue exits down
     if(fb)for(var ei=0;ei<exits.length;ei++){var ex=fb.x+exits[ei][0],ey=fb.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}}
     addUnit(a,sx,sy,'p');P.gold-=cost;
     if(fb)fb._spark=45; // building spawn animation
@@ -195,7 +195,7 @@ function cmd(a){
     // Spawn next to factory, drive to refinery
     var fac=P.blds.find(function(b){return b.t==='factory'&&b.hp>0});
     var sx=fac?fac.x+1:ref2.x+0.5,sy=fac?fac.y+0.5:ref2.y+0.5;
-    var exits=[[1,0.5],[-0.5,0.5],[0.5,1.5],[0.5,-0.5],[2,0.5],[-1.5,0.5],[0.5,2.5],[0.5,-1.5],[1.5,1.5],[-0.5,1.5],[1.5,-0.5],[-0.5,-0.5]];
+    var exits=[[0.5,1.5],[-0.5,1.5],[1.5,0.5],[-0.5,0.5],[0.5,2.5],[-0.5,2.5],[1.5,1.5],[-0.5,-0.5],[2.5,0.5],[2.5,1.5],[1.5,2.5],[-0.5,3.5]]; // blue exits down
     if(fac)for(var ei=0;ei<exits.length;ei++){var ex=fac.x+exits[ei][0],ey=fac.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}}
     if(fac)fac._spark=45;
     addUnit('harvester',sx,sy,'p');P.gold-=150;
@@ -368,7 +368,7 @@ function _tick(){
         var ref=E.blds.find(function(b){return b.t==='refinery'&&b.hp>0});if(ref){
           var efac=E.blds.find(function(b){return b.t==='factory'&&b.hp>0});
           var sx=efac?efac.x-1:ref.x-0.5,sy=efac?efac.y-0.5:ref.y-0.5;
-          var exits=[[-1,0.5],[0.5,-0.5],[-0.5,0.5],[0.5,1.5],[-2,0.5],[-1.5,0.5],[0.5,2.5],[0.5,-1.5],[-1.5,1.5],[-0.5,1.5],[-1.5,-0.5],[-0.5,-0.5]];
+          var exits=[[-0.5,-1.5],[0.5,-1.5],[-1.5,-0.5],[-0.5,-0.5],[-0.5,-2.5],[0.5,-2.5],[-1.5,-1.5],[0.5,0.5],[-2.5,-0.5],[-2.5,-1.5],[-1.5,-2.5],[0.5,-3.5]]; // red exits up
           if(efac)for(var ei=0;ei<exits.length;ei++){var ex=efac.x+exits[ei][0],ey=efac.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}}
           if(efac)efac._spark=45;
           E.gold-=150;addUnit('harvester',sx,sy,'e');E.units[E.units.length-1]._toRef={x:ref.x+0.5,y:ref.y+0.5}}
