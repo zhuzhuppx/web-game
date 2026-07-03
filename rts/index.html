@@ -17,12 +17,12 @@
 <canvas id="c"></canvas>
 <div class="info" id="info"></div>
 <div class="btns">
-<button id="btnB" onclick="cmd('barracks')">🏠 兵营 200💰</button>
-<button id="btnF" onclick="cmd('factory')">🏭 工厂 400💰</button>
-<button id="btnR" onclick="cmd('rifle')" disabled>🔫 步兵 100💰</button>
-<button id="btnT" onclick="cmd('tank')" disabled>🛡️ 坦克 300💰</button>
-<button onclick="cmd('rush')">⚔️ 全军出击</button>
-<button onclick="cmd('retreat')">🛡️ 全军回防</button>
+<button id="btnB" onclick="sfxResume();cmd('barracks')">🏠 兵营 200💰</button>
+<button id="btnF" onclick="sfxResume();cmd('factory')">🏭 工厂 400💰</button>
+<button id="btnR" onclick="sfxResume();cmd('rifle')" disabled>🔫 步兵 100💰</button>
+<button id="btnT" onclick="sfxResume();cmd('tank')" disabled>🛡️ 坦克 300💰</button>
+<button onclick="sfxResume();cmd('rush')">⚔️ 全军出击</button>
+<button onclick="sfxResume();cmd('retreat')">🛡️ 全军回防</button>
 </div>
 <a class="back" href="/">← 返回</a></div>
 <script>
@@ -288,8 +288,8 @@ function drawUnit(u,col,accent){
 
 // === INPUT ===
 function get(e){var r=c.getBoundingClientRect();var s=W/r.width;return{x:Math.floor((e.clientX-r.left)*s/TS),y:Math.floor((e.clientY-r.top)*s/TS)}}
-c.addEventListener('mousedown',function(e){e.preventDefault();var p=get(e);click(p.x,p.y)});
-c.addEventListener('touchstart',function(e){e.preventDefault();var p=get(e.touches[0]);click(p.x,p.y)});
+c.addEventListener('mousedown',function(e){e.preventDefault();sfxResume();var p=get(e);click(p.x,p.y)});
+c.addEventListener('touchstart',function(e){e.preventDefault();sfxResume();var p=get(e.touches[0]);click(p.x,p.y)});
 c.addEventListener('contextmenu',function(e){e.preventDefault();if(sel&&sel.o==='p'&&!sel.t&&sel.hp>0){var p=get(e);sel.st='moving';sel.tx=p.x+0.5;sel.ty=p.y+0.5;msg('📍 移动中',800)}});
 
 function click(gx,gy){
@@ -302,7 +302,7 @@ function click(gx,gy){
 }
 
 // === START ===
-draw();upd();
+draw();upd();sfxInit();
 var lastTick=0;
 function loop(t){
   if(!over){if(t-lastTick>=33){lastTick=t;tick.running=false;tick()}}
