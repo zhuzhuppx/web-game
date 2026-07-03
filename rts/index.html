@@ -222,7 +222,7 @@ function _tick(){
         var ref=P.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
         if(ref){u.st='moving';u.tx=ref.x+0.5;u.ty=ref.y+0.5;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
       }}
-      else if(u.st==='idle'||(u.st==='moving'&&!u._mineTime)){
+      else if(u.st==='idle'){
         var nearestOre=null,bestD=999;
         for(var y=0;y<GH;y++)for(var x=0;x<GW;x++){if(map[y][x]!==2)continue;
           var d=Math.hypot(x+0.5-u.x,y+0.5-u.y);if(d<bestD){bestD=d;nearestOre={x:x+0.5,y:y+0.5}}}
@@ -264,7 +264,7 @@ function _tick(){
         var refE=E.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
         if(refE){u.st='moving';u.tx=refE.x+0.5;u.ty=refE.y+0.5;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
       }}
-      else if(u.st==='idle'||(u.st==='moving'&&!u._mineTime)){
+      else if(u.st==='idle'){
         var nearestOreE=null,bestDE=999;
         for(var y3=0;y3<GH;y3++)for(var x3=0;x3<GW;x3++){if(map[y3][x3]!==2)continue;
           var d3=Math.hypot(x3+0.5-u.x,y3+0.5-u.y);if(d3<bestDE){bestDE=d3;nearestOreE={x:x3+0.5,y:y3+0.5}}}
