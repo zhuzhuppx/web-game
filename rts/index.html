@@ -357,12 +357,10 @@ function _tick(){
   if(must_defend&&!E._defending){E._defending=true;msg('🛡️ '+E.id+' 回防！',2000)}
   if(!must_defend)E._defending=false;
   
-  // Group attack logic: gather 3+ then strike
-  var e_alive=E.units.filter(function(u){return u.hp>0}).length;
-  if(!must_defend){
-    if(!E.attackReady&&e_alive>=3){E.attackReady=true;msg('⚔️ '+E.id+' 集结完毕，发起进攻！',2000)}
-    if(E.attackReady&&e_alive<2){E.attackReady=false;msg('💨 '+E.id+' 败退，重新集结…',2000)}
-  }
+  // Group attack: be aggressive always if we have combat units
+  var combatCount=E.units.filter(function(u){return u.hp>0&&u.t!=='harvester'}).length;
+  if(!must_defend&&combatCount>=2)E.attackReady=true;
+  if(must_defend||combatCount<1)E.attackReady=false;
   
   for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ff6644':'#ff4444',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();E.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
@@ -404,7 +402,6 @@ function _tick(){
     if(must_defend&&ehq){
       var intruders=cachedE.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5});
       if(intruders.length){
-        // Attack if cd ready, always chase intruders
         if(u.cd<=0){var ct=nearUnit(u,intruders)||near(u,intruders);if(ct){var wa2=ct.hpRef.hp>0;ct.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=ct.x-u.x;u.dy=ct.y-u.y;var m=muzzlePos(u);if(typeof sfxPew==='function')sfxPew(u.lv);spawnBullet(m.x,m.y,ct.x*TS,ct.y*TS,'#ff6666');if(wa2&&ct.hpRef.hp<=0)grantXp(u,ct.hpRef.t==='tank'?30:15)}}
         if(!u.cd||u.cd>0)moveToward(u,closest(u,intruders))
       }else{
@@ -412,11 +409,11 @@ function _tick(){
         if(distHome>4)moveToward(u,{x:ehq.x+0.5+Math.random()-0.5,y:ehq.y+0.5+Math.random()-0.5})
       }
     }else if(E.attackReady){
-      // Attack wave: push toward player HQ
-      var hq=hqOf(P);
-      if(!et&&hq){var d=Math.hypot(hq.x+0.5-u.x,hq.y+0.5-u.y);if(d>1.5)moveToward(u,{x:hq.x+0.5,y:hq.y+0.5})}
-    }else{
-      // Gathering: hang around HQ
+      // Attack: hunt nearest player unit or building
+      var tgt=closest(u,cachedE);
+      if(tgt){var d=Math.hypot(tgt.x-u.x,tgt.y-u.y);if(d>1)moveToward(u,tgt)}
+    }else if(!must_defend&&ehq){
+      // Gather near HQ
       if(!et&&ehq){var dh=Math.hypot(ehq.x+0.5-u.x,ehq.y+0.5-u.y);if(dh>3)moveToward(u,{x:ehq.x+0.5+Math.random()-0.5,y:ehq.y+0.5+Math.random()-0.5})}
     }
   }
