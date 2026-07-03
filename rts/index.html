@@ -1,13 +1,13 @@
 <!DOCTYPE html><html lang="zh-CN"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><title>红警·小规模冲突</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <script src="/sfx.js"></script><style>
-*{margin:0;padding:0;box-sizing:border-box}html,body{overflow:hidden;height:100dvh}body{background:#0a0a1a;color:#ccc;font-family:system-ui;display:flex;align-items:center;justify-content:center}
-.wrap{width:100%;padding:6px;display:flex;flex-direction:column;gap:4px;align-items:center}
-.hud{display:flex;align-items:center;justify-content:space-between;width:100%;font-size:13px}
+*{margin:0;padding:0;box-sizing:border-box}html,body{overflow:hidden;height:100dvh}body{background:#0a0a1a;color:#ccc;font-family:system-ui}
+.wrap{height:100dvh;padding:4px 6px;display:flex;flex-direction:column;gap:3px}
+.hud{display:flex;align-items:center;justify-content:space-between;font-size:13px;flex-shrink:0}
 .hud span{color:#aaa}.hud b{color:#ffcc44}#sel{color:#8888cc;font-size:11px}
-#c{max-width:100%;max-height:calc(100dvh - 200px);border-radius:8px;touch-action:none;border:1px solid rgba(255,255,255,0.05);display:block}
-.info{font-size:12px;color:#ff8844;min-height:18px;text-align:center;font-weight:600}
-.btns{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+#c{width:100%;flex:1;min-height:0;border-radius:8px;touch-action:none;border:1px solid rgba(255,255,255,0.05);display:block;object-fit:contain}
+.info{font-size:12px;color:#ff8844;text-align:center;font-weight:600;flex-shrink:0}
+.btns{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;flex-shrink:0}
 .btns button{padding:5px 10px;border:none;border-radius:6px;background:rgba(255,170,68,0.12);color:#ffaa44;font-size:12px;cursor:pointer;touch-action:manipulation}
 .btns button:active{background:rgba(255,170,68,0.25)}.btns button:disabled{opacity:0.25;cursor:default}
 .back{color:#8888cc;text-decoration:none;font-size:14px;position:absolute;bottom:12px;left:12px;z-index:100;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:6px}
@@ -33,7 +33,7 @@
 <a class="back" href="/">← 返回</a></div>
 <script>
 // === CONSTANTS ===
-var GW=18,GH=12,TS=Math.max(30,Math.floor(Math.min(window.innerWidth-16,window.innerHeight-200)/Math.max(GW,GH*1.5))), W=GW*TS, H=GH*TS;
+var GW=18,GH=12,TS=Math.max(30,Math.floor(Math.min(window.innerWidth-16,(window.innerHeight-130)*0.75)/GW)), W=GW*TS, H=GH*TS;
 var c=document.getElementById('c'),ctx=c.getContext('2d');
 c.width=W;c.height=H;
 
