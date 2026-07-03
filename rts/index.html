@@ -67,10 +67,13 @@ addBld('hq',GW-2,GH-2,600,'e');
 function hasB(o,t){return o.blds.some(function(b){return b.t===t&&b.hp>0})}
 function hqOf(o){return o.blds.find(function(b){return b.t==='hq'&&b.hp>0})}
 function eSpawn(type){var eh=hqOf(E);if(!eh)return;
-  var sx=eh.x+0.5,sy=eh.y+1.5;
-  var eoffs=[{x:0.5,y:1.5},{x:-0.5,y:1.5},{x:0.5,y:2.5},{x:-0.5,y:2.5},{x:1.5,y:0.5},{x:1.5,y:1.5},{x:-1.5,y:1.5},{x:-1.5,y:2.5}];
-  for(var oi=0;oi<eoffs.length;oi++){sx=eh.x+eoffs[oi].x;sy=eh.y+eoffs[oi].y;if(canPass(sx,sy))break}
-  addUnit(type,sx,sy,'e')}
+  // Spawn at production building
+  var bType=type==='tank'?'factory':'barracks';
+  var fb=E.blds.find(function(b){return b.t===bType&&b.hp>0});
+  var sx=fb?fb.x+0.5:eh.x+0.5,sy=fb?fb.y+0.5:eh.y+1.5;
+  addUnit(type,sx,sy,'e');
+  var nu=E.units[E.units.length-1];
+  nu.st='moving';nu.tx=eh.x+0.5+Math.random()*2-1;nu.ty=eh.y+1.5+Math.random();nu._spawn=1}
 function msg(s,t){var el=document.getElementById('info');el.textContent=s;if(t)setTimeout(function(){if(el.textContent===s)el.textContent=''},t)}
 function bName(t){return{hq:'🏛️',barracks:'🏠',factory:'🏭',refinery:'🏗️'}[t]||t}
 function uName(t){return{rifle:'🔫',tank:'🛡️',harvester:'⛏️'}[t]||t}
@@ -143,12 +146,17 @@ function cmd(a){
     var cost=a==='tank'?200:100;if(P.gold<cost){msg('💰 金币不足！',1500);return}
     if(!hasB(P,a==='tank'?'factory':'barracks')){msg('❌ 需要先建造对应建筑',1500);return}
     if(P.units.length>=40){msg('👥 人口已满！',1500);return}
-    var hq=hqOf(P);if(!hq)return;
-    // Spawn near HQ, avoid obstacles
-    var sx=hq.x+0.5,sy=hq.y+1.5;var offs=[{x:0.5,y:1.5},{x:-0.5,y:1.5},{x:0.5,y:2.5},{x:-0.5,y:2.5},{x:1.5,y:0.5},{x:1.5,y:1.5},{x:-1.5,y:1.5}];
-    for(var oi=0;oi<offs.length;oi++){sx=hq.x+offs[oi].x;sy=hq.y+offs[oi].y;if(canPass(sx,sy))break}
+    // Spawn at production building, then drive out
+    var bld=hasB(P,a==='tank'?'factory':'barracks');
+    var sx,sy;if(bld){var fb=P.blds.find(function(b){return b.t===(a==='tank'?'factory':'barracks')&&b.hp>0});sx=fb.x+0.5;sy=fb.y+0.5}
+    else{var hq=hqOf(P);sx=hq.x+0.5;sy=hq.y+1.5}
+    // Destination: near HQ
+    var dx=hqOf(P);var desX=dx.x+0.5+Math.random()*2-1,desY=dx.y+1.5+Math.random();
     addUnit(a,sx,sy,'p');P.gold-=cost;
-    msg('✅ '+uName(a)+' 训练完成',2000);if(typeof sfxBlip==='function')sfxBlip();upd();return}
+    var nu=P.units[P.units.length-1];
+    nu.st='moving';nu.tx=desX;nu.ty=desY;nu.dx=desX-sx;nu.dy=desY-sy;
+    nu._spawn=1;
+    msg('✅ '+uName(a)+' 出厂！',2000);if(typeof sfxBlip==='function')sfxBlip();upd();return}
   if(a==='rush'){
     var tg=allTargets('p');if(!tg.length)return;
     var cx=0,cy=0;for(var i=0;i<tg.length;i++){cx+=tg[i].x;cy+=tg[i].y}
@@ -202,6 +210,8 @@ function _tick(){
   // Player units
   for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ffaa22':'#ff8844',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
+    // Spawning unit: just move to destination, ignore combat
+    if(u._spawn){var dd=Math.hypot(u.tx-u.x,u.ty-u.y);if(dd<0.3){u.st='idle';u._spawn=0;if(u.t==='tank'&&typeof sfxTankStart==='function'){}}else{moveToward(u,{x:u.tx,y:u.ty})};continue}
     // HP regen for lv3+
     if(u.lv>=3&&u.hp<u.mhp){u._rgCd=(u._rgCd||0)+1;if(u._rgCd>=90){u.hp=Math.min(u.mhp,u.hp+1);u._rgCd=0}}
     // Auto-acquire target (skip if retreating)
@@ -267,6 +277,8 @@ function _tick(){
   
   for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ff6644':'#ff4444',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();E.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
+    // Spawning unit: just move to destination, ignore combat
+    if(u._spawn){var dd=Math.hypot(u.tx-u.x,u.ty-u.y);if(dd<0.3){u.st='idle';u._spawn=0;if(u.t==='tank'&&typeof sfxTankStart==='function'){}}else{moveToward(u,{x:u.tx,y:u.ty})};continue}
     // HP regen for lv3+
     if(u.lv>=3&&u.hp<u.mhp){u._rgCd=(u._rgCd||0)+1;if(u._rgCd>=90){u.hp=Math.min(u.mhp,u.hp+1);u._rgCd=0}}
     // Enemy harvester
