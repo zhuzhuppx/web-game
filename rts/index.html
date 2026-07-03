@@ -261,10 +261,6 @@ function draw(){
       // Grass dots
       ctx.fillStyle='#2a442a';for(var d=0;d<3;d++){var dx=gx+5+((d*13+y*7)%(TS-10)),dy=gy+5+((d*17+x*11)%(TS-10));ctx.fillRect(dx,dy,2,2)}}
   }
-  // Grid
-  ctx.strokeStyle='rgba(255,255,255,0.025)';ctx.lineWidth=0.5;
-  for(var y=0;y<=GH;y++){ctx.beginPath();ctx.moveTo(0,y*TS);ctx.lineTo(W,y*TS);ctx.stroke()}
-  for(var x=0;x<=GW;x++){ctx.beginPath();ctx.moveTo(x*TS,0);ctx.lineTo(x*TS,H);ctx.stroke()}
   // Base pads
   drawPad(1,1,4,4,'rgba(100,150,255,0.1)');
   drawPad(GW-4,GH-4,4,4,'rgba(255,100,100,0.1)');
