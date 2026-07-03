@@ -59,32 +59,55 @@ function spawnGems(){
 var uid=0,frame=0,sel=null,over=false;
 var fx=[]; // death particles
 var P={gold:1000,units:[],blds:[]};
-var E={gold:1000,units:[],blds:[],aiCd:50,attackReady:false};
+var E0={id:'e',gold:1000,units:[],blds:[],aiCd:0}; // bottom-right
+var E1={id:'e1',gold:1000,units:[],blds:[],aiCd:40}; // top-right
+var E2={id:'e2',gold:1000,units:[],blds:[],aiCd:20}; // bottom-left
+var ALL_ENEMIES=[E0,E1,E2];
+var EN_HQS=[[GW-1,GH-1],[GW-1,0],[0,GH-1]];
 var moveSoundCd=0; // throttle movement sfx
 var mineralTick=0; // mineral regen timer
 
-function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};(o==='p'?P.blds:E.blds).push(b);return b}
+function faction(o){if(o==='p')return P;if(o==='e')return E0;if(o==='e1')return E1;return E2}
+function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};faction(o).blds.push(b);return b}
 function addUnit(t,x,y,o){var s=t==='tank'?{hp:250,atk:35,rng:2.5,spd:0.025,rate:45}:t==='harvester'?{hp:200,atk:0,rng:0,spd:0.05,rate:999}:{hp:65,atk:6,rng:1.4,spd:0.028,rate:32};
   var u={id:uid++,t:t,x:x,y:y,hp:s.hp,mhp:s.hp,atk:s.atk,rng:s.rng,spd:s.spd,rate:s.rate,cd:0,o:o,st:'idle',tx:0,ty:0,dx:0,dy:0,xp:0,lv:1};
-  (o==='p'?P.units:E.units).push(u);return u}
+  faction(o).units.push(u);return u}
 
 // Init
 addBld('hq',0,0,600,'p');
-addBld('hq',GW-1,GH-1,600,'e');
-// Both start equal: just HQ, no free buildings/units
+addBld('hq',GW-1,GH-1,600,'e');   // E0 = bottom-right (original red)
+addBld('hq',GW-1,0,600,'e1');     // E1 = top-right (orange)
+addBld('hq',0,GH-1,600,'e2');     // E2 = bottom-left (pink)
 
 // === HELPERS ===
 function hasB(o,t){return o.blds.some(function(b){return b.t===t&&b.hp>0})}
 function hqOf(o){return o.blds.find(function(b){return b.t==='hq'&&b.hp>0})}
 function stopSfx(){if(typeof sfxTankStop==='function')sfxTankStop();if(typeof sfxMoveStop==='function')sfxMoveStop()}
-function eSpawn(type){var eh=hqOf(E);if(!eh)return;
+function allBuildings(){
+  var arr=P.blds.slice();
+  for(var ei=0;ei<ALL_ENEMIES.length;ei++)arr=arr.concat(ALL_ENEMIES[ei].blds);
+  return arr}
+function allUnits(){
+  var arr=P.units.slice();
+  for(var ei=0;ei<ALL_ENEMIES.length;ei++)arr=arr.concat(ALL_ENEMIES[ei].units);
+  return arr}
+function allPlayerTargets(){var r=[];for(var ei=0;ei<ALL_ENEMIES.length;ei++){var src=ALL_ENEMIES[ei];for(var i=0;i<src.blds.length;i++){var b=src.blds[i];if(b.hp>0)r.push({x:b.x+0.5,y:b.y+0.5,hpRef:b,isBld:true})}for(var i=0;i<src.units.length;i++){var u=src.units[i];if(u.hp>0)r.push({x:u.x,y:u.y,hpRef:u,isBld:false})}}return r}
+function enemyTargets(eFaction){var r=[];for(var i=0;i<P.blds.length;i++){var b=P.blds[i];if(b.hp>0)r.push({x:b.x+0.5,y:b.y+0.5,hpRef:b,isBld:true})}for(var i=0;i<P.units.length;i++){var u=P.units[i];if(u.hp>0)r.push({x:u.x,y:u.y,hpRef:u,isBld:false})}return r}
+
+// legacy compatibility
+var E=E0; // default enemy ref for old code
+function eSpawn(type,faction){var eh=hqOf(faction);if(!eh)return;
   var bType=type==='tank'?'factory':'barracks';
-  var fb=E.blds.find(function(b){return b.t===bType&&b.hp>0});
+  var fb=faction.blds.find(function(b){return b.t===bType&&b.hp>0});
   var sx=fb?fb.x-1:eh.x+0.5,sy=fb?fb.y-0.5:eh.y-0.5;
-  var exits=[[-0.5,-1.5],[0.5,-1.5],[-1.5,-0.5],[-0.5,-0.5],[-0.5,-2.5],[0.5,-2.5],[-1.5,-1.5],[0.5,0.5],[-2.5,-0.5],[-2.5,-1.5],[-1.5,-2.5],[0.5,-3.5]]; // red exits up
+  // Different exits per faction based on HQ corner
+  var exits;
+  if(faction===E1){exits=[[-0.5,1.5],[0.5,1.5],[-1.5,0.5],[-0.5,0.5],[-0.5,2.5],[0.5,2.5],[-1.5,1.5],[0.5,-0.5],[-2.5,0.5],[-2.5,1.5],[-1.5,2.5],[0.5,3.5]]}
+  else if(faction===E2){exits=[[1.5,-0.5],[1.5,-1.5],[0.5,-1.5],[0.5,-0.5],[2.5,-0.5],[2.5,-1.5],[1.5,-2.5],[0.5,0.5],[2.5,0.5],[2.5,-2.5],[1.5,0.5],[3.5,-0.5]]}
+  else{exits=[[-0.5,-1.5],[0.5,-1.5],[-1.5,-0.5],[-0.5,-0.5],[-0.5,-2.5],[0.5,-2.5],[-1.5,-1.5],[0.5,0.5],[-2.5,-0.5],[-2.5,-1.5],[-1.5,-2.5],[0.5,-3.5]]}
   if(fb){for(var ei=0;ei<exits.length;ei++){var ex=fb.x+exits[ei][0],ey=fb.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}};fb._spark=45}
-  addUnit(type,sx,sy,'e');
-  var nu=E.units[E.units.length-1];
+  addUnit(type,sx,sy,faction.id);
+  var nu=faction.units[faction.units.length-1];
   nu.st='moving';nu.tx=Math.min(GW-1.5,Math.max(0.5,eh.x+0.5+Math.random()*2-1));nu.ty=Math.min(GH-1.5,Math.max(0.5,eh.y-1.5+Math.random()));nu._spawn=1}
 function msg(s,t){var el=document.getElementById('info');el.textContent=s;if(t)setTimeout(function(){if(el.textContent===s)el.textContent=''},t)}
 function bName(t){return{hq:'🏛️',barracks:'🏠',factory:'🏭',refinery:'🏗️'}[t]||t}
@@ -105,17 +128,17 @@ function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   if(ix<0||ix>=GW||iy<0||iy>=GH)return false;
   // check buildings (allow leaving own tile)
   var ox=self?Math.floor(self.x):-1,oy=self?Math.floor(self.y):-1;
-  var all=P.blds.concat(E.blds);for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;
+  var all=allBuildings();for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;
     if(ix===all[i].x&&iy===all[i].y){
       if(!self)return false;
       if(self.t==='harvester'&&all[i].o===self.o&&all[i].t==='refinery')continue;
       if(!(ix===ox&&iy===oy&&all[i].o===self.o))return false}}
   // only enemy units at target tile block movement
   if(!self)return true;
-  var allu=P.units.concat(E.units);for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(ou.o!==self.o&&Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
+  var allu=allUnits();for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(ou.o!==self.o&&Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
   return true}
 function spawnFx(x,y,color,n){if(fx.length>200)return;for(var i=0;i<(n||8);i++){fx.push({x:x,y:y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3-1,life:20+Math.random()*15,c:color||'#ff8844',s:2+Math.random()*3})}}
-function spawnBldFx(b){if(fx.length>200)return;for(var i=0;i<14;i++){fx.push({x:(b.x+0.5)*TS,y:(b.y+0.5)*TS,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-2,life:25+Math.random()*15,c:b.o==='p'?'#66aaff':'#ff6644',s:3+Math.random()*4})}}
+function spawnBldFx(b){if(fx.length>200)return;var col=b.o==='p'?'#66aaff':b.o==='e1'?'#ff8844':b.o==='e2'?'#dd44cc':'#ff6644';for(var i=0;i<14;i++){fx.push({x:(b.x+0.5)*TS,y:(b.y+0.5)*TS,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-2,life:25+Math.random()*15,c:col,s:3+Math.random()*4})}}
 
 function grantXp(u,amount){
   if(u.lv>=3)return; // max level 3
@@ -136,10 +159,7 @@ function muzzlePos(u){var cx=u.x*TS+TS/2,cy=u.y*TS+TS/2,angle=u.dx||u.dy?Math.at
 function spawnBullet(fx2,fy2,tx,ty,c){if(fx.length>200)return;var dx=tx-fx2,dy=ty-fy2,d=Math.hypot(dx,dy);if(d<0.01)return;
   fx.push({x:fx2,y:fy2,vx:(dx/d)*8,vy:(dy/d)*8,life:Math.ceil(d/8)+1,c:c||'#ffff44',s:1.5,tx:tx,ty:ty})}
 
-function allTargets(o){var r=[];var src=o==='p'?E:P;
-  for(var i=0;i<src.blds.length;i++){var b=src.blds[i];if(b.hp>0)r.push({x:b.x+0.5,y:b.y+0.5,hpRef:b,isBld:true})}
-  for(var i=0;i<src.units.length;i++){var u=src.units[i];if(u.hp>0)r.push({x:u.x,y:u.y,hpRef:u,isBld:false})}
-  return r}
+function allTargets(o){return o==='p'?allPlayerTargets():enemyTargets()}
 function nearUnit(u,list){return near(u,list.filter(function(t){return !t.isBld}))}
 
 // === COMMANDS ===
@@ -152,7 +172,7 @@ function cmd(a){
     var off=[[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2],[1,1],[-1,1],[1,-1],[-1,-1]];
     for(var i=0;i<off.length;i++){var nx=hq.x+off[i][0],ny=hq.y+off[i][1];if(nx<0||nx>=GW||ny<0||ny>=GH)continue;
       if(map[ny][nx]===1)continue;
-      var occ=P.blds.some(function(b){return b.x===nx&&b.y===ny})||E.blds.some(function(b){return b.x===nx&&b.y===ny})||P.units.some(function(u){return u.hp>0&&Math.floor(u.x)===nx&&Math.floor(u.y)===ny});
+      var occ=P.blds.some(function(b){return b.x===nx&&b.y===ny})||ALL_ENEMIES.some(function(en){return en.blds.some(function(b){return b.x===nx&&b.y===ny})})||P.units.some(function(u){return u.hp>0&&Math.floor(u.x)===nx&&Math.floor(u.y)===ny});
       if(occ)continue;
       P.gold-=cost;addBld(a,nx,ny,a==='barracks'?300:400,'p');
       msg('✅ '+bName(a)+' 建造完成',2000);if(typeof sfxBlip==='function')sfxBlip();upd();return}
@@ -195,7 +215,7 @@ function cmd(a){
     var off=[[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2],[1,1],[-1,1],[1,-1],[-1,-1]];
     for(var i=0;i<off.length;i++){var nx=hq2.x+off[i][0],ny=hq2.y+off[i][1];
       if(nx<0||nx>=GW||ny<0||ny>=GH)continue;
-      var occ=P.blds.concat(E.blds).some(function(b){return b.x===nx&&b.y===ny});
+      var occ=allBuildings().some(function(b){return b.x===nx&&b.y===ny});
       if(occ)continue;
       P.gold-=250;addBld('refinery',nx,ny,350,'p');addUnit('harvester',nx+0.5,ny+0.5,'p');msg('✅ 精炼厂建成，附赠矿车',2000);upd();return}
     msg('❌ HQ旁无空地',1500)}
@@ -312,19 +332,20 @@ function _tick(){
   // Passive gold income — always on while HQ is alive
   var phq2=hqOf(P);
   if(phq2){P._goldTick=(P._goldTick||0)+1;if(P._goldTick>=90){P.gold+=10;P._goldTick=0;upd()}}else P._goldTick=0;
-  // Enemy AI
+  // Enemy AI — per faction
+  ALL_ENEMIES.forEach(function(E){
   var ehq2E=hqOf(E);
   if(ehq2E){E._goldTick=(E._goldTick||0)+1;if(E._goldTick>=90){E.gold+=10;E._goldTick=0}}else E._goldTick=0;
   var ehq=hqOf(E);var e_base_threat=ehq?cachedE.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5}).length:0;
   var must_defend=e_base_threat>=2;
-  if(must_defend&&!E._defending){E._defending=true;msg('🛡️ 敌军回防！',2000)}
+  if(must_defend&&!E._defending){E._defending=true;msg('🛡️ '+E.id+' 回防！',2000)}
   if(!must_defend)E._defending=false;
   
-  // Group attack logic: gather 5+ then strike
+  // Group attack logic: gather 3+ then strike
   var e_alive=E.units.filter(function(u){return u.hp>0}).length;
   if(!must_defend){
-    if(!E.attackReady&&e_alive>=3){E.attackReady=true;msg('⚔️ 敌军集结完毕，发起进攻！',2000)}
-    if(E.attackReady&&e_alive<2){E.attackReady=false;msg('💨 敌军败退，重新集结…',2000)}
+    if(!E.attackReady&&e_alive>=3){E.attackReady=true;msg('⚔️ '+E.id+' 集结完毕，发起进攻！',2000)}
+    if(E.attackReady&&e_alive<2){E.attackReady=false;msg('💨 '+E.id+' 败退，重新集结…',2000)}
   }
   
   for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ff6644':'#ff4444',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();E.units.splice(i,1);continue}
@@ -391,19 +412,19 @@ function _tick(){
       var offR=[[-1,0],[-1,-1],[0,-1],[1,-1],[-2,0],[0,-2],[-1,1],[1,0],[0,1],[-2,-1],[-2,1],[-1,-2]];
       for(var ri=0;ri<offR.length;ri++){var rx=ehq2.x+offR[ri][0],ry=ehq2.y+offR[ri][1];
         if(rx<0||rx>=GW||ry<0||ry>=GH)continue;
-        if(canPass(rx,ry)){E.gold-=250;addBld('refinery',rx,ry,350,'e');addUnit('harvester',rx+0.5,ry+0.5,'e');break}}
+        if(canPass(rx,ry)){E.gold-=250;addBld('refinery',rx,ry,350,E.id);addUnit('harvester',rx+0.5,ry+0.5,E.id);break}}
       if(!hasB(E,'refinery'))E.aiCd=-20
     }else if(!hasB(E,'factory')&&E.gold>=400){
       var offF=[[-2,0],[-2,-1],[-1,-2],[0,-2],[1,-1],[0,1],[-1,0],[1,0]];
       var placed=false;
       for(var fi=0;fi<offF.length;fi++){var fx=ehq2.x+offF[fi][0],fy=ehq2.y+offF[fi][1];
-        if(canPass(fx,fy)){E.gold-=400;addBld('factory',fx,fy,400,'e');placed=true;break}}
+        if(canPass(fx,fy)){E.gold-=400;addBld('factory',fx,fy,400,E.id);placed=true;break}}
       if(!placed)E.aiCd=-20
     }else if(!hasB(E,'barracks')&&E.gold>=200){
       var offB=[[0,-1],[1,-1],[-2,-1],[-1,-2],[0,1],[1,0],[-1,0],[-2,0]];
       placed=false;
       for(var bi=0;bi<offB.length;bi++){var bx=ehq2.x+offB[bi][0],by=ehq2.y+offB[bi][1];
-        if(canPass(bx,by)){E.gold-=200;addBld('barracks',bx,by,300,'e');placed=true;break}}
+        if(canPass(bx,by)){E.gold-=200;addBld('barracks',bx,by,300,E.id);placed=true;break}}
       if(!placed)E.aiCd=-20
     }else if(E.units.length<60&&(hasB(E,'barracks')||hasB(E,'factory'))){
       var hasF=hasB(E,'factory'),hasR=hasB(E,'refinery'),hasBbar=hasB(E,'barracks');
@@ -418,44 +439,45 @@ function _tick(){
           var exits=[[-0.5,-1.5],[0.5,-1.5],[-1.5,-0.5],[-0.5,-0.5],[-0.5,-2.5],[0.5,-2.5],[-1.5,-1.5],[0.5,0.5],[-2.5,-0.5],[-2.5,-1.5],[-1.5,-2.5],[0.5,-3.5]];
           if(efac)for(var ei=0;ei<exits.length;ei++){var ex=efac.x+exits[ei][0],ey=efac.y+exits[ei][1];if(canPass(ex,ey)){sx=ex;sy=ey;break}}
           if(efac)efac._spark=45;
-          E.gold-=150;addUnit('harvester',sx,sy,'e');
+          E.gold-=150;addUnit('harvester',sx,sy,E.id);
           var nearestRef=null,nrDist=999;
           var allRefs=E.blds.filter(function(b){return b.t==='refinery'&&b.hp>0});
           for(var ri2=0;ri2<allRefs.length;ri2++){var dr=Math.hypot(allRefs[ri2].x+0.5-sx,allRefs[ri2].y+0.5-sy);if(dr<nrDist){nrDist=dr;nearestRef=allRefs[ri2]}}
           if(nearestRef)E.units[E.units.length-1]._toRef={x:nearestRef.x+0.5,y:nearestRef.y+0.5};else E.units[E.units.length-1]._hs='go'}
       // Priority 2: if under threat, build combat units regardless
-      }else if(threat>=2&&hasF&&E.gold>=200){E.gold-=200;eSpawn('tank')}
-      else if(threat>=2&&!hasF&&hasBbar&&E.gold>=100){E.gold-=100;eSpawn('rifle')}
+      }else if(threat>=2&&hasF&&E.gold>=200){E.gold-=200;eSpawn('tank',E)}
+      else if(threat>=2&&!hasF&&hasBbar&&E.gold>=100){E.gold-=100;eSpawn('rifle',E)}
       // Priority 3: only build army when mature (6+ harvesters, all buildings) and wealthy
-      else if(mature&&E.gold>=500&&hasF){E.gold-=200;eSpawn('tank')}
-      else if(mature&&E.gold>=300&&!hasF&&hasBbar){E.gold-=100;eSpawn('rifle')}
+      else if(mature&&E.gold>=500&&hasF){E.gold-=200;eSpawn('tank',E)}
+      else if(mature&&E.gold>=300&&!hasF&&hasBbar){E.gold-=100;eSpawn('rifle',E)}
       // Priority 4: emergency defense — very few combat units
-      else if(E.units.filter(function(u){return u.t!=='harvester'}).length<1&&hasBbar&&E.gold>=150){E.gold-=100;eSpawn('rifle')}
+      else if(E.units.filter(function(u){return u.t!=='harvester'}).length<1&&hasBbar&&E.gold>=150){E.gold-=100;eSpawn('rifle',E)}
     }
   }
-  // Resources (no auto-gold, mining only)
-  // Building death FX
-  for(var i=P.blds.length-1;i>=0;i--){var b=P.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
+  // Building death FX (enemy)
   for(var i=E.blds.length-1;i>=0;i--){var b=E.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
-  // AI difficulty: periodic free units after 3 minutes (scales with game time)
+  // AI difficulty: periodic free units after 3 minutes
   E._waveCd=(E._waveCd||0)+1;
-  if(frame>1800&&E._waveCd>=450){E._waveCd=0; // every 15s after 1min
+  if(frame>1800&&E._waveCd>=450){E._waveCd=0;
     var eh=hqOf(E);if(eh&&hasB(E,'barracks')){
-      for(var wi=0;wi<3;wi++)eSpawn('tank');
-      for(var wi=0;wi<5;wi++)eSpawn('rifle');
+      for(var wi=0;wi<3;wi++)eSpawn('tank',E);
+      for(var wi=0;wi<5;wi++)eSpawn('rifle',E);
     }}
-  // Win/lose — count alive buildings
-  var pa=0,ea=0;
-  for(var i=0;i<P.blds.length;i++)if(P.blds[i].hp>0)pa++;
-  for(var i=0;i<E.blds.length;i++)if(E.blds[i].hp>0)ea++;
+  }); // end ALL_ENEMIES.forEach
+  
+  // Player building death FX
+  for(var i=P.blds.length-1;i>=0;i--){var b=P.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
+  // Win/lose — all player buildings destroyed, or ALL enemy HQs destroyed
+  var pa=0;for(var i=0;i<P.blds.length;i++)if(P.blds[i].hp>0)pa++;
+  var allEnHQsDead=ALL_ENEMIES.every(function(en){var ehq=hqOf(en);return !ehq||ehq.hp<=0});
   if(pa===0){over=true;stopSfx();msg('💀 失败！所有建筑被摧毁',99999)}
-  if(ea===0){over=true;stopSfx();msg('🎉 胜利！敌方全灭',99999)}
+  if(allEnHQsDead){over=true;stopSfx();msg('🎉 胜利！所有敌方基地全灭',99999)}
   // Movement sound (skip if game over)
   if(over)return;
   moveSoundCd-=dt;
   var anyTank=false,anyInf=false;
   for(var i=0;i<P.units.length;i++){var u=P.units[i];if(u._moved){u._moved=false;if(u.t==='tank')anyTank=true;else if(u.t!=='harvester')anyInf=true}}
-  for(var i=0;i<E.units.length;i++){var u=E.units[i];if(u._moved){u._moved=false;if(u.t==='tank')anyTank=true;else if(u.t!=='harvester')anyInf=true}}
+  for(var ei=0;ei<ALL_ENEMIES.length;ei++)for(var i=0;i<ALL_ENEMIES[ei].units.length;i++){var u=ALL_ENEMIES[ei].units[i];if(u._moved){u._moved=false;if(u.t==='tank')anyTank=true;else if(u.t!=='harvester')anyInf=true}}
   // Continuous tank tread sound
   if(anyTank){if(!tankSoundNodes.length&&typeof sfxTankStart==='function')sfxTankStart()}
   else{if(tankSoundNodes.length&&typeof sfxTankStop==='function')sfxTankStop()}
@@ -499,10 +521,14 @@ function draw(){
   ctx.globalAlpha=1;
   // Buildings
   for(var i=0;i<P.blds.length;i++)drawBld(P.blds[i],'#3355aa','#2244cc','#5588ff');
-  for(var i=0;i<E.blds.length;i++)drawBld(E.blds[i],'#aa3333','#cc2222','#ff4444');
+  for(var i=0;i<E0.blds.length;i++)drawBld(E0.blds[i],'#aa3333','#cc2222','#ff4444');
+  for(var i=0;i<E1.blds.length;i++)drawBld(E1.blds[i],'#aa5533','#cc6622','#ff8844');
+  for(var i=0;i<E2.blds.length;i++)drawBld(E2.blds[i],'#9933aa','#bb2299','#dd44cc');
   // Units
   for(var i=0;i<P.units.length;i++)drawUnit(P.units[i],'#4488ff','#2266dd');
-  for(var i=0;i<E.units.length;i++)drawUnit(E.units[i],'#ff5544','#dd3322');
+  for(var i=0;i<E0.units.length;i++)drawUnit(E0.units[i],'#ff5544','#dd3322');
+  for(var i=0;i<E1.units.length;i++)drawUnit(E1.units[i],'#ff8844','#cc6622');
+  for(var i=0;i<E2.units.length;i++)drawUnit(E2.units[i],'#dd44cc','#aa2288');
   
   // Particlez
   for(var i=fx.length-1;i>=0;i--){var p=fx[i];p.life--;if(p.life<=0){fx.splice(i,1);continue}
@@ -552,7 +578,7 @@ function drawBld(b,wall,roof,accent){
     ctx.fillStyle='#666';ctx.fillRect(x+s*0.3,y+s*0.25,s*0.4,s*0.5);
     ctx.fillStyle='#888';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,8,0,Math.PI*2);ctx.fill();
     // Pulsing glow when unloading
-    var src=b.o==='p'?P:E;var unloading=src.units.some(function(u){return u.t==='harvester'&&u._hs==='unload'&&Math.hypot(u.x-b.x-0.5,u.y-b.y-0.5)<1});
+    var src=faction(b.o);var unloading=src.units.some(function(u){return u.t==='harvester'&&u._hs==='unload'&&Math.hypot(u.x-b.x-0.5,u.y-b.y-0.5)<1});
     if(unloading){
       var pulse=6+Math.sin(frame*0.3)*4;
       ctx.fillStyle='rgba(255,200,0,0.3)';ctx.beginPath();ctx.arc(x+s/2,y+s*0.35,pulse+4,0,Math.PI*2);ctx.fill();
@@ -615,9 +641,9 @@ c.addEventListener('contextmenu',function(e){e.preventDefault();if(sel&&sel.o===
 function click(gx,gy){
   if(over)return;var f=null;
   for(var i=0;i<P.blds.length;i++){if(P.blds[i].hp>0&&P.blds[i].x===gx&&P.blds[i].y===gy){f=P.blds[i];break}}
-  if(!f){for(var i=0;i<E.blds.length;i++){if(E.blds[i].hp>0&&E.blds[i].x===gx&&E.blds[i].y===gy){f=E.blds[i];break}}}
+  if(!f){for(var ei=0;ei<ALL_ENEMIES.length&&!f;ei++)for(var i=0;i<ALL_ENEMIES[ei].blds.length;i++){if(ALL_ENEMIES[ei].blds[i].hp>0&&ALL_ENEMIES[ei].blds[i].x===gx&&ALL_ENEMIES[ei].blds[i].y===gy){f=ALL_ENEMIES[ei].blds[i];break}}}
   if(!f){for(var i=0;i<P.units.length;i++){if(P.units[i].hp>0&&Math.floor(P.units[i].x)===gx&&Math.floor(P.units[i].y)===gy){f=P.units[i];break}}}
-  if(!f){for(var i=0;i<E.units.length;i++){if(E.units[i].hp>0&&Math.floor(E.units[i].x)===gx&&Math.floor(E.units[i].y)===gy){f=E.units[i];break}}}
+  if(!f){for(var ei=0;ei<ALL_ENEMIES.length&&!f;ei++)for(var i=0;i<ALL_ENEMIES[ei].units.length;i++){if(ALL_ENEMIES[ei].units[i].hp>0&&Math.floor(ALL_ENEMIES[ei].units[i].x)===gx&&Math.floor(ALL_ENEMIES[ei].units[i].y)===gy){f=ALL_ENEMIES[ei].units[i];break}}}
   sel=f||null;draw();
 }
 
@@ -635,11 +661,10 @@ function loop(t){
     if(dt2>5000)lastTick=t;
     if(dt2>=33){lastTick=t;tick()}
     // Safety: win check every frame in case tick lags
-    var p2=0,e2=0;
-    for(var i=0;i<P.blds.length;i++)if(P.blds[i].hp>0)p2++;
-    for(var i=0;i<E.blds.length;i++)if(E.blds[i].hp>0)e2++;
+    var p2=0;for(var i=0;i<P.blds.length;i++)if(P.blds[i].hp>0)p2++;
+    var allEnHQsDead2=ALL_ENEMIES.every(function(en){var ehq=hqOf(en);return !ehq||ehq.hp<=0});
     if(p2===0){over=true;stopSfx();msg('💀 失败！所有建筑被摧毁',99999)}
-    if(e2===0){over=true;stopSfx();msg('🎉 胜利！敌方全灭',99999)}
+    if(allEnHQsDead2){over=true;stopSfx();msg('🎉 胜利！所有敌方基地全灭',99999)}
     }catch(e){console.error(e)}
   }
   if(over){stopSfx();draw();requestAnimationFrame(loop);return}
