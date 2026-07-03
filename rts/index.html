@@ -144,7 +144,7 @@ function upd(){
 // === UPDATE ===
 var cachedP=null,cachedE=null;
 function tick(){
-  if(over||tick.running)return;tick.running=true;
+  if(over)return;
   frame++;var dt=1;
   cachedP=allTargets('p');cachedE=allTargets('e');
   // Player units
@@ -338,8 +338,16 @@ function click(gx,gy){
 // === START ===
 draw();upd();sfxInit();
 var lastTick=0;
+// Resume audio on visibility change (tab switch / screen wake)
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden){sfxResume();lastTick=performance.now()}
+});
 function loop(t){
-  if(!over){if(t-lastTick>=33){lastTick=t;tick.running=false;tick()}}
+  if(!over){
+    var dt2=t-lastTick;
+    if(dt2>5000)lastTick=t; // cap delta, don't try to catch up after long sleep
+    if(dt2>=33){lastTick=t;tick()}
+  }
   draw();
   requestAnimationFrame(loop);
 }
