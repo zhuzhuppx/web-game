@@ -96,8 +96,8 @@ function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
       // Allow friendly units to exit own production buildings and refinery
       if(self&&all[i].o===self.o&&(all[i].t==='refinery'||all[i].t==='factory'||all[i].t==='barracks'))continue;
       if(!(self&&ix===ox&&iy===oy&&all[i].o===self.o))return false}}
-  // check units (all sides, skip self and friendly harvesters)
-  var allu=P.units.concat(E.units);for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(ou.t==='harvester'&&self&&self.t==='harvester'&&ou.o===self.o)continue;if(Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
+  // check units (all sides, skip self, friendly harvesters, and spawning units)
+  var allu=P.units.concat(E.units);for(var i=0;i<allu.length;i++){var ou=allu[i];if(ou.hp<=0||ou===self)continue;if(ou.t==='harvester'&&self&&self.t==='harvester'&&ou.o===self.o)continue;if(self&&self._spawn&&ou.o===self.o)continue;if(ou._spawn&&self&&ou.o===self.o)continue;if(Math.floor(ou.x)===ix&&Math.floor(ou.y)===iy)return false}
   return true}
 function spawnFx(x,y,color,n){if(fx.length>200)return;for(var i=0;i<(n||8);i++){fx.push({x:x,y:y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3-1,life:20+Math.random()*15,c:color||'#ff8844',s:2+Math.random()*3})}}
 function spawnBldFx(b){if(fx.length>200)return;for(var i=0;i<14;i++){fx.push({x:(b.x+0.5)*TS,y:(b.y+0.5)*TS,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-2,life:25+Math.random()*15,c:b.o==='p'?'#66aaff':'#ff6644',s:3+Math.random()*4})}}
