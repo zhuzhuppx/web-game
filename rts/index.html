@@ -155,7 +155,7 @@ function cmd(a){
   if(a==='retreat'){
     var hq=hqOf(P);if(!hq){msg('❌ 基地已毁！',1500);return}
     for(var i=0;i<P.units.length;i++){var u=P.units[i];if(u.hp<=0||u.t==='harvester')continue;
-      u.st='moving';u.tx=hq.x+0.5+Math.random()*2-1;u.ty=hq.y+1.5+Math.random();u.dx=u.tx-u.x;u.dy=u.ty-u.y}
+      u.st='moving';u._rt=1;u.tx=hq.x+0.5+Math.random()*2-1;u.ty=hq.y+1.5+Math.random();u.dx=u.tx-u.x;u.dy=u.ty-u.y}
     msg('🛡️ 全军回防！',1500)}
   if(a==='refinery'){
     if(hasB(P,'refinery')){msg('❌ 已有精炼厂',1500);return}
@@ -199,9 +199,9 @@ function _tick(){
   // Player units
   for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ffaa22':'#ff8844',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
-    // Auto-acquire target
-    if(u.t!=='harvester'){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){if(u.st!=='attacking'){u.st='attacking'}u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
-    if(u.st==='moving'){var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d<0.3){u.st='idle'}else{moveToward(u,{x:u.tx,y:u.ty})}}
+    // Auto-acquire target (skip if retreating)
+    if(u.t!=='harvester'&&!u._rt){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){if(u.st!=='attacking'){u.st='attacking'}u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
+    if(u.st==='moving'){var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d<0.3){u.st='idle';u._rt=0}else{moveToward(u,{x:u.tx,y:u.ty})}}
     else if(u.st==='attacking'){
       // Always try to attack first if ready
       if(u.cd<=0){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){var wasAlive=t.hpRef.hp>0;t.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=t.x-u.x;u.dy=t.y-u.y;u.tx=t.x;u.ty=t.y;var m=muzzlePos(u);if(typeof sfxPew==='function')sfxPew(u.lv);spawnBullet(m.x,m.y,t.x*TS,t.y*TS,'#ffff88');if(wasAlive&&t.hpRef.hp<=0)grantXp(u,t.hpRef.t==='tank'?15:8)}}
@@ -222,7 +222,7 @@ function _tick(){
           // Deploy to intercept: slightly forward of fence, spread out
           var defX=phq.x+0.5+(adx/ad)*(1.5+Math.random()*2);
           var defY=phq.y+0.5+(ady/ad)*(1.5+Math.random()*2);
-          u.st='attacking';u.tx=defX;u.ty=defY;u.dx=adx;u.dy=ady}
+          u.st='attacking';u._rt=0;u.tx=defX;u.ty=defY;u.dx=adx;u.dy=ady}
       }
     }}}
     // Harvester mining logic
