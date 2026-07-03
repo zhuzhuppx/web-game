@@ -20,7 +20,7 @@
 <button id="btnB" onclick="sfxResume();cmd('barracks')">🏠 兵营 200💰</button>
 <button id="btnF" onclick="sfxResume();cmd('factory')">🏭 工厂 400💰</button>
 <button id="btnR" onclick="sfxResume();cmd('rifle')" disabled>🔫 步兵 100💰</button>
-<button id="btnT" onclick="sfxResume();cmd('tank')" disabled>🛡️ 坦克 300💰</button>
+<button id="btnT" onclick="sfxResume();cmd('tank')" disabled>🛡️ 坦克 200💰</button>
 <button onclick="sfxResume();cmd('rush')">⚔️ 全军出击</button>
 <button onclick="sfxResume();cmd('retreat')">🛡️ 全军回防</button>
 </div>
@@ -43,8 +43,8 @@ map[GH-3][GW-2]=0;map[GH-2][GW-3]=0;map[GH-3][GW-3]=0; // enemy spawn
 // === GAME STATE ===
 var uid=0,frame=0,sel=null,over=false;
 var fx=[]; // death particles
-var P={gold:1200,units:[],blds:[]};
-var E={gold:1000,units:[],blds:[],aiCd:300,wave:0,attackReady:false};
+var P={gold:1500,units:[],blds:[]};
+var E={gold:600,units:[],blds:[],aiCd:300,wave:0,attackReady:false};
 var moveSoundCd=0; // throttle movement sfx
 
 function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};(o==='p'?P.blds:E.blds).push(b);return b}
@@ -128,7 +128,7 @@ function cmd(a){
       msg('✅ '+bName(a)+' 建造完成',2000);if(typeof sfxBlip==='function')sfxBlip();upd();return}
     msg('❌ HQ旁无空地！',1500);return}
   if(a==='rifle'||a==='tank'){
-    var cost=a==='tank'?300:100;if(P.gold<cost){msg('💰 金币不足！',1500);return}
+    var cost=a==='tank'?200:100;if(P.gold<cost){msg('💰 金币不足！',1500);return}
     if(!hasB(P,a==='tank'?'factory':'barracks')){msg('❌ 需要先建造对应建筑',1500);return}
     if(P.units.length>=40){msg('👥 人口已满！',1500);return}
     var hq=hqOf(P);if(!hq)return;
@@ -156,7 +156,7 @@ function upd(){
   document.getElementById('btnB').disabled=P.gold<200||over||hasB(P,'barracks');
   document.getElementById('btnF').disabled=P.gold<400||over||hasB(P,'factory');
   document.getElementById('btnR').disabled=!hasB(P,'barracks')||P.gold<100||over;
-  document.getElementById('btnT').disabled=!hasB(P,'factory')||P.gold<300||over;
+  document.getElementById('btnT').disabled=!hasB(P,'factory')||P.gold<200||over;
 }
 
 // === UPDATE ===
@@ -220,10 +220,10 @@ function tick(){
       var eh=E.blds.find(function(b){return b.t==='hq'});if(!eh)continue;
       var sx=eh.x+0.5,sy=eh.y+1.5;var eoffs=[{x:0.5,y:1.5},{x:-0.5,y:1.5},{x:0.5,y:2.5},{x:-0.5,y:2.5},{x:1.5,y:0.5},{x:1.5,y:1.5},{x:-1.5,y:1.5},{x:-1.5,y:2.5}];
       for(var oi=0;oi<eoffs.length;oi++){sx=eh.x+eoffs[oi].x;sy=eh.y+eoffs[oi].y;if(canPass(sx,sy))break}
-      addUnit(E.gold>300?'tank':'rifle',sx,sy,'e')}}
+      addUnit(E.gold>500?'tank':'rifle',sx,sy,'e')}}
     msg('⚠️ 第'+E.wave+'波敌军来袭！',3000)}
   // Resources
-  if(frame%50===0){P.gold+=5;E.gold+=8}
+  if(frame%50===0){P.gold+=8;E.gold+=6}
   // Building death FX
   for(var i=P.blds.length-1;i>=0;i--){var b=P.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
   for(var i=E.blds.length-1;i>=0;i--){var b=E.blds[i];if(b.hp<=0&&!b._dead){b._dead=true;spawnBldFx(b);if(typeof sfxExplode==='function')sfxExplode()}}
