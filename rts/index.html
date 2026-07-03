@@ -225,7 +225,7 @@ function _tick(){
   for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ffaa22':'#ff8844',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
     // Spawning unit: just move to destination, ignore combat
-    if(u._spawn){var dd=Math.hypot(u.tx-u.x,u.ty-u.y);if(dd<0.3){u.st='idle';u._spawn=0;if(u.t==='tank'&&typeof sfxTankStart==='function'){}}else{moveToward(u,{x:u.tx,y:u.ty})};continue}
+    if(u._spawn){var dd=Math.hypot(u.tx-u.x,u.ty-u.y);u._sCnt=(u._sCnt||0)+1;if(dd<0.3||u._sCnt>180){u.st='idle';u._spawn=0;u._sCnt=0;if(u.t==='tank'&&typeof sfxTankStart==='function'){}}else{moveToward(u,{x:u.tx,y:u.ty})};continue}
     // HP regen for lv3+
     if(u.lv>=3&&u.hp<u.mhp){u._rgCd=(u._rgCd||0)+1;if(u._rgCd>=90){u.hp=Math.min(u.mhp,u.hp+1);u._rgCd=0}}
     // Auto-acquire target (skip if retreating)
@@ -294,7 +294,7 @@ function _tick(){
   for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){spawnFx(u.x*TS,u.y*TS,u.t==='tank'?'#ff6644':'#ff4444',u.t==='tank'?12:6);if(u.t==='tank'&&typeof sfxExplode==='function')sfxExplode();E.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
     // Spawning unit: just move to destination, ignore combat
-    if(u._spawn){var dd=Math.hypot(u.tx-u.x,u.ty-u.y);if(dd<0.3){u.st='idle';u._spawn=0;if(u.t==='tank'&&typeof sfxTankStart==='function'){}}else{moveToward(u,{x:u.tx,y:u.ty})};continue}
+    if(u._spawn){var dd=Math.hypot(u.tx-u.x,u.ty-u.y);u._sCnt=(u._sCnt||0)+1;if(dd<0.3||u._sCnt>180){u.st='idle';u._spawn=0;u._sCnt=0;if(u.t==='tank'&&typeof sfxTankStart==='function'){}}else{moveToward(u,{x:u.tx,y:u.ty})};continue}
     // HP regen for lv3+
     if(u.lv>=3&&u.hp<u.mhp){u._rgCd=(u._rgCd||0)+1;if(u._rgCd>=90){u.hp=Math.min(u.mhp,u.hp+1);u._rgCd=0}}
     // Enemy harvester
