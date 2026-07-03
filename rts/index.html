@@ -83,9 +83,10 @@ function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   return true}
 
 function allTargets(o){var r=[];var src=o==='p'?E:P;
-  for(var i=0;i<src.blds.length;i++){var b=src.blds[i];if(b.hp>0)r.push({x:b.x+0.5,y:b.y+0.5,hpRef:b})}
-  for(var i=0;i<src.units.length;i++){var u=src.units[i];if(u.hp>0)r.push({x:u.x,y:u.y,hpRef:u})}
+  for(var i=0;i<src.blds.length;i++){var b=src.blds[i];if(b.hp>0)r.push({x:b.x+0.5,y:b.y+0.5,hpRef:b,isBld:true})}
+  for(var i=0;i<src.units.length;i++){var u=src.units[i];if(u.hp>0)r.push({x:u.x,y:u.y,hpRef:u,isBld:false})}
   return r}
+function nearUnit(u,list){return near(u,list.filter(function(t){return !t.isBld}))}
 
 // === COMMANDS ===
 function cmd(a){
@@ -146,9 +147,9 @@ function tick(){
   for(var i=P.units.length-1;i>=0;i--){var u=P.units[i];if(u.hp<=0){P.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
     if(u.st==='moving'){var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d<0.3){u.st='idle'}else{moveToward(u,{x:u.tx,y:u.ty})}}
-    else if(u.st==='idle'&&u.cd<=0){var t=near(u,cachedP);if(t){u.st='attacking';u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
+    else if(u.st==='idle'&&u.cd<=0){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){u.st='attacking';u.tx=t.x;u.ty=t.y;u.dx=t.x-u.x;u.dy=t.y-u.y}}
     else if(u.st==='attacking'){
-      if(u.cd<=0){var t=near(u,cachedP);if(t){t.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=t.x-u.x;u.dy=t.y-u.y;if(typeof sfxHit==='function')sfxHit()}else{u.st='idle'}}
+      if(u.cd<=0){var t=nearUnit(u,cachedP)||near(u,cachedP);if(t){t.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=t.x-u.x;u.dy=t.y-u.y;if(typeof sfxHit==='function')sfxHit()}else{u.st='idle'}}
       else{var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d>u.rng){moveToward(u,{x:u.tx,y:u.ty})}}
     }
   }
@@ -161,14 +162,14 @@ function tick(){
   
   for(var i=E.units.length-1;i>=0;i--){var u=E.units[i];if(u.hp<=0){E.units.splice(i,1);continue}
     if(u.cd>0)u.cd-=dt;
-    var et=near(u,cachedE); // any player target in range?
+    var et=nearUnit(u,cachedE)||near(u,cachedE); // prioritize player units over buildings
     if(et){if(u.cd<=0){et.hpRef.hp-=u.atk;u.cd=u.rate}} // fire!
     
     if(must_defend&&ehq){
       // DEFEND: move toward home base, attack intruders
       var intruders=cachedE.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5});
       if(intruders.length&&u.cd<=0){
-        var ct=near(u,intruders);if(ct){ct.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=ct.x-u.x;u.dy=ct.y-u.y;}
+        var ct=nearUnit(u,intruders)||near(u,intruders);if(ct){ct.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=ct.x-u.x;u.dy=ct.y-u.y;}
         else{moveToward(u,closest(u,intruders))}
       }else{
         var distHome=Math.hypot(ehq.x+0.5-u.x,ehq.y+0.5-u.y);
