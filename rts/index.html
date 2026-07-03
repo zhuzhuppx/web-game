@@ -23,6 +23,7 @@
 <button id="btnT" onclick="sfxResume();cmd('tank')" disabled>🛡️ 坦克 200💰</button>
 <button onclick="sfxResume();cmd('rush')">⚔️ 全军出击</button>
 <button onclick="sfxResume();cmd('retreat')">🛡️ 全军回防</button>
+<button id="btnAD" onclick="sfxResume();autoDef=!autoDef;document.getElementById('btnAD').textContent=autoDef?'⚔️ 自动防卫 ON':'⚔️ 自动防卫 OFF'">⚔️ 自动防卫 ON</button>
 </div>
 <a class="back" href="/">← 返回</a></div>
 <script>
@@ -41,7 +42,7 @@ map[2][1]=0;map[1][2]=0;map[2][2]=0; // player spawn open
 map[GH-3][GW-2]=0;map[GH-2][GW-3]=0;map[GH-3][GW-3]=0; // enemy spawn
 
 // === GAME STATE ===
-var uid=0,frame=0,sel=null,over=false;
+var uid=0,frame=0,sel=null,over=false,autoDef=true;
 var fx=[]; // death particles
 var P={gold:1500,units:[],blds:[]};
 var E={gold:1500,units:[],blds:[],aiCd:50,attackReady:false};
@@ -179,7 +180,7 @@ function _tick(){
       else{var d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d>u.rng){moveToward(u,{x:u.tx,y:u.ty})}}
     }
     // Auto-defend: idle units deploy to perimeter facing enemy direction
-    if(u.st==='idle'){
+    if(u.st==='idle'&&autoDef){
       var phq=hqOf(P);if(phq){
         var nearE2=cachedE.filter(function(e){return Math.hypot(e.x-phq.x-0.5,e.y-phq.y-0.5)<8});
         if(nearE2.length){
