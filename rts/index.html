@@ -182,7 +182,12 @@ function tick(){
   // AI spawn
   E.aiCd+=dt;if(E.aiCd>700){E.aiCd=0;E.wave++;
     var count=1+Math.floor(E.wave/3);if(E.wave>5)count+=1;
-    for(var j=0;j<count;j++){if(E.units.length<40&&E.gold>=80){E.gold-=80;addUnit(E.gold>300?'tank':'rifle',GW-3+Math.random()*2,GH-2+Math.random(),'e')}}
+    for(var j=0;j<count;j++){if(E.units.length<40&&E.gold>=80){E.gold-=80;
+      // Find empty spot near enemy HQ, avoid buildings
+      var eh=E.blds.find(function(b){return b.t==='hq'});if(!eh)continue;
+      var sx=eh.x+0.5,sy=eh.y+1.5;var eoffs=[{x:0.5,y:1.5},{x:-0.5,y:1.5},{x:0.5,y:2.5},{x:-0.5,y:2.5},{x:1.5,y:0.5},{x:1.5,y:1.5},{x:-1.5,y:1.5},{x:-1.5,y:2.5}];
+      for(var oi=0;oi<eoffs.length;oi++){sx=eh.x+eoffs[oi].x;sy=eh.y+eoffs[oi].y;if(canPass(sx,sy))break}
+      addUnit(E.gold>300?'tank':'rifle',sx,sy,'e')}}
     msg('⚠️ 第'+E.wave+'波敌军来袭！',3000)}
   // Resources
   if(frame%50===0){P.gold+=5;E.gold+=5}
