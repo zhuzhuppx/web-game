@@ -1,5 +1,7 @@
 // ====== 通用音效 & BGM 系统 ======
 // 纯 Web Audio API 生成，零外部文件
+// 音量配置: 改下面数值即可调整
+var SFX_VOL = { move:0.025, tank:0.025, tread:0.018, hit:0.12, explode:0.15, shoot:0.06, blip:0.07, power:0.08 };
 
 var sfxCtx = null, sfxGain = null, bgmGain = null, bgmNodes = [], bgmPlaying = false;
 
@@ -64,7 +66,7 @@ function sfxFreqSweep(f1, f2, dur, type, vol) {
 // ---- 命名音效 ----
 
 function sfxClick()   { sfxTone(800, 0.05, 'square', 0.05); }
-function sfxMove()    { sfxTone(600, 0.05, 'square', 0.05); }
+function sfxMove()    { sfxTone(600, 0.04, 'square', SFX_VOL.move); }
 function sfxTankMove(){ sfxNoise(0.12, 0.08); sfxFreqSweep(80, 40, 0.15, 'sawtooth', 0.06); }
 
 // ---- 坦克履带连续音效 ----
@@ -79,7 +81,7 @@ function sfxTankStart() {
     o.type = 'sawtooth';
     o.frequency.setValueAtTime(55, now);
     var g = sfxCtx.createGain();
-    g.gain.setValueAtTime(0.06, now);
+    g.gain.setValueAtTime(SFX_VOL.tank, now);
     o.connect(g); g.connect(sfxGain); o.start();
     // Noise layer for tread grinding
     var buf = sfxCtx.createBuffer(1, sfxCtx.sampleRate * 0.3, sfxCtx.sampleRate);
@@ -87,7 +89,7 @@ function sfxTankStart() {
     for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1);
     var ns = sfxCtx.createBufferSource(); ns.buffer = buf; ns.loop = true;
     var ng = sfxCtx.createGain();
-    ng.gain.setValueAtTime(0.04, now);
+    ng.gain.setValueAtTime(SFX_VOL.tread, now);
     // Filter to make it sound mechanical
     var bp = sfxCtx.createBiquadFilter();
     bp.type = 'bandpass'; bp.frequency.value = 200; bp.Q.value = 1;
