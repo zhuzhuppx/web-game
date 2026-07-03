@@ -33,12 +33,7 @@ c.width=W;c.height=H;
 
 // === MAP ===
 var map=[];
-for(var y=0;y<GH;y++){map[y]=[];for(var x=0;x<GW;x++)map[y][x]=Math.random()<0.08?1:0}
-// Clear bases
-for(var y=1;y<4;y++)for(var x=1;x<4;x++)map[y][x]=0;
-for(var y=GH-4;y<GH-1;y++)for(var x=GW-4;x<GW-1;x++)map[y][x]=0;
-map[2][1]=0;map[1][2]=0;map[2][2]=0; // player spawn open
-map[GH-3][GW-2]=0;map[GH-2][GW-3]=0;map[GH-3][GW-3]=0; // enemy spawn
+for(var y=0;y<GH;y++){map[y]=[];for(var x=0;x<GW;x++)map[y][x]=0}
 
 // === GAME STATE ===
 var uid=0,frame=0,sel=null,over=false;
@@ -80,7 +75,7 @@ function moveToward(u,t,spd){var dx=t.x-u.x,dy=t.y-u.y,d=Math.hypot(dx,dy);if(d>
   if(u.x!==ox||u.y!==oy)u._moved=true;
   u.dx=dx;u.dy=dy}}
 function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
-  if(ix<0||ix>=GW||iy<0||iy>=GH)return false;if(map[iy][ix]===1)return false;
+  if(ix<0||ix>=GW||iy<0||iy>=GH)return false;
   // check buildings
   var all=P.blds.concat(E.blds);for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;if(all[i].x===ix&&all[i].y===iy)return false}
   // check units (all sides, skip self)
@@ -279,18 +274,10 @@ function draw(){
   // Ground
   for(var y=0;y<GH;y++)for(var x=0;x<GW;x++){
     var gx=x*TS,gy=y*TS;
-    if(map[y][x]===1){ctx.fillStyle='#5a4428';ctx.fillRect(gx,gy,TS,TS);
-      // Ore rocks
-      ctx.fillStyle='#aa8833';ctx.beginPath();ctx.arc(gx+TS*0.5,gy+TS*0.4,7,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#cc9944';ctx.beginPath();ctx.arc(gx+TS*0.3,gy+TS*0.6,4,0,Math.PI*2);ctx.fill();
-      ctx.fillStyle='#997722';ctx.beginPath();ctx.arc(gx+TS*0.7,gy+TS*0.5,5,0,Math.PI*2);ctx.fill()}
-    else{ctx.fillStyle='#233823';ctx.fillRect(gx,gy,TS,TS);
-      // Grass dots
-      ctx.fillStyle='#2a442a';for(var d=0;d<3;d++){var dx=gx+5+((d*13+y*7)%(TS-10)),dy=gy+5+((d*17+x*11)%(TS-10));ctx.fillRect(dx,dy,2,2)}}
+    ctx.fillStyle='#233823';ctx.fillRect(gx,gy,TS,TS);
+    // Grass dots
+    ctx.fillStyle='#2a442a';for(var d=0;d<3;d++){var dx=gx+5+((d*13+y*7)%(TS-10)),dy=gy+5+((d*17+x*11)%(TS-10));ctx.fillRect(dx,dy,2,2)}
   }
-  // Base pads
-  drawPad(1,1,4,4,'rgba(100,150,255,0.1)');
-  drawPad(GW-4,GH-4,4,4,'rgba(255,100,100,0.1)');
   
   // Buildings
   for(var i=0;i<P.blds.length;i++)drawBld(P.blds[i],'#3355aa','#2244cc','#5588ff');
