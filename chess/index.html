@@ -186,8 +186,8 @@ async function aiMove(board,color){
   // 1️⃣ Opening book
   if(g_ply<24){for(var oi=0;oi<OPENINGS.length;oi++){var line=OPENINGS[oi];var totalMoves=line.length/4;if(g_ply<totalMoves){var match=true;for(var pi=0;pi<g_ply;pi++){var idx=pi*4;if(line[idx]!==g_moves[pi].fr||line[idx+1]!==g_moves[pi].fc||line[idx+2]!==g_moves[pi].tr||line[idx+3]!==g_moves[pi].tc){match=false;break}}if(match){var ni=g_ply*4;var nm=[line[ni],line[ni+1],line[ni+2],line[ni+3]];if(pMatch(board,nm[0],nm[1],color)){var vm=validMoves(nm[0],nm[1],board,color);for(var vi=0;vi<vm.length;vi++){if(vm[vi].r===nm[2]&&vm[vi].c===nm[3]){console.log('♟️ 棋谱走法 ply'+g_ply+':',nm);return{fr:nm[0],fc:nm[1],tr:nm[2],tc:nm[3]}}}}}}}}
   
-  // 2️⃣ DeepSeek LLM (primary, need API key set)
-  var aiEnabled = localStorage.getItem('chess_ai_enabled')==='true';
+  // 2️⃣ DeepSeek LLM (disabled - uncomment to enable)
+  /* var aiEnabled = localStorage.getItem('chess_ai_enabled')==='true';
   var aiKey = localStorage.getItem('chess_llm_key');
   if(aiEnabled && aiKey) {
     document.getElementById('msg').textContent = '🤖 DeepSeek 思考中…';
@@ -199,9 +199,9 @@ async function aiMove(board,color){
         return llmResult;
       }
     } catch(e) { console.error('DeepSeek 失败:', e.message); }
-  }
+  } */
   
-  // 3️⃣ Pikafish engine (fallback)
+  // 3️⃣ Pikafish engine
   document.getElementById('msg').textContent = '♟️ 皮卡鱼思考中…';
   if(window.scene && window.scene.msgT) window.scene.msgT.setText('♟️ 皮卡鱼思考中…');
   try {
