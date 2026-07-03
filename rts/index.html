@@ -51,7 +51,7 @@ var E={gold:1000,units:[],blds:[],aiCd:50,attackReady:false};
 var moveSoundCd=0; // throttle movement sfx
 
 function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};(o==='p'?P.blds:E.blds).push(b);return b}
-function addUnit(t,x,y,o){var s=t==='tank'?{hp:150,atk:28,rng:1.8,spd:0.015,rate:50}:t==='harvester'?{hp:100,atk:0,rng:0,spd:0.02,rate:999}:{hp:65,atk:12,rng:1.4,spd:0.028,rate:32};
+function addUnit(t,x,y,o){var s=t==='tank'?{hp:150,atk:28,rng:1.8,spd:0.025,rate:50}:t==='harvester'?{hp:100,atk:0,rng:0,spd:0.03,rate:999}:{hp:65,atk:12,rng:1.4,spd:0.028,rate:32};
   var u={id:uid++,t:t,x:x,y:y,hp:s.hp,mhp:s.hp,atk:s.atk,rng:s.rng,spd:s.spd,rate:s.rate,cd:0,o:o,st:'idle',tx:0,ty:0,dx:0,dy:0,xp:0,lv:1};
   (o==='p'?P.units:E.units).push(u);return u}
 
@@ -303,11 +303,17 @@ function _tick(){
         if(canPass(rx,ry)){E.gold-=250;addBld('refinery',rx,ry,350,'e');addUnit('harvester',rx+0.5,ry+0.5,'e');break}}
       if(!hasB(E,'refinery'))E.aiCd=-50
     }else if(!hasB(E,'barracks')&&E.gold>=200){
-      var bx=ehq2.x+1,by=ehq2.y;if(canPass(bx,by)){E.gold-=200;addBld('barracks',bx,by,300,'e')}
-      else{E.aiCd=-50} // retry sooner
+      var offB=[[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]];
+      var placed=false;
+      for(var bi=0;bi<offB.length;bi++){var bx=ehq2.x+offB[bi][0],by=ehq2.y+offB[bi][1];
+        if(canPass(bx,by)){E.gold-=200;addBld('barracks',bx,by,300,'e');placed=true;break}}
+      if(!placed)E.aiCd=-50
     }else if(!hasB(E,'factory')&&E.gold>=400){
-      var fx=ehq2.x-1,fy=ehq2.y;if(canPass(fx,fy)){E.gold-=400;addBld('factory',fx,fy,400,'e')}
-      else{E.aiCd=-50}
+      var offF=[[-1,0],[1,0],[0,1],[0,-1],[-2,0],[2,0],[0,2],[0,-2]];
+      placed=false;
+      for(var fi=0;fi<offF.length;fi++){var fx=ehq2.x+offF[fi][0],fy=ehq2.y+offF[fi][1];
+        if(canPass(fx,fy)){E.gold-=400;addBld('factory',fx,fy,400,'e');placed=true;break}}
+      if(!placed)E.aiCd=-50
     }else if(E.units.length<40&&hasB(E,'barracks')){
       var hasF=hasB(E,'factory');
       // Train harvesters first, then combat units
