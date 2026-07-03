@@ -451,18 +451,19 @@ function draw(){
     // Grass dots
     ctx.fillStyle='#2a442a';for(var d=0;d<3;d++){var dx=gx+5+((d*13+y*7)%(TS-10)),dy=gy+5+((d*17+x*11)%(TS-10));ctx.fillRect(dx,dy,2,2)}
   }
-  // Minerals — golden sparkling nuggets
-  for(var y=0;y<GH;y++)for(var x=0;x<GW;x++){if(map[y][x]===2){
-    var gx=x*TS,gy=y*TS;
-    var n=minerals[x+','+y]||0;
-    for(var ni=0;ni<n;ni++){
-      var seed=(x*37+y*53+ni*71)%997;
-      var nx=gx+6+((seed%83)%(TS-12)),ny=gy+6+((seed%61)%(TS-12));
-      var twinkle=Math.sin(frame*0.15+seed*0.1)*0.3+0.7;
-      var alpha=0.4+twinkle*0.6;
-      ctx.fillStyle='rgba(255,200,60,'+alpha+')';ctx.beginPath();ctx.arc(nx,ny,1.5+twinkle*0.8,0,Math.PI*2);ctx.fill();
+  // Minerals — one continuous golden field
+  var totalNuggets=0;for(var k in minerals)totalNuggets+=minerals[k];
+  if(totalNuggets>0){
+    // Seed-based distribution across the whole mineral area
+    for(var ni=0;ni<totalNuggets*3;ni++){
+      var seed=ni*7919%10007;
+      var mx=7+(seed%43)*0.1,my=4+(seed%37)*0.1; // spread across 7-11, 4-7
+      var gx=mx*TS,gy=my*TS;
+      var twinkle=Math.sin(frame*0.12+ni*0.37)*0.35+0.65;
+      var alpha=0.3+twinkle*0.7;
+      ctx.fillStyle='rgba(255,200,60,'+alpha+')';ctx.beginPath();ctx.arc(gx,gy,1.2+twinkle*1,0,Math.PI*2);ctx.fill();
     }
-  }}
+  }
   // Buildings
   for(var i=0;i<P.blds.length;i++)drawBld(P.blds[i],'#3355aa','#2244cc','#5588ff');
   for(var i=0;i<E.blds.length;i++)drawBld(E.blds[i],'#aa3333','#cc2222','#ff4444');
