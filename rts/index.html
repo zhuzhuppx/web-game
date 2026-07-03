@@ -118,13 +118,14 @@ function spawnFx(x,y,color,n){if(fx.length>200)return;for(var i=0;i<(n||8);i++){
 function spawnBldFx(b){if(fx.length>200)return;for(var i=0;i<14;i++){fx.push({x:(b.x+0.5)*TS,y:(b.y+0.5)*TS,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-2,life:25+Math.random()*15,c:b.o==='p'?'#66aaff':'#ff6644',s:3+Math.random()*4})}}
 
 function grantXp(u,amount){
+  if(u.lv>=3)return; // max level 3
   u.xp+=amount;
   var need=u.lv*20;
-  while(u.xp>=need){
+  while(u.xp>=need&&u.lv<3){
     u.xp-=need;u.lv++;
-    u.mhp+=u.t==='tank'?30:15;u.hp=u.mhp;
-    u.atk+=u.t==='tank'?6:3;
-    u.rate=Math.max(10,u.rate-3);
+    u.mhp+=u.t==='tank'?50:15;u.hp=u.mhp;
+    u.atk+=u.t==='tank'?12:4; // tanks get big ATK boost
+    u.rate=Math.max(12,u.rate-4);
     spawnFx(u.x*TS,u.y*TS,'#ffdd44',10);
     if(typeof sfxPowerUp==='function')sfxPowerUp()
     need=u.lv*20}
