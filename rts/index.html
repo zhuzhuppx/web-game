@@ -43,8 +43,30 @@ c.style.width=(W*scale)+'px';c.style.height=(H*scale)+'px';
 
 // === MAP ===
 var map=[];
+// tile: 0=ground, 1=indestructible wall, 2=mineral
 for(var y=0;y<GH;y++){map[y]=[];for(var x=0;x<GW;x++)map[y][x]=0}
-// Mineral field center
+function addWall(x,y){if(x>=0&&x<GW&&y>=0&&y<GH)map[y][x]=1}
+// Perimiter walls around each base (3x3 area), with one gap for entry
+// Player (HQ 0,0): walls around 0-3, 0-3, gap at (3,1)
+for(var x=1;x<=3;x++)addWall(x,0);for(var y=1;y<=3;y++){if(y!==1)addWall(3,y)}for(var x=0;x<=2;x++)addWall(x,3);for(var y=1;y<=2;y++)addWall(0,y);
+// E0 (HQ 17,11): walls around 14-17, 8-11, gap at (14,10)
+for(var x=14;x<=17;x++)addWall(x,8);for(var y=9;y<=11;y++){if(y!==10)addWall(14,y)}for(var x=14;x<=17;x++)addWall(x,12);for(var y=9;y<=11;y++)addWall(18,y);
+// E1 (HQ 17,0): walls around 14-17, 0-3, gap at (14,1)
+for(var x=14;x<=17;x++)addWall(x,3);for(var y=0;y<=2;y++){if(y!==1)addWall(14,y)}for(var x=14;x<=17;x++)addWall(x,-1);for(var y=0;y<=2;y++)addWall(18,y);
+// E2 (HQ 0,11): walls around 0-3, 8-11, gap at (3,10)
+for(var x=0;x<=3;x++)addWall(x,8);for(var y=9;y<=11;y++){if(y!==10)addWall(3,y)}for(var x=0;x<=3;x++)addWall(x,12);for(var y=9;y<=11;y++)addWall(-1,y);
+// Minerals spread everywhere except walls and base interiors
+var minerals={};var gems={};
+for(var y=0;y<GH;y++)for(var x=0;x<GW;x++){
+  if(map[y][x]===0){map[y][x]=2;minerals[x+','+y]=10} // lighter mineral spread
+}
+// Remove minerals from base interiors (just make them ground)
+for(var y=0;y<=3;y++)for(var x=0;x<=3;x++){map[y][x]=0;delete minerals[x+','+y]}
+for(var y=8;y<=12;y++)for(var x=14;x<=18;x++){map[y][x]=0;delete minerals[x+','+y]} // E0 base
+for(var y=0;y<=3;y++)for(var x=14;x<=18;x++){map[y][x]=0;delete minerals[x+','+y]} // E1 base
+for(var y=8;y<=12;y++)for(var x=0;x<=3;x++){map[y][x]=0;delete minerals[x+','+y]} // E2 base
+var MIN_NUGGETS=10,MIN_REGEN=1; // lighter minerals
+
 var minerals={}; // {x,y : nuggets 0-20}
 var gems={}; // {x,y : [{c:color,v:bonus}]}
 for(var y=4;y<8;y++)for(var x=7;x<11;x++){map[y][x]=2;minerals[x+','+y]=20}
@@ -52,7 +74,9 @@ var MIN_NUGGETS=20,MIN_REGEN=1; // 1 nugget per 6 seconds per tile (slow regen)
 var GEM_COLORS=[{c:'#ff4466',v:30},{c:'#44ccff',v:30},{c:'#aa44ff',v:40},{c:'#ff8844',v:25},{c:'#44ff88',v:20}];
 // Spawn initial gems
 function spawnGems(){
-  for(var gi=0;gi<12;gi++){var gx=7+Math.floor(Math.random()*4),gy=4+Math.floor(Math.random()*4);var k=gx+','+gy;if(!gems[k])gems[k]=[];gems[k].push(GEM_COLORS[Math.floor(Math.random()*GEM_COLORS.length)])}
+  for(var gi=0;gi<30;gi++){var gx,gy;
+    do{gx=Math.floor(Math.random()*GW);gy=Math.floor(Math.random()*GH)}while(map[gy][gx]!==2);
+    var k=gx+','+gy;if(!gems[k])gems[k]=[];gems[k].push(GEM_COLORS[Math.floor(Math.random()*GEM_COLORS.length)])}
 }spawnGems();
 
 // === GAME STATE ===
@@ -130,6 +154,8 @@ function moveToward(u,t,spd){var dx=t.x-u.x,dy=t.y-u.y,d=Math.hypot(dx,dy);if(d>
   u.dx=dx;u.dy=dy}}
 function canPass(gx,gy,self){var ix=Math.floor(gx),iy=Math.floor(gy);
   if(ix<0||ix>=GW||iy<0||iy>=GH)return false;
+  // indestructible walls
+  if(map[iy][ix]===1)return false;
   // check buildings (allow leaving own tile)
   var ox=self?Math.floor(self.x):-1,oy=self?Math.floor(self.y):-1;
   var all=allBuildings();for(var i=0;i<all.length;i++){if(all[i].hp<=0)continue;
@@ -332,7 +358,7 @@ function _tick(){
     for(var k in minerals){minerals[k]=Math.min(MIN_NUGGETS,minerals[k]+MIN_REGEN);
       var parts=k.split(',');map[+parts[1]][+parts[0]]=minerals[k]>0?2:0}
     // Occasionally spawn gems
-    if(Math.random()<0.3){var gx=7+Math.floor(Math.random()*4),gy=4+Math.floor(Math.random()*4);var gk=gx+','+gy;if(!gems[gk])gems[gk]=[];gems[gk].push(GEM_COLORS[Math.floor(Math.random()*GEM_COLORS.length)])}}
+    if(Math.random()<0.3){var gx,gy;do{gx=Math.floor(Math.random()*GW);gy=Math.floor(Math.random()*GH)}while(map[gy][gx]!==2);var gk=gx+','+gy;if(!gems[gk])gems[gk]=[];gems[gk].push(GEM_COLORS[Math.floor(Math.random()*GEM_COLORS.length)])}}
   // Passive gold income — always on while HQ is alive
   var phq2=hqOf(P);
   if(phq2){P._goldTick=(P._goldTick||0)+1;if(P._goldTick>=90){P.gold+=10;P._goldTick=0;upd()}}else P._goldTick=0;
@@ -490,19 +516,30 @@ function _tick(){
 
 // === RENDER ===
 function draw(){
-  // Ground
+  // Ground + walls
   for(var y=0;y<GH;y++)for(var x=0;x<GW;x++){
     var gx=x*TS,gy=y*TS;
-    ctx.fillStyle='#233823';ctx.fillRect(gx,gy,TS,TS);
-    // Grass dots
-    ctx.fillStyle='#2a442a';for(var d=0;d<3;d++){var dx=gx+5+((d*13+y*7)%(TS-10)),dy=gy+5+((d*17+x*11)%(TS-10));ctx.fillRect(dx,dy,2,2)}
+    if(map[y][x]===1){
+      // Wall tile — dark stone
+      ctx.fillStyle='#555555';ctx.fillRect(gx,gy,TS,TS);
+      ctx.fillStyle='#666666';ctx.fillRect(gx+2,gy+2,TS-4,TS-4);
+      ctx.strokeStyle='#444444';ctx.lineWidth=1;ctx.strokeRect(gx+2,gy+2,TS-4,TS-4);
+      // brick lines
+      ctx.strokeStyle='#3a3a3a';
+      ctx.beginPath();ctx.moveTo(gx,gy+TS/2);ctx.lineTo(gx+TS,gy+TS/2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(gx+TS/3,gy);ctx.lineTo(gx+TS/3,gy+TS/2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(gx+TS*2/3,gy+TS/2);ctx.lineTo(gx+TS*2/3,gy+TS);ctx.stroke();
+    }else{
+      ctx.fillStyle='#233823';ctx.fillRect(gx,gy,TS,TS);
+      ctx.fillStyle='#2a442a';for(var d=0;d<3;d++){var dx=gx+5+((d*13+y*7)%(TS-10)),dy=gy+5+((d*17+x*11)%(TS-10));ctx.fillRect(dx,dy,2,2)}
+    }
   }
-  // Minerals — one continuous golden field
+  // Minerals — spread across whole map
   var totalNuggets=0;for(var k in minerals)totalNuggets+=minerals[k];
   if(totalNuggets>0){
-    for(var ni=0;ni<totalNuggets*2;ni++){
+    for(var ni=0;ni<totalNuggets*1.5;ni++){
       var seed=ni*7919%10007;
-      var mx=7+(seed%43)*0.1,my=4+(seed%37)*0.1; // spread across 7-11, 4-7
+      var mx=0.5+(seed/10007)*GW,my=0.5+((seed*3517)%10007)/10007*GH;
       var gx=mx*TS,gy=my*TS;
       var twinkle=Math.sin(frame*0.12+ni*0.37)*0.35+0.65;
       var alpha=0.3+twinkle*0.7;
