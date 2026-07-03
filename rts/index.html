@@ -51,7 +51,7 @@ var E={gold:1000,units:[],blds:[],aiCd:50,attackReady:false};
 var moveSoundCd=0; // throttle movement sfx
 
 function addBld(t,x,y,hp,o){var b={t:t,x:x,y:y,hp:hp,mhp:hp,o:o};(o==='p'?P.blds:E.blds).push(b);return b}
-function addUnit(t,x,y,o){var s=t==='tank'?{hp:150,atk:28,rng:1.8,spd:0.015,rate:50}:t==='harvester'?{hp:100,atk:0,rng:0,spd:0.012,rate:999}:{hp:65,atk:12,rng:1.4,spd:0.028,rate:32};
+function addUnit(t,x,y,o){var s=t==='tank'?{hp:150,atk:28,rng:1.8,spd:0.015,rate:50}:t==='harvester'?{hp:100,atk:0,rng:0,spd:0.02,rate:999}:{hp:65,atk:12,rng:1.4,spd:0.028,rate:32};
   var u={id:uid++,t:t,x:x,y:y,hp:s.hp,mhp:s.hp,atk:s.atk,rng:s.rng,spd:s.spd,rate:s.rate,cd:0,o:o,st:'idle',tx:0,ty:0,dx:0,dy:0,xp:0,lv:1};
   (o==='p'?P.units:E.units).push(u);return u}
 
@@ -219,27 +219,27 @@ function _tick(){
     // Harvester mining logic
     if(u.t==='harvester'&&u.hp>0){
       if(u._mineTime>0){u._mineTime-=dt;if(u._mineTime<=0){
-        // Mining complete → return to refinery
         var ref=P.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
         if(ref){u.st='moving';u.tx=ref.x+0.5;u.ty=ref.y+0.5;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
       }}
       else if(u.st==='idle'||(u.st==='moving'&&!u._mineTime)){
-        // Find nearest mineral
         var nearestOre=null,bestD=999;
         for(var y=0;y<GH;y++)for(var x=0;x<GW;x++){if(map[y][x]!==2)continue;
           var d=Math.hypot(x+0.5-u.x,y+0.5-u.y);if(d<bestD){bestD=d;nearestOre={x:x+0.5,y:y+0.5}}}
         if(nearestOre){
           var dd=Math.hypot(nearestOre.x-u.x,nearestOre.y-u.y);
-          if(dd<0.3){u._mineTime=90;u.st='idle'} // start mining
-          else{u.st='moving';u.tx=nearestOre.x;u.ty=nearestOre.y;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
+          if(dd<0.3){u._mineTime=90;u.st='idle'}
+          else{u.st='moving';u.tx=nearestOre.x;u.ty=nearestOre.y;u.dx=u.tx-u.x;u.dy=u.ty-u.y;moveToward(u,{x:nearestOre.x,y:nearestOre.y})}
         }
       }
       else if(u.st==='moving'&&u._mineTime<=0){
-        // Check if arrived at refinery
         var ref=P.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
-        if(ref&&Math.hypot(ref.x+0.5-u.x,ref.y+0.5-u.y)<0.5){P.gold+=100;u.st='idle';upd()}
+        if(ref){
+          var dd2=Math.hypot(ref.x+0.5-u.x,ref.y+0.5-u.y);
+          if(dd2<0.5){P.gold+=100;u.st='idle';upd()}
+          else{moveToward(u,{x:ref.x+0.5,y:ref.y+0.5})}
+        }
       }
-      // Don't fight
       continue;
     }
   }
@@ -271,12 +271,16 @@ function _tick(){
         if(nearestOreE){
           var ddE=Math.hypot(nearestOreE.x-u.x,nearestOreE.y-u.y);
           if(ddE<0.3){u._mineTime=90;u.st='idle'}
-          else{u.st='moving';u.tx=nearestOreE.x;u.ty=nearestOreE.y;u.dx=u.tx-u.x;u.dy=u.ty-u.y}
+          else{u.st='moving';u.tx=nearestOreE.x;u.ty=nearestOreE.y;u.dx=u.tx-u.x;u.dy=u.ty-u.y;moveToward(u,{x:nearestOreE.x,y:nearestOreE.y})}
         }
       }
       else if(u.st==='moving'&&u._mineTime<=0){
         var refE=E.blds.find(function(b){return b.t==='refinery'&&b.hp>0});
-        if(refE&&Math.hypot(refE.x+0.5-u.x,refE.y+0.5-u.y)<0.5){E.gold+=100;u.st='idle'}
+        if(refE){
+          var ddE2=Math.hypot(refE.x+0.5-u.x,refE.y+0.5-u.y);
+          if(ddE2<0.5){E.gold+=100;u.st='idle'}
+          else{moveToward(u,{x:refE.x+0.5,y:refE.y+0.5})}
+        }
       }
       continue;
     }
