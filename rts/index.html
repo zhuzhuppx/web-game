@@ -46,7 +46,7 @@ for(var y=0;y<GH;y++){map[y]=[];for(var x=0;x<GW;x++)map[y][x]=0}
 // Mineral field center
 var minerals={}; // {x,y : nuggets 0-20}
 for(var y=4;y<8;y++)for(var x=7;x<11;x++){map[y][x]=2;minerals[x+','+y]=20}
-var MIN_NUGGETS=20,MIN_REGEN=1; // 1 nugget per 2 seconds per tile
+var MIN_NUGGETS=20,MIN_REGEN=1; // 1 nugget per 6 seconds per tile (slow regen)
 
 // === GAME STATE ===
 var uid=0,frame=0,sel=null,over=false;
@@ -274,7 +274,7 @@ function _tick(){
       if(u._hs==='mine'){u._mt=(u._mt||90)-dt;if(u._mt<=0){u._hs='back';u._mt=0}}
       else if(u._hs==='unload'){u._mt=(u._mt||45)-dt;if(u._mt<=0){P.gold+=100;
         // Deplete the mined tile
-        if(u._mineKey&&minerals[u._mineKey]!==undefined){minerals[u._mineKey]=Math.max(0,minerals[u._mineKey]-5);if(minerals[u._mineKey]<=0){var p2=u._mineKey.split(',');map[+p2[1]][+p2[0]]=0}}
+        if(u._mineKey&&minerals[u._mineKey]!==undefined){minerals[u._mineKey]=Math.max(0,minerals[u._mineKey]-15);if(minerals[u._mineKey]<=0){var p2=u._mineKey.split(',');map[+p2[1]][+p2[0]]=0}}
         u._hs='go';u._mt=0;upd()}}
       else if(u._hs==='back'){
         var ref=null,bd2=999;
@@ -291,9 +291,9 @@ function _tick(){
       continue;
     }
   }
-  // Mineral regeneration (1 nugget every 60 ticks = 2 seconds)
+  // Mineral regeneration (1 nugget every 180 ticks ≈ 6 seconds per tile)
   mineralTick=(mineralTick||0)+1;
-  if(mineralTick>=60){mineralTick=0;
+  if(mineralTick>=180){mineralTick=0;
     for(var k in minerals){minerals[k]=Math.min(MIN_NUGGETS,minerals[k]+MIN_REGEN);
       var parts=k.split(',');map[+parts[1]][+parts[0]]=minerals[k]>0?2:0}}
   // Passive gold income — always on while HQ is alive
@@ -329,7 +329,7 @@ function _tick(){
       if(u._hs==='idle')continue;
       if(u._hs==='mine'){u._mt=(u._mt||90)-dt;if(u._mt<=0){u._hs='back';u._mt=0}}
       else if(u._hs==='unload'){u._mt=(u._mt||45)-dt;if(u._mt<=0){E.gold+=100;
-        if(u._mineKey&&minerals[u._mineKey]!==undefined){minerals[u._mineKey]=Math.max(0,minerals[u._mineKey]-5);if(minerals[u._mineKey]<=0){var p2=u._mineKey.split(',');map[+p2[1]][+p2[0]]=0}}
+        if(u._mineKey&&minerals[u._mineKey]!==undefined){minerals[u._mineKey]=Math.max(0,minerals[u._mineKey]-15);if(minerals[u._mineKey]<=0){var p2=u._mineKey.split(',');map[+p2[1]][+p2[0]]=0}}
         u._hs='go';u._mt=0}}
       else if(u._hs==='back'){
         var ref=null,bd2=999;
@@ -454,8 +454,7 @@ function draw(){
   // Minerals — one continuous golden field
   var totalNuggets=0;for(var k in minerals)totalNuggets+=minerals[k];
   if(totalNuggets>0){
-    // Seed-based distribution across the whole mineral area
-    for(var ni=0;ni<totalNuggets*3;ni++){
+    for(var ni=0;ni<totalNuggets*2;ni++){
       var seed=ni*7919%10007;
       var mx=7+(seed%43)*0.1,my=4+(seed%37)*0.1; // spread across 7-11, 4-7
       var gx=mx*TS,gy=my*TS;
