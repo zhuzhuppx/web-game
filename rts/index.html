@@ -143,7 +143,7 @@ function tick(){
     }
   }
   // Enemy AI
-  var ehq=hqOf(E);var e_base_threat=ehq?cachedP.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5}).length:0;
+  var ehq=hqOf(E);var e_base_threat=ehq?cachedE.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5}).length:0;
   var e_alive=E.units.filter(function(u){return u.hp>0}).length;
   var must_defend=e_base_threat>=2||e_alive<=3; // defend if player near base or low on troops
   if(must_defend&&!E._defending){E._defending=true;msg('🛡️ 敌军回防！',2000)}
@@ -156,7 +156,7 @@ function tick(){
     
     if(must_defend&&ehq){
       // DEFEND: move toward home base, attack intruders
-      var intruders=cachedP.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5});
+      var intruders=cachedE.filter(function(t){return Math.hypot(t.x-ehq.x-0.5,t.y-ehq.y-0.5)<5});
       if(intruders.length&&u.cd<=0){
         var ct=near(u,intruders);if(ct){ct.hpRef.hp-=u.atk;u.cd=u.rate;u.dx=ct.x-u.x;u.dy=ct.y-u.y;}
         else{moveToward(u,closest(u,intruders))}
