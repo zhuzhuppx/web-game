@@ -45,8 +45,14 @@ var map=[];
 for(var y=0;y<GH;y++){map[y]=[];for(var x=0;x<GW;x++)map[y][x]=0}
 // Mineral field center
 var minerals={}; // {x,y : nuggets 0-20}
+var gems={}; // {x,y : [{c:color,v:bonus}]}
 for(var y=4;y<8;y++)for(var x=7;x<11;x++){map[y][x]=2;minerals[x+','+y]=20}
 var MIN_NUGGETS=20,MIN_REGEN=1; // 1 nugget per 6 seconds per tile (slow regen)
+var GEM_COLORS=[{c:'#ff4466',v:30},{c:'#44ccff',v:30},{c:'#aa44ff',v:40},{c:'#ff8844',v:25},{c:'#44ff88',v:20}];
+// Spawn initial gems
+function spawnGems(){
+  for(var gi=0;gi<12;gi++){var gx=7+Math.floor(Math.random()*4),gy=4+Math.floor(Math.random()*4);var k=gx+','+gy;if(!gems[k])gems[k]=[];gems[k].push(GEM_COLORS[Math.floor(Math.random()*GEM_COLORS.length)])}
+}spawnGems();
 
 // === GAME STATE ===
 var uid=0,frame=0,sel=null,over=false;
@@ -272,7 +278,10 @@ function _tick(){
       if(u._hs==='idle'&&u._idleCd>0){u._idleCd--;if(u._idleCd<=0)u._hs='go';continue}
       if(u._hs==='idle')continue;
       if(u._hs==='mine'){u._mt=(u._mt||90)-dt;if(u._mt<=0){u._hs='back';u._mt=0}}
-      else if(u._hs==='unload'){u._mt=(u._mt||45)-dt;if(u._mt<=0){P.gold+=100;
+      else if(u._hs==='unload'){u._mt=(u._mt||45)-dt;if(u._mt<=0){
+        var bonus=0;
+        if(u._mineKey&&gems[u._mineKey]&&gems[u._mineKey].length>0){bonus=gems[u._mineKey].pop().v}
+        P.gold+=100+bonus;
         // Deplete the mined tile
         if(u._mineKey&&minerals[u._mineKey]!==undefined){minerals[u._mineKey]=Math.max(0,minerals[u._mineKey]-15);if(minerals[u._mineKey]<=0){var p2=u._mineKey.split(',');map[+p2[1]][+p2[0]]=0}}
         u._hs='go';u._mt=0;upd()}}
@@ -291,11 +300,13 @@ function _tick(){
       continue;
     }
   }
-  // Mineral regeneration (1 nugget every 180 ticks ≈ 6 seconds per tile)
+  // Mineral regeneration and gem spawn
   mineralTick=(mineralTick||0)+1;
   if(mineralTick>=180){mineralTick=0;
     for(var k in minerals){minerals[k]=Math.min(MIN_NUGGETS,minerals[k]+MIN_REGEN);
-      var parts=k.split(',');map[+parts[1]][+parts[0]]=minerals[k]>0?2:0}}
+      var parts=k.split(',');map[+parts[1]][+parts[0]]=minerals[k]>0?2:0}
+    // Occasionally spawn gems
+    if(Math.random()<0.3){var gx=7+Math.floor(Math.random()*4),gy=4+Math.floor(Math.random()*4);var gk=gx+','+gy;if(!gems[gk])gems[gk]=[];gems[gk].push(GEM_COLORS[Math.floor(Math.random()*GEM_COLORS.length)])}}
   // Passive gold income — always on while HQ is alive
   var phq2=hqOf(P);
   if(phq2){P._goldTick=(P._goldTick||0)+1;if(P._goldTick>=90){P.gold+=20;P._goldTick=0;upd()}}else P._goldTick=0;
@@ -328,7 +339,10 @@ function _tick(){
       if(u._hs==='idle'&&u._idleCd>0){u._idleCd--;if(u._idleCd<=0)u._hs='go';continue}
       if(u._hs==='idle')continue;
       if(u._hs==='mine'){u._mt=(u._mt||90)-dt;if(u._mt<=0){u._hs='back';u._mt=0}}
-      else if(u._hs==='unload'){u._mt=(u._mt||45)-dt;if(u._mt<=0){E.gold+=100;
+      else if(u._hs==='unload'){u._mt=(u._mt||45)-dt;if(u._mt<=0){
+        var bonus=0;
+        if(u._mineKey&&gems[u._mineKey]&&gems[u._mineKey].length>0){bonus=gems[u._mineKey].pop().v}
+        E.gold+=100+bonus;
         if(u._mineKey&&minerals[u._mineKey]!==undefined){minerals[u._mineKey]=Math.max(0,minerals[u._mineKey]-15);if(minerals[u._mineKey]<=0){var p2=u._mineKey.split(',');map[+p2[1]][+p2[0]]=0}}
         u._hs='go';u._mt=0}}
       else if(u._hs==='back'){
@@ -463,6 +477,17 @@ function draw(){
       ctx.fillStyle='rgba(255,200,60,'+alpha+')';ctx.beginPath();ctx.arc(gx,gy,1.2+twinkle*1,0,Math.PI*2);ctx.fill();
     }
   }
+  // Gems — colored sparkles on mineral field
+  for(var gk in gems){var gl=gems[gk];if(!gl.length)continue;
+    var parts=gk.split(',');var gx=(+parts[0]+0.5)*TS,gy=(+parts[1]+0.5)*TS;
+    for(var gi=0;gi<gl.length;gi++){
+      var gem=gl[gi];var offx=Math.sin(gi*2.1+frame*0.05)*8,offy=Math.cos(gi*1.7+frame*0.05)*8;
+      var pulse=Math.sin(frame*0.1+gi)*0.3+0.7;
+      ctx.fillStyle=gem.c;ctx.globalAlpha=0.6+pulse*0.4;
+      ctx.beginPath();ctx.arc(gx+offx,gy+offy,2.5+pulse,0,Math.PI*2);ctx.fill();
+    }
+  }
+  ctx.globalAlpha=1;
   // Buildings
   for(var i=0;i<P.blds.length;i++)drawBld(P.blds[i],'#3355aa','#2244cc','#5588ff');
   for(var i=0;i<E.blds.length;i++)drawBld(E.blds[i],'#aa3333','#cc2222','#ff4444');
