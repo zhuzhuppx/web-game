@@ -87,8 +87,9 @@ function updateUI(){
   document.getElementById('sharkhp').textContent=Math.max(0,shark.hp);
   document.getElementById('score').textContent=score+'/6';
   var sb=document.getElementById('shopBtn');
-  sb.style.borderColor=nearBasket?'#ffaa44':'#886644';
-  sb.style.boxShadow=nearBasket?'0 0 8px rgba(255,170,68,0.4)':'none';
+  var nb=typeof nearBasket!=='undefined'&&nearBasket;
+  sb.style.borderColor=nb?'#ffaa44':'#886644';
+  sb.style.boxShadow=nb?'0 0 8px rgba(255,170,68,0.4)':'none';
 }
 
 // === INPUT ===
