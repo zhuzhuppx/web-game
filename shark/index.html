@@ -21,16 +21,16 @@
 var W=Math.min(800,window.innerWidth-20),H=Math.min(600,window.innerHeight-200);
 var c=document.getElementById('c'),ctx=c.getContext('2d');
 c.width=W;c.height=H;
-var ISLAND_X=W/2,ISLAND_Y=H/2-30,ISLAND_R=100;
+var ISLAND_X=W/2,ISLAND_Y=H/2-15,ISLAND_R=65;
 var MAINLAND_Y=H-40;
 
 // === GAME STATE ===
-var player={x:W/2,y:H-60,hp:100,mhp:100,gems:0,speed:2.5,radius:14,gun:false,gunCd:0};
-var shark={x:W/2+120,y:H/2-50,hp:150,mhp:150,speed:2,radius:22,state:'patrol',targetX:0,targetY:0,atkCd:0};
+var player={x:W/2,y:H-60,hp:100,mhp:100,gems:0,speed:2.8,radius:14,gun:false,gunCd:0};
+var shark={x:W/2+120,y:H/2-50,hp:150,mhp:150,speed:1.3,radius:22,state:'patrol',targetX:0,targetY:0,atkCd:0};
 var gemList=[],bulletList=[],particleList=[],bloodList=[];
 var keys={},mouse={x:0,y:0,down:false};
 var score=0,gameOver=false,win=false;
-var WIN_GEMS=8;
+var WIN_GEMS=6;
 var sharkRespawnTimer=0,spawnDelay=180; // 6s respawn
 
 // === INIT GEMS ===
@@ -122,7 +122,7 @@ function tick(){
     var dd=Math.hypot(dx,dy);
     if(dd<250){ // shooting range
       bulletList.push({x:player.x,y:player.y,vx:dx/dd*8,vy:dy/dd*8,life:40});
-      player.gunCd=15;
+      player.gunCd=10;
       if(typeof sfxPew==='function')sfxPew(0);
     }
   }
@@ -154,8 +154,8 @@ function tick(){
     if(dShark<300&&!onMainland){ // Chase player
       shark.state='chase';
       var ang=Math.atan2(player.y-shark.y,player.x-shark.x);
-      shark.x+=Math.cos(ang)*shark.speed*(dShark<150?2:1.2);
-      shark.y+=Math.sin(ang)*shark.speed*(dShark<150?2:1.2);
+      shark.x+=Math.cos(ang)*shark.speed*(dShark<120?1.5:1.0);
+      shark.y+=Math.sin(ang)*shark.speed*(dShark<120?1.5:1.0);
       
       // Attack player
       shark.atkCd=Math.max(0,shark.atkCd-1);
