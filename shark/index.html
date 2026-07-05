@@ -1,0 +1,351 @@
+<!DOCTYPE html><html lang="zh-CN"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><title>鲨鱼岛夺宝</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<script src="/sfx.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}html,body{overflow:hidden;height:100dvh}body{background:linear-gradient(180deg,#0a1628 0%,#1a2a4a 100%);color:#ccc;font-family:system-ui}
+.wrap{height:100dvh;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.hud{display:flex;align-items:center;justify-content:center;gap:12px;font-size:14px;flex-shrink:0;padding:4px 12px;background:rgba(0,0,0,0.3);border-radius:8px;width:90%;max-width:600px}
+.hud span{color:#aaa}.hud b{color:#ffcc44}#msg{font-size:12px;color:#ff8844;font-weight:600;height:16px;text-align:center}
+#c{max-width:95vw;max-height:70vh;border-radius:8px;touch-action:none;border:2px solid rgba(255,255,255,0.08);box-shadow:0 2px 20px rgba(0,0,0,0.4);cursor:crosshair}
+.back{color:#8888cc;text-decoration:none;font-size:14px;position:absolute;bottom:12px;left:12px;z-index:100;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:6px;transition:all 0.2s}
+.back:hover{background:rgba(100,100,200,0.2);color:#aaaaff}
+</style>
+<div class="wrap">
+<div class="hud"><span>❤️</span><b id="hp">100</b><span>💎</span><b id="gems">0/8</b><span>🦈</span><b id="sharkhp">150</b><span>🏆</span><b id="score">0</b></div>
+<div id="msg"></div>
+<canvas id="c"></canvas>
+<a class="back" href="/">← 返回</a>
+</div>
+<script>
+// === CONSTANTS ===
+var W=Math.min(800,window.innerWidth-20),H=Math.min(600,window.innerHeight-200);
+var c=document.getElementById('c'),ctx=c.getContext('2d');
+c.width=W;c.height=H;
+var ISLAND_X=W/2,ISLAND_Y=H/2-30,ISLAND_R=100;
+var MAINLAND_Y=H-40;
+
+// === GAME STATE ===
+var player={x:W/2,y:H-60,hp:100,mhp:100,gems:0,speed:2.5,radius:14,gun:false,gunCd:0};
+var shark={x:W/2+120,y:H/2-50,hp:150,mhp:150,speed:2,radius:22,state:'patrol',targetX:0,targetY:0,atkCd:0};
+var gemList=[],bulletList=[],particleList=[],bloodList=[];
+var keys={},mouse={x:0,y:0,down:false};
+var score=0,gameOver=false,win=false;
+var WIN_GEMS=8;
+var sharkRespawnTimer=0,spawnDelay=180; // 6s respawn
+
+// === INIT GEMS ===
+function spawnGems(){
+  gemList=[];
+  for(var i=0;i<WIN_GEMS+2;i++){
+    var ang=Math.random()*Math.PI*2,dist=15+Math.random()*(ISLAND_R-25);
+    gemList.push({x:ISLAND_X+Math.cos(ang)*dist,y:ISLAND_Y+Math.sin(ang)*dist,radius:8,sparkle:Math.random()*Math.PI*2});
+  }
+}
+spawnGems();
+shark.targetX=shark.x;shark.targetY=shark.y;
+
+// === HELPERS ===
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function msg(s,t){var el=document.getElementById('msg');el.textContent=s;if(t)setTimeout(function(){if(el.textContent===s)el.textContent=''},t)}
+function updateUI(){
+  document.getElementById('hp').textContent=Math.max(0,player.hp);
+  document.getElementById('gems').textContent=player.gems+'/'+WIN_GEMS;
+  document.getElementById('sharkhp').textContent=Math.max(0,shark.hp);
+  document.getElementById('score').textContent=score;
+}
+
+// === INPUT ===
+document.addEventListener('keydown',function(e){keys[e.key.toLowerCase()]=true});
+document.addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false});
+c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();mouse.x=(e.clientX-r.left)*(W/r.width);mouse.y=(e.clientY-r.top)*(H/r.height)});
+c.addEventListener('mousedown',function(e){mouse.down=true;sfxResume()});
+c.addEventListener('mouseup',function(){mouse.down=false});
+c.addEventListener('touchmove',function(e){e.preventDefault();var r=c.getBoundingClientRect();mouse.x=(e.touches[0].clientX-r.left)*(W/r.width);mouse.y=(e.touches[0].clientY-r.top)*(H/r.height)});
+c.addEventListener('touchstart',function(e){e.preventDefault();mouse.down=true;sfxResume();var r=c.getBoundingClientRect();mouse.x=(e.touches[0].clientX-r.left)*(W/r.width);mouse.y=(e.touches[0].clientY-r.top)*(H/r.height)});
+c.addEventListener('touchend',function(){mouse.down=false});
+
+// === TICK ===
+function tick(){
+  if(gameOver)return;
+  // Player movement
+  var mx=0,my=0;
+  if(keys['w']||keys['arrowup']||keys['w']||(mouse.down&&mouse.y<player.y-10))my=-1;
+  if(keys['s']||keys['arrowdown']||(mouse.down&&mouse.y>player.y+10))my=1;
+  if(keys['a']||keys['arrowleft']||(mouse.down&&mouse.x<player.x-10))mx=-1;
+  if(keys['d']||keys['arrowright']||(mouse.down&&mouse.x>player.x+10))mx=1;
+  if(mx||my){var d=Math.hypot(mx,my);mx/=d;my/=d}
+  
+  // Speed: slower in water
+  var onIsland=dist(player,{x:ISLAND_X,y:ISLAND_Y})<ISLAND_R-player.radius;
+  var onMainland=player.y>MAINLAND_Y-20;
+  var inWater=!onIsland&&!onMainland;
+  var spd=inWater?player.speed*0.6:player.speed;
+  
+  var nx=player.x+mx*spd,ny=player.y+my*spd;
+  // Clamp to bounds
+  if(nx>player.radius&&nx<W-player.radius)player.x=nx;
+  if(ny>20&&ny<H-10)player.y=ny;
+  // Can't walk through island center (too dense)
+  if(onIsland){
+    if(dist(player,{x:ISLAND_X,y:ISLAND_Y})>ISLAND_R-player.radius){
+      var ang=Math.atan2(player.y-ISLAND_Y,player.x-ISLAND_X);
+      player.x=ISLAND_X+Math.cos(ang)*(ISLAND_R-player.radius);
+      player.y=ISLAND_Y+Math.sin(ang)*(ISLAND_R-player.radius);
+    }
+  }
+  
+  // Collect gems on island
+  if(onIsland){
+    for(var i=gemList.length-1;i>=0;i--){
+      if(dist(player,gemList[i])<player.radius+gemList[i].radius){
+        if(player.gems<WIN_GEMS+2){player.gems++;gemList.splice(i,1);if(typeof sfxPew==='function')sfxPew(1)}
+      }
+    }
+  }
+  
+  // Deliver gems to mainland
+  if(onMainland&&player.gems>0){
+    score+=player.gems;
+    player.gems=0;
+    msg('🎉 宝石已运回！',2000);
+    // Respawn gems on island periodically
+    if(gemList.length<3)spawnGems();
+  }
+  
+  // Gun: player has gun when carrying gems
+  player.gun=player.gems>0;
+  player.gunCd=Math.max(0,player.gunCd-1);
+  
+  // Shoot shark
+  if(player.gun&&player.gunCd<=0&&mouse.down&&shark.hp>0){
+    var dx=shark.x-player.x,dy=shark.y-player.y;
+    var dd=Math.hypot(dx,dy);
+    if(dd<250){ // shooting range
+      bulletList.push({x:player.x,y:player.y,vx:dx/dd*8,vy:dy/dd*8,life:40});
+      player.gunCd=15;
+      if(typeof sfxPew==='function')sfxPew(0);
+    }
+  }
+  
+  // Bullets
+  for(var i=bulletList.length-1;i>=0;i--){
+    var b=bulletList[i];b.life--;
+    b.x+=b.vx;b.y+=b.vy;
+    if(b.life<=0||b.x<0||b.x>W||b.y<0||b.y>H){bulletList.splice(i,1);continue}
+    if(shark.hp>0&&dist(b,shark)<shark.radius+4){
+      shark.hp-=8;bulletList.splice(i,1);
+      for(var j=0;j<3;j++)bloodList.push({x:b.x,y:b.y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3-1,life:15});
+      continue;
+    }
+  }
+  
+  // Shark AI
+  if(shark.hp<=0){
+    sharkRespawnTimer++;
+    if(sharkRespawnTimer>=spawnDelay){
+      shark.hp=shark.mhp;shark.x=ISLAND_X+(Math.random()-0.5)*200;shark.y=ISLAND_Y+(Math.random()-0.5)*200;
+      sharkRespawnTimer=0;shark.atkCd=0;shark.state='patrol';
+      msg('🦈 新的鲨鱼来了！',2000);
+    }
+  }
+  
+  var dShark=dist(player,shark);
+  if(shark.hp>0){
+    if(dShark<300&&!onMainland){ // Chase player
+      shark.state='chase';
+      var ang=Math.atan2(player.y-shark.y,player.x-shark.x);
+      shark.x+=Math.cos(ang)*shark.speed*(dShark<150?2:1.2);
+      shark.y+=Math.sin(ang)*shark.speed*(dShark<150?2:1.2);
+      
+      // Attack player
+      shark.atkCd=Math.max(0,shark.atkCd-1);
+      if(dShark<shark.radius+player.radius+8&&shark.atkCd<=0){
+        player.hp-=12;shark.atkCd=30;
+        for(var j=0;j<4;j++)bloodList.push({x:player.x,y:player.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5-2,life:18});
+        if(typeof sfxExplode==='function')sfxExplode();
+      }
+    }else if(shark.state==='chase'){
+      shark.state='patrol';
+      shark.targetX=ISLAND_X+(Math.random()-0.5)*250;
+      shark.targetY=ISLAND_Y+(Math.random()-0.5)*250;
+    }else{ // Patrol around island
+      var dT=dist(shark,{x:shark.targetX,y:shark.targetY});
+      if(dT<10||shark.targetX===0){
+        shark.targetX=ISLAND_X+Math.cos(Math.random()*Math.PI*2)*(ISLAND_R+60+Math.random()*120);
+        shark.targetY=ISLAND_Y+Math.sin(Math.random()*Math.PI*2)*(ISLAND_R+60+Math.random()*120);
+      }
+      var da=Math.atan2(shark.targetY-shark.y,shark.targetX-shark.x);
+      shark.x+=Math.cos(da)*shark.speed*0.7;
+      shark.y+=Math.sin(da)*shark.speed*0.7;
+    }
+    // Clamp shark near island
+    if(dist(shark,{x:ISLAND_X,y:ISLAND_Y})>350){
+      var sa=Math.atan2(shark.y-ISLAND_Y,shark.x-ISLAND_X);
+      shark.x=ISLAND_X+Math.cos(sa)*340;
+      shark.y=ISLAND_Y+Math.sin(sa)*340;
+    }
+  }
+  
+  // Particles
+  for(var i=bloodList.length-1;i>=0;i--){
+    var p=bloodList[i];p.life--;p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;
+    if(p.life<=0)bloodList.splice(i,1);
+  }
+  
+  // Win condition
+  if(score>=WIN_GEMS&&!win){
+    win=true;gameOver=true;
+    msg('🎉 胜利！所有宝石已运回大陆！',99999);
+  }
+  
+  // Die
+  if(player.hp<=0&&!gameOver){
+    gameOver=true;msg('💀 被鲨鱼咬死了… 刷新重来',99999);
+  }
+  
+  updateUI();
+}
+
+// === DRAW ===
+function draw(){
+  // Sky gradient
+  var sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#1a3a5c');sky.addColorStop(0.5,'#2a5588');sky.addColorStop(0.85,'#1a4477');sky.addColorStop(1,'#0a3050');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  
+  // Water waves
+  ctx.fillStyle='rgba(20,80,160,0.3)';
+  for(var wi=0;wi<30;wi++){
+    var wx=(wi*37+Date.now()*0.02)%W,wy=MAINLAND_Y-40+(wi*23)%40;
+    ctx.beginPath();ctx.arc(wx,wy,15+Math.sin(wi+Date.now()*0.003)*8,0,Math.PI);ctx.fill();
+  }
+  
+  // Mainland (beach)
+  ctx.fillStyle='#c2a060';ctx.fillRect(0,MAINLAND_Y,W,H-MAINLAND_Y);
+  ctx.fillStyle='#d4b878';ctx.fillRect(0,MAINLAND_Y,W,8);
+  ctx.fillStyle='#8b6914';ctx.fillRect(0,MAINLAND_Y+8,W,4);
+  // Palm trees
+  for(var ti=0;ti<4;ti++){
+    var tx=80+ti*180,ty=MAINLAND_Y-10;
+    ctx.fillStyle='#5a3a1a';ctx.fillRect(tx-3,ty-40,6,40);
+    ctx.fillStyle='#2a6a2a';ctx.beginPath();ctx.arc(tx,ty-45,30,0,Math.PI);ctx.fill();
+    ctx.fillStyle='#3a8a3a';ctx.beginPath();ctx.arc(tx-15+ti*8,ty-50,20,Math.PI*0.3,Math.PI*0.9);ctx.fill();
+    ctx.beginPath();ctx.arc(tx+15-ti*6,ty-48,18,Math.PI*0.1,Math.PI*0.7);ctx.fill();
+  }
+  
+  // Island
+  var ig=ctx.createRadialGradient(ISLAND_X-10,ISLAND_Y-10,5,ISLAND_X,ISLAND_Y,ISLAND_R);
+  ig.addColorStop(0,'#e8d898');ig.addColorStop(0.6,'#c8a858');ig.addColorStop(1,'#8b6914');
+  ctx.fillStyle=ig;ctx.beginPath();ctx.arc(ISLAND_X,ISLAND_Y,ISLAND_R,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#6a4a0a';ctx.lineWidth=2;ctx.stroke();
+  // Sand details
+  ctx.fillStyle='rgba(255,255,200,0.2)';
+  for(var si=0;si<8;si++){var sx=ISLAND_X-ISLAND_R+30+(si*17)%(ISLAND_R*2-40),sy=ISLAND_Y-ISLAND_R+20+(si*23)%(ISLAND_R*2-30);ctx.beginPath();ctx.arc(sx,sy,4+si%6,0,Math.PI*2);ctx.fill()}
+  
+  // Gems on island
+  for(var i=0;i<gemList.length;i++){
+    var g=gemList[i];
+    g.sparkle+=0.08;
+    var pulse=Math.sin(g.sparkle)*0.3+0.7;
+    ctx.fillStyle='rgba(255,100,200,'+(0.6+pulse*0.4)+')';ctx.beginPath();ctx.arc(g.x,g.y,g.radius*pulse,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.globalAlpha=pulse;ctx.beginPath();ctx.arc(g.x-g.radius*0.3,g.y-g.radius*0.3,g.radius*0.4,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  }
+  
+  // Shark
+  if(shark.hp>0){
+    ctx.save();ctx.translate(shark.x,shark.y);
+    var sAng=Math.atan2(player.y-shark.y,player.x-shark.x);
+    if(shark.state==='patrol')sAng=Math.atan2(shark.targetY-shark.y,shark.targetX-shark.x);
+    ctx.rotate(sAng);
+    // Body
+    ctx.fillStyle='#5588aa';ctx.beginPath();ctx.ellipse(0,0,shark.radius,shark.radius*0.5,0,0,Math.PI*2);ctx.fill();
+    // Darker top
+    ctx.fillStyle='#4477aa';ctx.beginPath();ctx.ellipse(0,-shark.radius*0.2,shark.radius*0.9,shark.radius*0.35,0,0,Math.PI*2);ctx.fill();
+    // Fin
+    ctx.fillStyle='#336688';ctx.beginPath();ctx.moveTo(-shark.radius*0.3,-shark.radius*0.5);ctx.lineTo(0,-shark.radius*0.9);ctx.lineTo(shark.radius*0.3,-shark.radius*0.5);ctx.fill();
+    // Tail
+    ctx.fillStyle='#336688';ctx.beginPath();ctx.moveTo(-shark.radius,-shark.radius*0.15);ctx.lineTo(-shark.radius*1.4,-shark.radius*0.6);ctx.lineTo(-shark.radius*1.4,shark.radius*0.6);ctx.lineTo(-shark.radius,shark.radius*0.15);ctx.fill();
+    // Eye
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(shark.radius*0.5,-shark.radius*0.2,shark.radius*0.18,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#111';ctx.beginPath();ctx.arc(shark.radius*0.55,-shark.radius*0.2,shark.radius*0.1,0,Math.PI*2);ctx.fill();
+    // Teeth
+    ctx.fillStyle='#fff';
+    for(var ti=0;ti<3;ti++){ctx.beginPath();ctx.moveTo(shark.radius*0.7+ti*6,shark.radius*0.05);ctx.lineTo(shark.radius*0.6+ti*6,shark.radius*0.25);ctx.lineTo(shark.radius*0.8+ti*6,shark.radius*0.25);ctx.fill()}
+    ctx.restore();
+    // HP bar
+    var shpPct=shark.hp/shark.mhp;
+    ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(shark.x-25,shark.y-shark.radius-14,50,6);
+    ctx.fillStyle=shpPct>0.5?'#44ff44':'#ff2222';ctx.fillRect(shark.x-25,shark.y-shark.radius-14,50*shpPct,6);
+  }
+  
+  // Player
+  ctx.save();ctx.translate(player.x,player.y);
+  var pAng=Math.atan2(player.y-H/2,player.x-W/2)+Math.PI;
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)';ctx.beginPath();ctx.ellipse(0,player.radius*0.5,player.radius*0.8,4,0,0,Math.PI*2);ctx.fill();
+  // Body
+  ctx.fillStyle='#3a6a3a';ctx.fillRect(-6,-8,12,16);
+  ctx.fillStyle='#4a8a4a';ctx.fillRect(-5,-6,10,12);
+  // Head
+  ctx.fillStyle='#ffcc88';ctx.beginPath();ctx.arc(0,-12,7,0,Math.PI*2);ctx.fill();
+  // Hat
+  ctx.fillStyle='#5a3a1a';ctx.fillRect(-8,-18,16,4);ctx.fillRect(-6,-22,12,5);
+  // Arms
+  ctx.fillStyle='#ffcc88';ctx.fillRect(-10,-5,4,8);ctx.fillRect(6,-5,4,8);
+  // Legs
+  ctx.fillStyle='#3a3a6a';ctx.fillRect(-5,8,5,8);ctx.fillRect(1,8,5,8);
+  // Gun if armed
+  if(player.gun){
+    ctx.fillStyle='#444';ctx.fillRect(6,-8,3,14);
+    ctx.fillStyle='#333';ctx.fillRect(5,-8,5,3);
+  }
+  // Gem indicator
+  if(player.gems>0){
+    ctx.fillStyle='#ff66aa';ctx.globalAlpha=0.5+Math.sin(Date.now()*0.01)*0.3;
+    ctx.beginPath();ctx.arc(8,-15,5,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    ctx.fillStyle='#fff';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText(player.gems,8,-12);
+  }
+  ctx.restore();
+  // HP bar
+  var hpPct=player.hp/player.mhp;
+  ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(player.x-25,player.y-player.radius-14,50,6);
+  ctx.fillStyle=hpPct>0.5?'#44ff44':'#ff2222';ctx.fillRect(player.x-25,player.y-player.radius-14,50*hpPct,6);
+  
+  // Bullets
+  for(var i=0;i<bulletList.length;i++){
+    var b=bulletList[i];
+    ctx.fillStyle='#ffff44';ctx.beginPath();ctx.arc(b.x,b.y,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(b.x,b.y,1.5,0,Math.PI*2);ctx.fill();
+  }
+  
+  // Blood particles
+  for(var i=0;i<bloodList.length;i++){
+    var p=bloodList[i];
+    ctx.fillStyle='rgba(255,60,40,'+(p.life/20)+')';ctx.beginPath();ctx.arc(p.x,p.y,2+p.life*0.1,0,Math.PI*2);ctx.fill();
+  }
+  
+  // Win overlay
+  if(gameOver&&win){
+    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#ffd700';ctx.font='bold 40px system-ui';ctx.textAlign='center';ctx.fillText('🎉 胜利！',W/2,H/2-30);
+    ctx.fillStyle='#fff';ctx.font='18px system-ui';ctx.fillText('宝石全部运回大陆！',W/2,H/2+15);
+    ctx.fillText('刷新页面再来一局',W/2,H/2+45);
+  }
+  if(gameOver&&!win){
+    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#ff4444';ctx.font='bold 36px system-ui';ctx.textAlign='center';ctx.fillText('💀 阵亡',W/2,H/2-20);
+    ctx.fillStyle='#fff';ctx.font='18px system-ui';ctx.fillText('刷新页面再来一局',W/2,H/2+20);
+  }
+}
+
+// === LOOP ===
+function loop(){
+  tick();draw();
+  if(!gameOver||win)requestAnimationFrame(loop);
+  else draw(); // show game over screen once
+}
+
+// === START ===
+updateUI();loop();
+</script>
+</html>
