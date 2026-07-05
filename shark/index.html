@@ -24,7 +24,6 @@ var W=Math.min(800,window.innerWidth-20),H=Math.min(600,window.innerHeight-200);
 var c=document.getElementById('c'),ctx=c.getContext('2d');
 c.width=W;c.height=H;
 var ISLAND_X=W/2,ISLAND_Y=H/2-15,ISLAND_R=65;
-var MAINLAND_Y=H-40;
 
 // === GAME STATE ===
 var player={x:W/2,y:H-60,hp:100,mhp:100,gems:0,speed:2.8,radius:14,gun:false,gunCd:0};
@@ -79,8 +78,9 @@ function tick(){
   
   // Speed: slower in water
   var onIsland=dist(player,{x:ISLAND_X,y:ISLAND_Y})<ISLAND_R-player.radius;
-  var onMainland=player.y>MAINLAND_Y-20;
-  var inWater=!onIsland&&!onMainland;
+  var basketDist=40;
+  var nearBasket=(player.x<basketDist||player.x>W-basketDist||player.y<basketDist||player.y>H-basketDist);
+  var inWater=!onIsland&&!nearBasket;
   var spd=inWater?player.speed*0.6:player.speed;
   
   var nx=player.x+mx*spd,ny=player.y+my*spd;
@@ -105,12 +105,11 @@ function tick(){
     }
   }
   
-  // Deliver gems to mainland
-  if(onMainland&&player.gems>0){
+  // Deliver gems to any basket (all 4 sides)
+  if(nearBasket&&player.gems>0){
     score+=player.gems;
     player.gems=0;
     msg('🎉 宝石已运回！',2000);
-    // Respawn gems on island periodically
     if(gemList.length<3)spawnGems();
   }
   
@@ -153,7 +152,7 @@ function tick(){
   
   var dShark=dist(player,shark);
   if(shark.hp>0){
-    if(dShark<300&&!onMainland){ // Chase player
+    if(dShark<300&&!onIsland&&!nearBasket){ // Chase player, but safe on island and at baskets
       shark.state='chase';
       var ang=Math.atan2(player.y-shark.y,player.x-shark.x);
       shark.x+=Math.cos(ang)*shark.speed*(dShark<120?1.5:1.0);
@@ -218,17 +217,26 @@ function draw(){
   // Water waves
   ctx.fillStyle='rgba(20,80,160,0.3)';
   for(var wi=0;wi<30;wi++){
-    var wx=(wi*37+Date.now()*0.02)%W,wy=MAINLAND_Y-40+(wi*23)%40;
+    var wx=(wi*37+Date.now()*0.02)%W,wy=H-60+(wi*23)%40;
     ctx.beginPath();ctx.arc(wx,wy,15+Math.sin(wi+Date.now()*0.003)*8,0,Math.PI);ctx.fill();
   }
+
+  // Beach strips on all 4 sides
+  ctx.fillStyle='#c2a060';ctx.fillRect(0,0,W,20);ctx.fillRect(0,0,20,H);ctx.fillRect(W-20,0,20,H);ctx.fillRect(0,H-20,W,20);
+  ctx.fillStyle='#d4b878';ctx.fillRect(0,18,W,6);ctx.fillRect(18,0,6,H);ctx.fillRect(W-22,0,6,H);ctx.fillRect(0,H-22,W,6);
+
+  // Delivery baskets on 4 edges
+  var baskets=[{x:W/2,y:10,label:'北'},{x:W-10,y:H/2,label:'东'},{x:W/2,y:H-10,label:'南'},{x:10,y:H/2,label:'西'}];
+  for(var bi=0;bi<baskets.length;bi++){
+    var b=baskets[bi];
+    ctx.fillStyle='#8b6914';ctx.beginPath();ctx.arc(b.x,b.y,10,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#a08030';ctx.strokeStyle='#6a4a0a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(b.x,b.y,8,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#ffd700';ctx.font='bold 9px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('🧺',b.x,b.y);
+  }
   
-  // Mainland (beach)
-  ctx.fillStyle='#c2a060';ctx.fillRect(0,MAINLAND_Y,W,H-MAINLAND_Y);
-  ctx.fillStyle='#d4b878';ctx.fillRect(0,MAINLAND_Y,W,8);
-  ctx.fillStyle='#8b6914';ctx.fillRect(0,MAINLAND_Y+8,W,4);
   // Palm trees
   for(var ti=0;ti<4;ti++){
-    var tx=80+ti*180,ty=MAINLAND_Y-10;
+    var tx=80+ti*180,ty=H-25;
     ctx.fillStyle='#5a3a1a';ctx.fillRect(tx-3,ty-40,6,40);
     ctx.fillStyle='#2a6a2a';ctx.beginPath();ctx.arc(tx,ty-45,30,0,Math.PI);ctx.fill();
     ctx.fillStyle='#3a8a3a';ctx.beginPath();ctx.arc(tx-15+ti*8,ty-50,20,Math.PI*0.3,Math.PI*0.9);ctx.fill();
