@@ -213,9 +213,6 @@ document.addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false});
 c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();mouse.x=(e.clientX-r.left)*(W/r.width);mouse.y=(e.clientY-r.top)*(H/r.height)});
 c.addEventListener('mousedown',function(e){mouse.down=true;mouse._clicked=true;sfxResume()});
 c.addEventListener('mouseup',function(){mouse.down=false});
-c.addEventListener('touchmove',function(e){e.preventDefault();var r=c.getBoundingClientRect();mouse.x=(e.touches[0].clientX-r.left)*(W/r.width);mouse.y=(e.touches[0].clientY-r.top)*(H/r.height)});
-c.addEventListener('touchstart',function(e){e.preventDefault();mouse.down=true;sfxResume();var r=c.getBoundingClientRect();mouse.x=(e.touches[0].clientX-r.left)*(W/r.width);mouse.y=(e.touches[0].clientY-r.top)*(H/r.height)});
-c.addEventListener('touchend',function(){mouse.down=false});
 
 // === TICK ===
 function tick(){
