@@ -9,12 +9,14 @@
 #c{max-width:95vw;max-height:70vh;border-radius:8px;touch-action:none;border:2px solid rgba(255,255,255,0.08);box-shadow:0 2px 20px rgba(0,0,0,0.4);cursor:crosshair}
 .back{color:#8888cc;text-decoration:none;font-size:14px;position:absolute;bottom:12px;left:12px;z-index:100;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:6px;transition:all 0.2s}
 .back:hover{background:rgba(100,100,200,0.2);color:#aaaaff}
+#restart{color:#cc8844;font-size:14px;position:absolute;bottom:12px;right:12px;z-index:100;background:rgba(0,0,0,0.5);padding:4px 12px;border-radius:6px;border:none;cursor:pointer;transition:all 0.2s;font-family:system-ui}
+#restart:hover{background:rgba(200,150,50,0.25);color:#ffaa44}
 </style>
 <div class="wrap">
 <div class="hud"><span>❤️</span><b id="hp">100</b><span>💎</span><b id="gems">0/8</b><span>🦈</span><b id="sharkhp">150</b><span>🏆</span><b id="score">0</b></div>
 <div id="msg"></div>
 <canvas id="c"></canvas>
-<a class="back" href="/">← 返回</a>
+<a class="back" href="/">← 返回</a><button id="restart" onclick="location.reload()">🔄 重开</button>
 </div>
 <script>
 // === CONSTANTS ===
