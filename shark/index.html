@@ -29,10 +29,21 @@
 <div id="msg"></div>
 <canvas id="c"></canvas>
 <a class="back" href="/">← 返回</a><button id="restart" onclick="location.reload()">🔄 重开</button>
-<div id="shop"><button class="close" onclick="document.getElementById('shop').style.display='none'">✕</button><h3>🏪 宝石商店</h3><div id="shopScore" style="color:#ffcc44;font-size:12px;margin-bottom:8px">可用：0💎</div><button class="btn" id="btnHeal" onclick="buyHeal()">❤️ 血包 +50HP — 1💎</button><button class="btn" id="btnGun" onclick="buyGun()">🔫 强化武器 伤害+5 — 2💎</button><button class="btn" id="btnKnife" onclick="buyKnife()">🔪 匕首(自动近战) — 2💎</button><button class="btn" id="btnBomb" onclick="buyBomb()">💣 手雷 范围40伤 — 3💎</button><button class="btn" id="btnShield" onclick="buyShield()">🛡️ 护盾 5秒无敌 — 2💎</button><button class="btn" id="btnSpeed" onclick="buySpeed()">⚡ 加速靴 20秒 — 1💎</button>
+<div id="shop"><button class="close" onclick="document.getElementById('shop').style.display='none'">✕</button><h3>🏪 军事商店</h3><div id="shopScore" style="color:#ffcc44;font-size:12px;margin-bottom:8px">可用：0💎</div>
+<button class="btn" id="btnHeal" onclick="buyHeal()">❤️ 血包 +50HP — 1💎</button>
+<button class="btn" id="btnGun" onclick="buyGun()">🔫 强化武器 伤害+5 — 2💎</button>
+<button class="btn" id="btnKnife" onclick="buyKnife()">🔪 匕首(自动近战) — 2💎</button>
+<button class="btn" id="btnFlame" onclick="buyFlame()">🔥 喷火枪(近程灼烧) — 4💎</button>
+<button class="btn" id="btnScope" onclick="buyScope()">🎯 瞄准镜 射程翻倍 — 3💎</button>
+<button class="btn" id="btnAdrenaline" onclick="buyAdrenaline()">💉 肾上腺素 8s无敌+神速 — 1💎</button>
+<button class="btn" id="btnBomb" onclick="buyBomb()">💣 手雷 范围40伤 — 3💎</button>
+<button class="btn" id="btnMine" onclick="buyMine()">💥 水雷(鲨鱼触碰爆炸) — 2💎</button>
+<button class="btn" id="btnTorpedo" onclick="buyTorpedo()">🚀 鱼雷(追踪50伤) — 3💎</button>
+<button class="btn" id="btnShield" onclick="buyShield()">🛡️ 护盾 5秒无敌 — 2💎</button>
+<button class="btn" id="btnSpeed" onclick="buySpeed()">⚡ 加速靴 20秒 — 1💎</button>
 <button class="btn" id="btnBoat" onclick="buyBoat()">⛵ 炮艇(自动开炮) — 10💎</button>
 <button class="btn" id="btnShip" onclick="buyShip()">🚢 战舰(重炮+高血) — 10💎</button>
-<button class="btn" id="btnFlame" onclick="buyFlame()">🔥 喷火枪(近程灼烧) — 4💎</button><div style="color:#888;font-size:11px;margin-top:6px">靠近岸边篮子即可打开商店</div></div>
+<div style="color:#888;font-size:11px;margin-top:6px">靠近岸边篮子即可打开商店</div></div>
 <div id="joystick"><div class="knob" id="knob"></div></div>
 <button id="btnShoot" ontouchstart="doShoot(event)" onmousedown="doShoot(event)">🔫</button>
 </div>
@@ -44,9 +55,9 @@ c.width=W;c.height=H;
 var ISLAND_X=W/2,ISLAND_Y=H/2-10,ISLAND_R=45;
 
 // === GAME STATE ===
-var player={x:W/2,y:H-25,hp:100,mhp:100,gems:0,speed:2.8,radius:14,gun:false,gunCd:0,gunDmg:8,speedBoost:0,hasKnife:false,knifeCd:0,shieldTime:0,hasFlame:false};
+var player={x:W/2,y:H-25,hp:100,mhp:100,gems:0,speed:2.8,radius:14,gun:false,gunCd:0,gunDmg:8,speedBoost:0,hasKnife:false,knifeCd:0,shieldTime:0,hasFlame:false,hasScope:false,adrenaline:0};
 var shark={x:W/2+120,y:H/2-50,hp:150,mhp:150,speed:1.0,radius:22,state:'patrol',targetX:0,targetY:0,atkCd:0,hunger:50};
-var gemList=[],bulletList=[],particleList=[],bloodList=[],fishList=[],foodList=[],boatList=[],chestList=[];
+var gemList=[],bulletList=[],particleList=[],bloodList=[],fishList=[],foodList=[],boatList=[],chestList=[],mineList=[],torpedoList=[];
 var keys={},mouse={x:0,y:0,down:false};
 var score=0,gameOver=false,win=false,chestSpawnTimer=600; // first chest at 20s
 var WIN_GEMS=30;
@@ -82,7 +93,7 @@ function msg(s,t){var el=document.getElementById('msg');el.textContent=s;if(t)se
 
 // === SHOP ===
 function openShop(){
-  if(score>0||player.gunDmg>8||player.speedBoost>0||player.hasKnife||player.hasFlame||boatList.length>0){
+  if(score>0||player.gunDmg>8||player.speedBoost>0||player.hasKnife||player.hasFlame||player.hasScope||boatList.length>0||mineList.length>0){
     document.getElementById('shop').style.display='block';
     updateShopUI();
   }
@@ -91,14 +102,18 @@ function closeShop(){document.getElementById('shop').style.display='none'}
 function updateShopUI(){
   document.getElementById('shopScore').textContent='可用：'+score+'💎';
   document.getElementById('btnHeal').disabled=score<1||player.hp>=player.mhp;
-  document.getElementById('btnGun').disabled=score<2||player.gunDmg>=20;
+  document.getElementById('btnGun').disabled=score<2||player.gunDmg>=30;
   document.getElementById('btnKnife').disabled=score<2||player.hasKnife;
+  document.getElementById('btnFlame').disabled=score<4||player.hasFlame;
+  document.getElementById('btnScope').disabled=score<3||player.hasScope;
+  document.getElementById('btnAdrenaline').disabled=score<1;
   document.getElementById('btnBomb').disabled=score<3;
+  document.getElementById('btnMine').disabled=score<2;
+  document.getElementById('btnTorpedo').disabled=score<3;
   document.getElementById('btnShield').disabled=score<2;
   document.getElementById('btnSpeed').disabled=score<1;
   document.getElementById('btnBoat').disabled=score<10;
   document.getElementById('btnShip').disabled=score<10;
-  document.getElementById('btnFlame').disabled=score<4||player.hasFlame;
 }
 function s_click(){
   var el=document.getElementById('shop');
@@ -108,7 +123,7 @@ function buyHeal(){
   if(score>=1&&player.hp<player.mhp){score--;player.hp=Math.min(player.mhp,player.hp+50);msg('❤️ 回复50HP！',2000);updateShopUI();updateUI()}
 }
 function buyGun(){
-  if(score>=2&&player.gunDmg<20){score-=2;player.gunDmg+=5;msg('🔫 武器强化！伤害+5',2000);updateShopUI();updateUI()}
+  if(score>=2&&player.gunDmg<30){score-=2;player.gunDmg+=5;msg('🔫 武器强化！伤害+5',2000);updateShopUI();updateUI()}
 }
 function buySpeed(){
   if(score>=1){score--;player.speedBoost=600;msg('⚡ 加速20秒！',2000);updateShopUI();updateUI()}
@@ -137,6 +152,20 @@ function buyBomb(){
 }
 function buyShield(){
   if(score>=2){score-=2;player.shieldTime=150;msg('🛡️ 5秒无敌！',2000);updateShopUI();updateUI()}
+}
+function buyScope(){
+  if(score>=3&&!player.hasScope){score-=3;player.hasScope=true;msg('🎯 瞄准镜！射程翻倍',2000);updateShopUI();updateUI()}
+}
+function buyAdrenaline(){
+  if(score>=1){score--;player.adrenaline=240;msg('💉 肾上腺素！8秒无敌+神速',2000);updateShopUI();updateUI()}
+}
+function buyMine(){
+  if(score>=2){score-=2;mineList.push({x:player.x,y:player.y,life:900});msg('💥 水雷已布设！',2000);updateShopUI();updateUI()}
+}
+function buyTorpedo(){
+  if(score>=3&&shark.hp>0){score-=3;
+    torpedoList.push({x:player.x,y:player.y,vx:0,vy:0,life:300});
+    msg('🚀 鱼雷发射！',2000);updateShopUI();updateUI()}
 }
 
 // === TOUCH JOYSTICK ===
@@ -187,7 +216,7 @@ function tick(){
   var basketDist=40;
   var nearBasket=(player.x<basketDist||player.x>W-basketDist||player.y<basketDist||player.y>H-basketDist);
   var inWater=!onIsland&&!nearBasket;
-  var baseSpd=player.speed*(player.speedBoost>0?1.5:1);
+  var baseSpd=player.speed*((player.speedBoost>0||player.adrenaline>0)?1.5:1);
   var spd=inWater?baseSpd*0.6:baseSpd;
 
   if(!shopOpen){
@@ -252,7 +281,7 @@ function tick(){
   if(player.gun&&player.gunCd<=0&&mouse._clicked&&shark.hp>0&&!onIsland){
     var dx=shark.x-player.x,dy=shark.y-player.y;
     var dd=Math.hypot(dx,dy);
-    if(dd<250){ // shooting range
+    if(dd<(player.hasScope?500:250)){ // shooting range
       bulletList.push({x:player.x,y:player.y,vx:dx/dd*8,vy:dy/dd*8,life:40});
       player.gunCd=10;
       if(typeof sfxPew==='function')sfxPew(0);
@@ -328,7 +357,7 @@ function tick(){
         for(var j=0;j<2;j++)bloodList.push({x:shark.x+(Math.random()-0.5)*20,y:shark.y+(Math.random()-0.5)*20,vx:(Math.random()-0.5)*2,vy:-1-Math.random()*3,life:8,color:'#ff6600'});
       }
       if(dShark<shark.radius+player.radius+8&&shark.atkCd<=0){
-        if(player.shieldTime>0){shark.atkCd=30} // shield blocks but shark still recoils
+        if(player.shieldTime>0||player.adrenaline>0){shark.atkCd=30} // shield blocks but shark still recoils
         else{player.hp-=12;shark.atkCd=30;
         for(var j=0;j<4;j++)bloodList.push({x:player.x,y:player.y,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5-2,life:18});
         if(typeof sfxExplode==='function')sfxExplode()}
@@ -426,6 +455,32 @@ function tick(){
     if(b.x<30)b.x=30;if(b.x>W-30)b.x=W-30;
     if(b.y<40)b.y=40;if(b.y>H-30)b.y=H-30;
     b.radius=b.type==='ship'?16:12;
+  }
+
+  // Adrenaline
+  if(player.adrenaline>0)player.adrenaline--;
+
+  // Mines
+  for(var mi=mineList.length-1;mi>=0;mi--){
+    var mn=mineList[mi];mn.life--;
+    if(mn.life<=0){mineList.splice(mi,1);continue}
+    if(shark.hp>0&&dist(shark,mn)<shark.radius+15){
+      shark.hp-=30;mineList.splice(mi,1);
+      for(var j=0;j<10;j++)bloodList.push({x:mn.x,y:mn.y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-3,life:20,color:'#ff8800'});
+    }
+  }
+
+  // Torpedoes
+  for(var ti=torpedoList.length-1;ti>=0;ti--){
+    var tp=torpedoList[ti];tp.life--;
+    if(tp.life<=0||shark.hp<=0){torpedoList.splice(ti,1);continue}
+    var tdx=shark.x-tp.x,tdy=shark.y-tp.y,td=Math.hypot(tdx,tdy)||1;
+    tp.vx+=(tdx/td)*0.3;tp.vy+=(tdy/td)*0.3;
+    var ts=Math.hypot(tp.vx,tp.vy);if(ts>5){tp.vx=tp.vx/ts*5;tp.vy=tp.vy/ts*5}
+    tp.x+=tp.vx;tp.y+=tp.vy;
+    if(dist(tp,shark)<shark.radius+5){shark.hp-=50;torpedoList.splice(ti,1);
+      for(var j=0;j<15;j++)bloodList.push({x:tp.x,y:tp.y,vx:(Math.random()-0.5)*10,vy:(Math.random()-0.5)*10-5,life:25,color:'#ff4400'});
+    }
   }
 
   // Particles
@@ -631,6 +686,12 @@ function draw(){
     ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(b.x,b.y,1.5,0,Math.PI*2);ctx.fill();
   }
   
+  // Mines
+  for(var mi=0;mi<mineList.length;mi++){var mn=mineList[mi];ctx.fillStyle='#444';ctx.beginPath();ctx.arc(mn.x,mn.y,8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ff4400';ctx.beginPath();ctx.arc(mn.x,mn.y,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='8px system-ui';ctx.textAlign='center';ctx.fillText('💥',mn.x,mn.y+3)}
+
+  // Torpedoes
+  for(var ti=0;ti<torpedoList.length;ti++){var tp=torpedoList[ti];ctx.fillStyle='#558';ctx.beginPath();ctx.ellipse(tp.x,tp.y,8,3,Math.atan2(tp.vy,tp.vx),0,Math.PI*2);ctx.fill();ctx.fillStyle='#ff0';ctx.beginPath();ctx.arc(tp.x,tp.y,2,0,Math.PI*2);ctx.fill()}
+
   // Blood particles
   for(var i=0;i<bloodList.length;i++){
     var p=bloodList[i];
