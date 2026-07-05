@@ -18,6 +18,11 @@
 #shop .btn:disabled{opacity:0.4;cursor:default}
 #shop .close{color:#888;background:none;border:none;font-size:16px;cursor:pointer;float:right;padding:0 4px}
 #shop .close:hover{color:#fff}
+#joystick{position:absolute;bottom:50px;left:30px;width:100px;height:100px;background:rgba(255,255,255,0.08);border-radius:50%;border:2px solid rgba(255,255,255,0.15);z-index:150;touch-action:none}
+#joystick .knob{position:absolute;width:40px;height:40px;background:rgba(255,255,255,0.3);border-radius:50%;top:30px;left:30px;transition:transform 0.05s;pointer-events:none}
+#btnShoot{display:none;position:absolute;bottom:70px;right:30px;width:70px;height:70px;background:rgba(255,60,40,0.4);border-radius:50%;border:2px solid rgba(255,100,60,0.6);z-index:150;font-size:24px;color:#fff;touch-action:manipulation;cursor:pointer}
+#btnShoot.armed{display:flex;align-items:center;justify-content:center}
+@media(min-width:768px){#joystick,#btnShoot{display:none}}
 </style>
 <div class="wrap">
 <div class="hud"><span>❤️</span><b id="hp">100</b><span>💎</span><b id="gems">0</b><span>🦈</span><b id="sharkhp">150</b><span>🏆</span><b id="score">0/6</b><button id="shopBtn" onclick="s_click()" style="background:rgba(100,80,40,0.3);border:1px solid #886644;color:#ffcc44;padding:2px 10px;border-radius:6px;cursor:pointer;font-size:13px;font-family:system-ui">🏪 商店</button></div>
@@ -25,6 +30,8 @@
 <canvas id="c"></canvas>
 <a class="back" href="/">← 返回</a><button id="restart" onclick="location.reload()">🔄 重开</button>
 <div id="shop"><button class="close" onclick="document.getElementById('shop').style.display='none'">✕</button><h3>🏪 宝石商店</h3><div id="shopScore" style="color:#ffcc44;font-size:12px;margin-bottom:8px">可用：0💎</div><button class="btn" id="btnHeal" onclick="buyHeal()">❤️ 血包 +50HP — 1💎</button><button class="btn" id="btnGun" onclick="buyGun()">🔫 强化武器 伤害+5 — 2💎</button><button class="btn" id="btnSpeed" onclick="buySpeed()">⚡ 加速靴 20秒 — 1💎</button><div style="color:#888;font-size:11px;margin-top:6px">靠近岸边篮子即可打开商店</div></div>
+<div id="joystick"><div class="knob" id="knob"></div></div>
+<button id="btnShoot" ontouchstart="doShoot(event)" onmousedown="doShoot(event)">🔫</button>
 </div>
 <script>
 // === CONSTANTS ===
@@ -81,6 +88,23 @@ function buyGun(){
 function buySpeed(){
   if(score>=1){score--;player.speedBoost=600;msg('⚡ 加速20秒！',2000);updateShopUI();updateUI()}
 }
+
+// === TOUCH JOYSTICK ===
+var joy={active:false,dx:0,dy:0};
+var jstick=document.getElementById('joystick'),knob=document.getElementById('knob');
+jstick.addEventListener('touchstart',function(e){e.preventDefault();joy.active=true;updateJoy(e)});
+jstick.addEventListener('touchmove',function(e){e.preventDefault();updateJoy(e)});
+jstick.addEventListener('touchend',function(e){e.preventDefault();joy.active=false;joy.dx=0;joy.dy=0;knob.style.transform='translate(0px,0px)'});
+function updateJoy(e){
+  var r=jstick.getBoundingClientRect();
+  var cx=r.left+r.width/2,cy=r.top+r.height/2;
+  var tx=e.touches[0].clientX-cx,ty=e.touches[0].clientY-cy;
+  var dist=Math.hypot(tx,ty),maxR=40;
+  if(dist>maxR){tx=tx/dist*maxR;ty=ty/dist*maxR;dist=maxR}
+  joy.dx=tx/maxR;joy.dy=ty/maxR;
+  knob.style.transform='translate('+tx+'px,'+ty+'px)';
+}
+function doShoot(e){e.preventDefault();mouse._clicked=true;sfxResume()}
 function updateUI(){
   document.getElementById('hp').textContent=Math.max(0,player.hp);
   document.getElementById('gems').textContent=player.gems>0?'💎':'';
@@ -118,10 +142,13 @@ function tick(){
 
   if(!shopOpen){
   var mx=0,my=0;
-  if(keys['w']||keys['arrowup']||keys['w']||(mouse.down&&mouse.y<player.y-10))my=-1;
+  if(joy.active){mx=joy.dx;my=joy.dy}
+  else{
+  if(keys['w']||keys['arrowup']||(mouse.down&&mouse.y<player.y-10))my=-1;
   if(keys['s']||keys['arrowdown']||(mouse.down&&mouse.y>player.y+10))my=1;
   if(keys['a']||keys['arrowleft']||(mouse.down&&mouse.x<player.x-10))mx=-1;
   if(keys['d']||keys['arrowright']||(mouse.down&&mouse.x>player.x+10))mx=1;
+  }
   if(mx||my){var d=Math.hypot(mx,my);mx/=d;my/=d}
   
   var nx=player.x+mx*spd,ny=player.y+my*spd;
@@ -155,6 +182,7 @@ function tick(){
   
   // Gun: player has gun when carrying gems
   player.gun=player.gems>0;
+  document.getElementById('btnShoot').className=player.gun?'armed':'';
   player.gunCd=Math.max(0,player.gunCd-1);
   
   // Shoot shark (not from island, requires fresh click)
