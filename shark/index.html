@@ -6,6 +6,13 @@
 .wrap{height:100dvh;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
 .hud{display:flex;align-items:center;justify-content:center;gap:12px;font-size:14px;flex-shrink:0;padding:4px 12px;background:rgba(0,0,0,0.3);border-radius:8px;width:90%;max-width:600px}
 .hud span{color:#aaa}.hud b{color:#ffcc44}#msg{font-size:12px;color:#ff8844;font-weight:600;min-height:20px;line-height:20px;text-align:center;flex-shrink:0}
+.hp-bar{display:flex;align-items:center;gap:4px;min-width:80px}
+.hp-bar .icon{font-size:12px;flex-shrink:0}
+.hp-bar .track{flex:1;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;min-width:40px}
+.hp-bar .fill{height:100%;border-radius:4px;transition:width 0.3s}
+.hp-bar .fill.green{background:linear-gradient(90deg,#2a8,#4c6)}
+.hp-bar .fill.red{background:linear-gradient(90deg,#a22,#e44)}
+.hp-bar .val{font-size:10px;color:#aaa;min-width:24px;text-align:right}
 #c{max-width:95vw;max-height:70vh;border-radius:8px;touch-action:none;border:2px solid rgba(255,255,255,0.08);box-shadow:0 2px 20px rgba(0,0,0,0.4);cursor:crosshair}
 .back{color:#8888cc;text-decoration:none;font-size:14px;position:absolute;bottom:12px;left:12px;z-index:100;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:6px;transition:all 0.2s}
 .back:hover{background:rgba(100,100,200,0.2);color:#aaaaff}
@@ -25,7 +32,13 @@
 @media(min-width:768px){#joystick,#btnShoot{display:none}}
 </style>
 <div class="wrap">
-<div class="hud"><span>❤️</span><b id="hp">100</b><span>💎</span><b id="gems">0</b><span>🦈</span><b id="sharkhp">150</b><span>🏆</span><b id="score">0/30</b><button id="shopBtn" onclick="s_click()" style="background:rgba(100,80,40,0.3);border:1px solid #886644;color:#ffcc44;padding:2px 10px;border-radius:6px;cursor:pointer;font-size:13px;font-family:system-ui">🏪 商店</button></div>
+<div class="hud">
+<div class="hp-bar"><span class="icon">❤️</span><div class="track"><div id="hpFill" class="fill green" style="width:100%"></div></div><span id="hpVal" class="val">100</span></div>
+<div class="hp-bar"><span class="icon">🦈</span><div class="track"><div id="shFill" class="fill red" style="width:100%"></div></div><span id="shVal" class="val">150</span></div>
+<span>💎</span><b id="gems">0</b>
+<span>🏆</span><b id="score">0/30</b>
+<button id="shopBtn" onclick="s_click()" style="background:rgba(100,80,40,0.3);border:1px solid #886644;color:#ffcc44;padding:2px 10px;border-radius:6px;cursor:pointer;font-size:13px;font-family:system-ui">🏪 商店</button>
+</div>
 <div id="msg"></div>
 <canvas id="c"></canvas>
 <a class="back" href="/">← 返回</a><button id="restart" onclick="location.reload()">🔄 重开</button>
@@ -175,9 +188,13 @@ function updateJoy(e){
 }
 function doShoot(e){e.preventDefault();mouse._clicked=true;sfxResume()}
 function updateUI(){
-  document.getElementById('hp').textContent=Math.max(0,player.hp);
+  var php=Math.max(0,Math.round(player.hp/player.mhp*100));
+  var shp=Math.max(0,Math.round(shark.hp/shark.mhp*100));
+  document.getElementById('hpFill').style.width=php+'%';
+  document.getElementById('hpVal').textContent=Math.max(0,player.hp);
+  document.getElementById('shFill').style.width=shp+'%';
+  document.getElementById('shVal').textContent=Math.max(0,shark.hp);
   document.getElementById('gems').textContent=player.gems>0?'💎':'';
-  document.getElementById('sharkhp').textContent=Math.max(0,shark.hp);
   document.getElementById('score').textContent=score+'/30';
   var sb=document.getElementById('shopBtn');
   var nb=typeof nearBasket!=='undefined'&&nearBasket;
