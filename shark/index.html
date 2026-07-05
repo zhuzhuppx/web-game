@@ -96,7 +96,7 @@ function updateUI(){
 document.addEventListener('keydown',function(e){keys[e.key.toLowerCase()]=true});
 document.addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false});
 c.addEventListener('mousemove',function(e){var r=c.getBoundingClientRect();mouse.x=(e.clientX-r.left)*(W/r.width);mouse.y=(e.clientY-r.top)*(H/r.height)});
-c.addEventListener('mousedown',function(e){mouse.down=true;sfxResume()});
+c.addEventListener('mousedown',function(e){mouse.down=true;mouse._clicked=true;sfxResume()});
 c.addEventListener('mouseup',function(){mouse.down=false});
 c.addEventListener('touchmove',function(e){e.preventDefault();var r=c.getBoundingClientRect();mouse.x=(e.touches[0].clientX-r.left)*(W/r.width);mouse.y=(e.touches[0].clientY-r.top)*(H/r.height)});
 c.addEventListener('touchstart',function(e){e.preventDefault();mouse.down=true;sfxResume();var r=c.getBoundingClientRect();mouse.x=(e.touches[0].clientX-r.left)*(W/r.width);mouse.y=(e.touches[0].clientY-r.top)*(H/r.height)});
@@ -153,8 +153,8 @@ function tick(){
   player.gun=player.gems>0;
   player.gunCd=Math.max(0,player.gunCd-1);
   
-  // Shoot shark
-  if(player.gun&&player.gunCd<=0&&mouse.down&&shark.hp>0&&!onIsland){
+  // Shoot shark (not from island, requires fresh click)
+  if(player.gun&&player.gunCd<=0&&mouse._clicked&&shark.hp>0&&!onIsland){
     var dx=shark.x-player.x,dy=shark.y-player.y;
     var dd=Math.hypot(dx,dy);
     if(dd<250){ // shooting range
@@ -163,7 +163,8 @@ function tick(){
       if(typeof sfxPew==='function')sfxPew(0);
     }
   }
-  
+  mouse._clicked=false; // consume click
+
   // Bullets
   for(var i=bulletList.length-1;i>=0;i--){
     var b=bulletList[i];b.life--;
