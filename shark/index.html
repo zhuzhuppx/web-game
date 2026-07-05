@@ -105,14 +105,9 @@ c.addEventListener('touchend',function(){mouse.down=false});
 // === TICK ===
 function tick(){
   if(gameOver)return;
-  // Player movement
-  var mx=0,my=0;
-  if(keys['w']||keys['arrowup']||keys['w']||(mouse.down&&mouse.y<player.y-10))my=-1;
-  if(keys['s']||keys['arrowdown']||(mouse.down&&mouse.y>player.y+10))my=1;
-  if(keys['a']||keys['arrowleft']||(mouse.down&&mouse.x<player.x-10))mx=-1;
-  if(keys['d']||keys['arrowright']||(mouse.down&&mouse.x>player.x+10))mx=1;
-  if(mx||my){var d=Math.hypot(mx,my);mx/=d;my/=d}
-  
+  // Player movement (skip if shop open)
+  var shopOpen=document.getElementById('shop').style.display==='block';
+
   // Speed: slower in water
   var onIsland=dist(player,{x:ISLAND_X,y:ISLAND_Y})<ISLAND_R-player.radius;
   var basketDist=40;
@@ -120,6 +115,14 @@ function tick(){
   var inWater=!onIsland&&!nearBasket;
   var baseSpd=player.speed*(player.speedBoost>0?1.5:1);
   var spd=inWater?baseSpd*0.6:baseSpd;
+
+  if(!shopOpen){
+  var mx=0,my=0;
+  if(keys['w']||keys['arrowup']||keys['w']||(mouse.down&&mouse.y<player.y-10))my=-1;
+  if(keys['s']||keys['arrowdown']||(mouse.down&&mouse.y>player.y+10))my=1;
+  if(keys['a']||keys['arrowleft']||(mouse.down&&mouse.x<player.x-10))mx=-1;
+  if(keys['d']||keys['arrowright']||(mouse.down&&mouse.x>player.x+10))mx=1;
+  if(mx||my){var d=Math.hypot(mx,my);mx/=d;my/=d}
   
   var nx=player.x+mx*spd,ny=player.y+my*spd;
   // Clamp to bounds
@@ -132,6 +135,7 @@ function tick(){
       player.x=ISLAND_X+Math.cos(ang)*(ISLAND_R-player.radius);
       player.y=ISLAND_Y+Math.sin(ang)*(ISLAND_R-player.radius);
     }
+  }
   }
   
   // Collect gem on island (only 1 at a time)
