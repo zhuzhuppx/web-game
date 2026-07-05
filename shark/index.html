@@ -23,7 +23,7 @@
 var W=Math.min(800,window.innerWidth-20),H=Math.min(600,window.innerHeight-200);
 var c=document.getElementById('c'),ctx=c.getContext('2d');
 c.width=W;c.height=H;
-var ISLAND_X=W/2,ISLAND_Y=H/2-15,ISLAND_R=65;
+var ISLAND_X=W/2,ISLAND_Y=H/2-10,ISLAND_R=45;
 
 // === GAME STATE ===
 var player={x:W/2,y:H-60,hp:100,mhp:100,gems:0,speed:2.8,radius:14,gun:false,gunCd:0};
@@ -113,7 +113,7 @@ function tick(){
   player.gunCd=Math.max(0,player.gunCd-1);
   
   // Shoot shark
-  if(player.gun&&player.gunCd<=0&&mouse.down&&shark.hp>0){
+  if(player.gun&&player.gunCd<=0&&mouse.down&&shark.hp>0&&!onIsland){
     var dx=shark.x-player.x,dy=shark.y-player.y;
     var dd=Math.hypot(dx,dy);
     if(dd<250){ // shooting range
