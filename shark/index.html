@@ -24,7 +24,7 @@
 #shop .btn{display:block;width:100%;margin:6px 0;padding:8px 12px;background:rgba(100,80,40,0.4);border:1px solid #886644;border-radius:8px;color:#ddd;font-size:13px;cursor:pointer;font-family:system-ui;transition:all 0.2s;white-space:nowrap}
 #shop .btn:hover{background:rgba(180,140,60,0.4);color:#fff}
 #shop .btn:disabled{opacity:0.4;cursor:default}
-#shop .close{color:#888;background:none;border:none;font-size:16px;cursor:pointer;float:right;padding:0 4px}
+#shop .cat{color:#8ab4f8;font-size:11px;margin:10px 0 4px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:2px}
 #shop .close:hover{color:#fff}
 #joystick{position:absolute;bottom:50px;left:30px;width:100px;height:100px;background:rgba(255,255,255,0.08);border-radius:50%;border:2px solid rgba(255,255,255,0.15);z-index:150;touch-action:none}
 #joystick .knob{position:absolute;width:40px;height:40px;background:rgba(255,255,255,0.3);border-radius:50%;top:30px;left:30px;transition:transform 0.05s;pointer-events:none}
@@ -44,18 +44,22 @@
 <div id="msg"></div>
 <canvas id="c"></canvas>
 <a class="back" href="/">← 返回</a><button id="restart" onclick="location.reload()">🔄 重开</button>
-<div id="shop"><button class="close" onclick="document.getElementById('shop').style.display='none'">✕</button><h3>🏪 军事商店</h3><div id="shopScore" style="color:#ffcc44;font-size:12px;margin-bottom:8px">可用：0💎</div>
+<div id="shop"><button class="close" onclick="document.getElementById('shop').style.display='none'">✕</button><h3>🏪 军事商店</h3><div id="shopScore" style="color:#ffcc44;font-size:12px;margin-bottom:4px">可用：0💎</div>
+<div class="cat">🩹 补给</div>
 <button class="btn" id="btnHeal" onclick="buyHeal()">❤️ 血包 +50HP — 1💎</button>
+<button class="btn" id="btnShield" onclick="buyShield()">🛡️ 护盾 5秒无敌 — 2💎</button>
+<button class="btn" id="btnAdrenaline" onclick="buyAdrenaline()">💉 肾上腺素 8s无敌+神速 — 1💎</button>
+<button class="btn" id="btnSpeed" onclick="buySpeed()">⚡ 加速靴 20秒 — 1💎</button>
+<div class="cat">⚔️ 武器</div>
 <button class="btn" id="btnGun" onclick="buyGun()">🔫 强化武器 伤害+5 — 2💎</button>
+<button class="btn" id="btnScope" onclick="buyScope()">🎯 瞄准镜 射程翻倍 — 3💎</button>
 <button class="btn" id="btnKnife" onclick="buyKnife()">🔪 匕首(自动近战) — 2💎</button>
 <button class="btn" id="btnFlame" onclick="buyFlame()">🔥 喷火枪(近程灼烧) — 4💎</button>
-<button class="btn" id="btnScope" onclick="buyScope()">🎯 瞄准镜 射程翻倍 — 3💎</button>
-<button class="btn" id="btnAdrenaline" onclick="buyAdrenaline()">💉 肾上腺素 8s无敌+神速 — 1💎</button>
+<div class="cat">💣 爆破</div>
 <button class="btn" id="btnBomb" onclick="buyBomb()">💣 手雷 范围40伤 — 3💎</button>
-<button class="btn" id="btnMine" onclick="buyMine()">💥 水雷(鲨鱼触碰爆炸) — 2💎</button>
+<button class="btn" id="btnMine" onclick="buyMine()">💥 水雷(触碰爆炸) — 2💎</button>
 <button class="btn" id="btnTorpedo" onclick="buyTorpedo()">🚀 鱼雷(追踪50伤) — 3💎</button>
-<button class="btn" id="btnShield" onclick="buyShield()">🛡️ 护盾 5秒无敌 — 2💎</button>
-<button class="btn" id="btnSpeed" onclick="buySpeed()">⚡ 加速靴 20秒 — 1💎</button>
+<div class="cat">🚢 舰船</div>
 <button class="btn" id="btnBoat" onclick="buyBoat()">⛵ 炮艇(自动开炮) — 10💎</button>
 <button class="btn" id="btnShip" onclick="buyShip()">🚢 战舰(重炮+高血) — 10💎</button>
 <div style="color:#888;font-size:11px;margin-top:6px">靠近岸边篮子即可打开商店</div></div>
