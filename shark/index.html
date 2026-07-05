@@ -93,10 +93,8 @@ function msg(s,t){var el=document.getElementById('msg');el.textContent=s;if(t)se
 
 // === SHOP ===
 function openShop(){
-  if(score>0||player.gunDmg>8||player.speedBoost>0||player.hasKnife||player.hasFlame||player.hasScope||boatList.length>0||mineList.length>0){
-    document.getElementById('shop').style.display='block';
-    updateShopUI();
-  }
+  document.getElementById('shop').style.display='block';
+  updateShopUI();
 }
 function closeShop(){document.getElementById('shop').style.display='none'}
 function updateShopUI(){
