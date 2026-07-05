@@ -31,7 +31,8 @@
 <a class="back" href="/">← 返回</a><button id="restart" onclick="location.reload()">🔄 重开</button>
 <div id="shop"><button class="close" onclick="document.getElementById('shop').style.display='none'">✕</button><h3>🏪 宝石商店</h3><div id="shopScore" style="color:#ffcc44;font-size:12px;margin-bottom:8px">可用：0💎</div><button class="btn" id="btnHeal" onclick="buyHeal()">❤️ 血包 +50HP — 1💎</button><button class="btn" id="btnGun" onclick="buyGun()">🔫 强化武器 伤害+5 — 2💎</button><button class="btn" id="btnKnife" onclick="buyKnife()">🔪 匕首(自动近战) — 2💎</button><button class="btn" id="btnBomb" onclick="buyBomb()">💣 手雷 范围40伤 — 3💎</button><button class="btn" id="btnShield" onclick="buyShield()">🛡️ 护盾 5秒无敌 — 2💎</button><button class="btn" id="btnSpeed" onclick="buySpeed()">⚡ 加速靴 20秒 — 1💎</button>
 <button class="btn" id="btnBoat" onclick="buyBoat()">⛵ 炮艇(自动开炮) — 10💎</button>
-<button class="btn" id="btnShip" onclick="buyShip()">🚢 战舰(重炮+高血) — 20💎</button><div style="color:#888;font-size:11px;margin-top:6px">靠近岸边篮子即可打开商店</div></div>
+<button class="btn" id="btnShip" onclick="buyShip()">🚢 战舰(重炮+高血) — 10💎</button>
+<button class="btn" id="btnFlame" onclick="buyFlame()">🔥 喷火枪(近程灼烧) — 4💎</button><div style="color:#888;font-size:11px;margin-top:6px">靠近岸边篮子即可打开商店</div></div>
 <div id="joystick"><div class="knob" id="knob"></div></div>
 <button id="btnShoot" ontouchstart="doShoot(event)" onmousedown="doShoot(event)">🔫</button>
 </div>
@@ -43,7 +44,7 @@ c.width=W;c.height=H;
 var ISLAND_X=W/2,ISLAND_Y=H/2-10,ISLAND_R=45;
 
 // === GAME STATE ===
-var player={x:W/2,y:H-25,hp:100,mhp:100,gems:0,speed:2.8,radius:14,gun:false,gunCd:0,gunDmg:8,speedBoost:0,hasKnife:false,knifeCd:0,shieldTime:0};
+var player={x:W/2,y:H-25,hp:100,mhp:100,gems:0,speed:2.8,radius:14,gun:false,gunCd:0,gunDmg:8,speedBoost:0,hasKnife:false,knifeCd:0,shieldTime:0,hasFlame:false};
 var shark={x:W/2+120,y:H/2-50,hp:150,mhp:150,speed:1.0,radius:22,state:'patrol',targetX:0,targetY:0,atkCd:0,hunger:50};
 var gemList=[],bulletList=[],particleList=[],bloodList=[],fishList=[],foodList=[],boatList=[];
 var keys={},mouse={x:0,y:0,down:false};
@@ -81,7 +82,7 @@ function msg(s,t){var el=document.getElementById('msg');el.textContent=s;if(t)se
 
 // === SHOP ===
 function openShop(){
-  if(score>0||player.gunDmg>8||player.speedBoost>0||player.hasKnife||boatList.length>0){
+  if(score>0||player.gunDmg>8||player.speedBoost>0||player.hasKnife||player.hasFlame||boatList.length>0){
     document.getElementById('shop').style.display='block';
     updateShopUI();
   }
@@ -96,7 +97,8 @@ function updateShopUI(){
   document.getElementById('btnShield').disabled=score<2;
   document.getElementById('btnSpeed').disabled=score<1;
   document.getElementById('btnBoat').disabled=score<10;
-  document.getElementById('btnShip').disabled=score<20;
+  document.getElementById('btnShip').disabled=score<10;
+  document.getElementById('btnFlame').disabled=score<4||player.hasFlame;
 }
 function s_click(){
   var el=document.getElementById('shop');
@@ -117,9 +119,13 @@ function buyBoat(){
     msg('⛵ 炮艇出动！',2000);updateShopUI();updateUI()}
 }
 function buyShip(){
-  if(score>=20){score-=20;
+  if(score>=10){score-=10;
     boatList.push({x:W/2,y:H-50,hp:200,mhp:200,type:'ship',cannonCd:0,speed:1.0,targetX:0,targetY:0});
     msg('🚢 战舰下水！',2000);updateShopUI();updateUI()}
+}
+function buyFlame(){
+  if(score>=4&&!player.hasFlame){score-=4;player.hasFlame=true;
+    msg('🔥 喷火枪装备！靠近鲨鱼自动灼烧',2000);updateShopUI();updateUI()}
 }
 function buyKnife(){
   if(score>=2&&!player.hasKnife){score-=2;player.hasKnife=true;msg('🔪 匕首装备！靠近鲨鱼自动攻击',2000);updateShopUI();updateUI()}
@@ -299,6 +305,11 @@ function tick(){
       if(player.hasKnife&&player.knifeCd<=0&&dShark<shark.radius+player.radius+20&&shark.hp>0){
         shark.hp-=10;player.knifeCd=60;
         for(var j=0;j<3;j++)bloodList.push({x:shark.x,y:shark.y,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4-2,life:12});
+      }
+      // Flamethrower: burns shark when close
+      if(player.hasFlame&&dShark<shark.radius+player.radius+30&&shark.hp>0){
+        shark.hp-=3;
+        for(var j=0;j<2;j++)bloodList.push({x:shark.x+(Math.random()-0.5)*20,y:shark.y+(Math.random()-0.5)*20,vx:(Math.random()-0.5)*2,vy:-1-Math.random()*3,life:8,color:'#ff6600'});
       }
       if(dShark<shark.radius+player.radius+8&&shark.atkCd<=0){
         if(player.shieldTime>0){shark.atkCd=30} // shield blocks but shark still recoils
@@ -571,7 +582,8 @@ function draw(){
   // Blood particles
   for(var i=0;i<bloodList.length;i++){
     var p=bloodList[i];
-    ctx.fillStyle='rgba(255,60,40,'+(p.life/20)+')';ctx.beginPath();ctx.arc(p.x,p.y,2+p.life*0.1,0,Math.PI*2);ctx.fill();
+    var pc=p.color||'rgba(255,60,40,'+(p.life/20)+')';
+    ctx.fillStyle=pc;ctx.beginPath();ctx.arc(p.x,p.y,2+p.life*0.1,0,Math.PI*2);ctx.fill();
   }
   
   // Win overlay
