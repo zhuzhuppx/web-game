@@ -20,8 +20,8 @@
 #shop .close:hover{color:#fff}
 #joystick{position:absolute;bottom:50px;left:30px;width:100px;height:100px;background:rgba(255,255,255,0.08);border-radius:50%;border:2px solid rgba(255,255,255,0.15);z-index:150;touch-action:none}
 #joystick .knob{position:absolute;width:40px;height:40px;background:rgba(255,255,255,0.3);border-radius:50%;top:30px;left:30px;transition:transform 0.05s;pointer-events:none}
-#btnShoot{display:none;position:absolute;bottom:70px;right:30px;width:70px;height:70px;background:rgba(255,60,40,0.4);border-radius:50%;border:2px solid rgba(255,100,60,0.6);z-index:150;font-size:24px;color:#fff;touch-action:manipulation;cursor:pointer}
-#btnShoot.armed{display:flex;align-items:center;justify-content:center}
+#btnShoot{display:flex;align-items:center;justify-content:center;position:absolute;bottom:70px;right:30px;width:70px;height:70px;background:rgba(255,60,40,0.4);border-radius:50%;border:2px solid rgba(255,100,60,0.6);z-index:150;font-size:24px;color:#fff;touch-action:manipulation;cursor:pointer}
+#btnShoot.noWeapon{background:rgba(100,100,100,0.3);border-color:rgba(150,150,150,0.4)}
 @media(min-width:768px){#joystick,#btnShoot{display:none}}
 </style>
 <div class="wrap">
@@ -272,11 +272,12 @@ function tick(){
   
   // Gun: player has gun when carrying gems
   player.gun=player.gems>0;
-  document.getElementById('btnShoot').className=player.gun?'armed':'';
+  document.getElementById('btnShoot').className=player.gun?'':'noWeapon';
   player.gunCd=Math.max(0,player.gunCd-1);
   
   // Shoot shark (not from island, requires fresh click)
-  if(player.gun&&player.gunCd<=0&&mouse._clicked&&shark.hp>0&&!onIsland){
+  if(mouse._clicked&&shark.hp>0&&!onIsland){
+    if(player.gun&&player.gunCd<=0){
     var dx=shark.x-player.x,dy=shark.y-player.y;
     var dd=Math.hypot(dx,dy);
     if(dd<(player.hasScope?500:250)){ // shooting range
@@ -284,6 +285,7 @@ function tick(){
       player.gunCd=10;
       if(typeof sfxPew==='function')sfxPew(0);
     }
+    }else{msg('🔫 需要先拿到宝石才能开枪',1500)}
   }
   mouse._clicked=false; // consume click
 
@@ -416,11 +418,17 @@ function tick(){
     ch.timer--;
     // Player collects unlocked chest
     if(ch.unlocked&&dist(player,ch)<player.radius+20){
-      var loot=Math.floor(Math.random()*4);
+      var loot=Math.floor(Math.random()*10);
       if(loot===0){player.gunDmg=Math.min(30,player.gunDmg+8);msg('🔫 武器箱！伤害+8',2000)}
       else if(loot===1){player.speed+=0.3;msg('⚡ 速度药剂！永久+0.3',2000)}
       else if(loot===2){player.hp=player.mhp;msg('❤️ 满血复活！',2000)}
-      else{score+=3;msg('💎 获得3颗宝石！',2000)}
+      else if(loot===3){score+=3;msg('💎 获得3颗宝石！',2000)}
+      else if(loot===4){player.hasScope=true;msg('🎯 瞄准镜！射程翻倍',2000)}
+      else if(loot===5){torpedoList.push({x:player.x,y:player.y-20,vx:0,vy:0,life:300});msg('🚀 获得鱼雷！自动追踪',2000)}
+      else if(loot===6){player.adrenaline=240;msg('💉 肾上腺素！8秒无敌+神速',2000)}
+      else if(loot===7){mineList.push({x:player.x,y:player.y,life:900});msg('💥 获得水雷！已自动布设',2000)}
+      else if(loot===8){score+=2;player.gunDmg=Math.min(30,player.gunDmg+4);msg('🏹 弓箭包！伤害+4 +2💎',2000)}
+      else{boatList.push({x:W/2,y:H-40,hp:80,mhp:80,type:'boat',cannonCd:0,speed:1.5,targetX:0,targetY:0});msg('⛵ 宝箱开出炮艇！',2000)}
       chestList.splice(ci,1);updateUI();
     }
     // Expired
