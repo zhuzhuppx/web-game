@@ -412,7 +412,7 @@ async function send(){
     var codeMatch=reply.match(/```html\s*\n([\s\S]*?)\n\s*```/);
     // 兜底：如果上面没匹配到但有 ```，尝试更宽松的匹配
     if(!codeMatch){codeMatch=reply.match(/```html\s*\n?([\s\S]*?)```/)}
-    if(codeMatch){
+    if(codeMatch && codeMatch[1].trim()){
       gameCode=codeMatch[1];
       version++;
       if(!gameStarted){gameStarted=true;
