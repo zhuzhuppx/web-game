@@ -117,7 +117,7 @@ var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，专门帮儿童设计和开
 async function init(){
   try{
     var r=await fetch('/api/me');var d=await r.json();
-    if(!d.loggedIn){location.href='/platform/login.html';return}
+    if(!d.loggedIn){location.href='/login';return}
     username=d.username;
     document.getElementById('usernameLabel').textContent='👤 '+username+' 的工作台';
     var cr=await fetch('/api/config');var cd=await cr.json();
@@ -266,7 +266,7 @@ function toggleList(){
 
 async function logout(){
   await fetch('/api/logout',{method:'POST'});
-  location.href='/platform/login.html';
+  location.href='/login';
 }
 </script>
 </html>

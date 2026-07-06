@@ -20,10 +20,15 @@ function hash(pw){return crypto.createHash('sha256').update(pw+SALT).digest('hex
 var app=express();
 app.use(express.json({limit:'2mb'}));
 app.use(cookieParser());
-app.get('/', function(req,res){res.redirect('/platform/')});
-app.get('/platform/', function(req,res){
+app.get('/', function(req,res){
   var html=fs.readFileSync(path.resolve(__dirname,'workspace.html'),'utf8');
   res.type('html').send(html);
+});
+app.get('/login', function(req,res){
+  res.type('html').send(fs.readFileSync(path.join(__dirname,'login.html'),'utf8'));
+});
+app.get('/admin', function(req,res){
+  res.type('html').send(fs.readFileSync(path.join(__dirname,'admin.html'),'utf8'));
 });
 app.get('/api/config', function(req,res){
   res.json({apiKey:process.env.DEEPSEEK_API_KEY_GAME||''});
@@ -168,5 +173,5 @@ app.get('/api/stats',requireAdmin,function(req,res){
 });
 
 app.listen(PORT,function(){
-  console.log('平台运行: http://localhost:'+PORT+'/platform/');
+  console.log('AI 游戏工坊: http://studio.2u1.cn ← http://localhost:'+PORT);
 });

@@ -85,7 +85,7 @@ async function submit(){
     if(!r.ok){err.textContent=d.error;return}
     if(isRegister){info.textContent='注册成功！正在跳转...'}
     else{info.textContent='登录成功！正在跳转...'}
-    setTimeout(function(){window.location.href=d.username?'/platform/index.html':'/platform/'},600);
+    setTimeout(function(){window.location.href='/'},600);
   }catch(e){err.textContent='网络错误，请重试'}
 }
 </script>
