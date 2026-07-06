@@ -695,22 +695,29 @@ function closePlay(){
 
 function editCurrentGame(){
   closePlay();
+  if(!_editingGame)return;
+  // 先设置游戏状态，再切换视图，避免 enterWorkspace 重置
+  gameCode=_editingGame.html;
+  gameTitle=_editingGame.title;
+  version=_editingGame.version||1;
+  gameStarted=true;
+  document.getElementById('gameName').textContent=gameTitle;
+  document.getElementById('gameVer').textContent='🔄 第'+version+'次迭代';
+  var frame=document.getElementById('previewFrame');
+  frame.srcdoc='';setTimeout(function(){frame.srcdoc=gameCode},50);
+  document.getElementById('topPreviewBtn').style.display='inline-block';
+
   enterWorkspace();
-  if(_editingGame){
-    gameCode=_editingGame.html;
-    gameTitle=_editingGame.title;
-    version=_editingGame.version||1;
-    gameStarted=true;
-    document.getElementById('gameName').textContent=gameTitle;
-    document.getElementById('gameVer').textContent='🔄 第'+version+'次迭代';
-    var frame=document.getElementById('previewFrame');
-    frame.srcdoc='';setTimeout(function(){frame.srcdoc=gameCode},50);
-    document.getElementById('topPreviewBtn').style.display='inline-block';
-    messages=[{role:'user',content:'我想优化「'+gameTitle+'」'}];
-    turnCount=0;
-    addMsg('📂 继续创作「'+gameTitle+'」',false);
-    addMsg('好的！你想给「'+gameTitle+'」加什么新功能？或者改什么？',false);
-  }
+
+  // 清旧消息，设新上下文（把当前代码发给 AI）
+  document.getElementById('msgs').innerHTML='';
+  messages=[
+    {role:'user',content:'这是「'+gameTitle+'」的当前代码：\n```html\n'+gameCode+'\n```'},
+    {role:'assistant',content:'了解了！你想给「'+gameTitle+'」做什么改进？'}
+  ];
+  turnCount=0;
+  addMsg('📂 继续创作「'+gameTitle+'」',false);
+  addMsg('了解了！你想给这个游戏做什么改进？',false);
 }
 
 function deleteFromLobby(title){
