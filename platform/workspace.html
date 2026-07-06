@@ -620,8 +620,7 @@ async function send(){
       var frame=document.getElementById('previewFrame');
       frame.srcdoc=''; // 先清空
       setTimeout(function(){frame.srcdoc=gameCode},50); // 再赋值确保刷新
-      document.getElementById('topPreviewBtn').style.display='inline-block';
-      // 首次生成或有新代码时自动打开预览
+      // 有新代码时自动打开预览
       openPreview();
     }
     // 完整显示 AI 回复
@@ -780,7 +779,6 @@ async function loadGame(id,title){
     document.getElementById('gameVer').textContent='🔄 第'+version+'次迭代';
     var frame=document.getElementById('previewFrame');
     frame.srcdoc='';setTimeout(function(){frame.srcdoc=gameCode},50);
-    document.getElementById('topPreviewBtn').style.display='inline-block';
     gameStarted=true;
     addMsg('📂 已加载存档「'+gameTitle+'」，可以继续优化或预览！',false);
   }catch(e){alert('加载失败')}
@@ -956,7 +954,6 @@ function editCurrentGame(){
   document.getElementById('gameVer').textContent='🔄 第'+version+'次迭代';
   var frame=document.getElementById('previewFrame');
   frame.srcdoc='';setTimeout(function(){frame.srcdoc=gameCode},50);
-  document.getElementById('topPreviewBtn').style.display='inline-block';
 
   enterWorkspace();
 
