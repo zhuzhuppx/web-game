@@ -315,7 +315,32 @@ async function send(){
     }
   }catch(e){
     var el=document.getElementById('typing');if(el)el.remove();
-    addMsg('网络出错了，再试一次吧～',false);
+    var errDiv=document.createElement('div');
+    errDiv.className='msg ai';
+    errDiv.innerHTML='网络出错了 😣 <button onclick="retryLast()" style="margin-left:6px;padding:4px 10px;border-radius:12px;border:1px solid #555;background:#333;color:#fff;cursor:pointer;font-size:12px;font-family:system-ui">🔄 再试一次</button>';
+    document.getElementById('msgs').appendChild(errDiv);
+    document.getElementById('msgs').scrollTop=document.getElementById('msgs').scrollHeight;
+  }
+}
+
+function retryLast(){
+  // 撤销出错的那条用户消息，重新发送
+  if(messages.length>0){
+    var last=messages[messages.length-1];
+    if(last.role==='user'){
+      messages.pop();
+      turnCount--;
+      // 移除最后两条消息（用户+错误）
+      var msgs=document.getElementById('msgs');
+      var children=msgs.querySelectorAll('.msg');
+      for(var i=children.length-1;i>=0;i--){
+        if(children[i].classList.contains('user')||children[i].textContent.includes('网络出错了')){
+          children[i].remove();
+        }else{break}
+      }
+      document.getElementById('input').value=last.content;
+      send();
+    }
   }
 }
 
