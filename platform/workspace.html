@@ -573,6 +573,13 @@ async function send(){
       var m=reply.match(/(<!DOCTYPE html[\s\S]*<\/html>)/i);
       if(m)codeMatch=[m[0],m[1]];
     }
+    // 终极兜底：如果回复本身就是一个完整的HTML文档
+    if(!codeMatch){
+      var trimmed=reply.trim();
+      if(/^\s*<(!DOCTYPE|html)/i.test(trimmed) && /<\/html>\s*$/i.test(trimmed)){
+        codeMatch=[trimmed,trimmed];
+      }
+    }
     if(codeMatch && codeMatch[1].trim()){
       if(codeMatch[1].trim().length<50){codeMatch=null}
     }
@@ -724,16 +731,23 @@ async function doSave(){
   if(!name)return;
   gameTitle=name;
   document.getElementById('gameName').textContent=gameTitle;
-  // 始终从 iframe 取最新代码，避免 gameCode 变量是旧值
-  var html=document.getElementById('previewFrame').srcdoc;
-  console.log('💾 doSave: iframe srcdoc长度='+(html?html.length:0)+', gameCode长度='+(gameCode?gameCode.length:0)+', gameId='+gameId+', version='+version);
-  if(!html||html.length<50)html=gameCode;
-  if(!html||html.length<50){alert('还没有生成游戏呢');return}
+  // 始终从 iframe 取最新代码
+  var frame=document.getElementById('previewFrame');
+  // 先尝试 srcdoc，如果为空则尝试 contentDocument
+  var html=(frame.srcdoc||'').trim();
+  if(!html || html.length<50){
+    try{
+      var doc=frame.contentDocument||frame.contentWindow.document;
+      html=doc.documentElement.outerHTML;
+    }catch(e){}
+  }
+  if(!html || html.length<50)html=gameCode;
+  if(!html || html.length<50){alert('⚠️ 还没有生成游戏呢，先去聊天做游戏吧！');return}
   try{
     var r=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:gameTitle,html:html,id:gameId,version:version})});
     var d=await r.json();
-    if(d.ok){closeSave();gameSaved=true;gameId=d.id;SFX.success();alert('保存成功！✌️')}else{SFX.fail();alert('保存失败：'+d.error)}
-  }catch(e){SFX.fail();alert('保存失败')}
+    if(d.ok){closeSave();gameSaved=true;gameId=d.id;SFX.success();alert('✅ 保存成功！✌️\n版本：'+d.ver)}else{SFX.fail();alert('❌ 保存失败：'+(d.error||'未知错误'))}
+  }catch(e){SFX.fail();alert('❌ 保存失败：网络错误')}
 }
 
 async function loadGameList(){
