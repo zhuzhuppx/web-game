@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>登录 · 游戏工坊</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui;background:#0f0f0f;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#1a1a1a;border:1px solid #222;border-radius:16px;padding:32px;width:360px;max-width:90vw}
+.card h1{font-size:24px;color:#fff;margin-bottom:4px}
+.card .sub{font-size:13px;color:#666;margin-bottom:24px}
+label{display:block;font-size:12px;color:#888;margin-bottom:4px;margin-top:12px}
+input{width:100%;padding:10px 14px;border-radius:8px;border:1px solid #333;background:#2a2a2a;color:#fff;font-size:14px;outline:none;font-family:system-ui}
+input:focus{border-color:#667eea}
+button{width:100%;padding:12px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:600;margin-top:20px;transition:all 0.2s}
+.btn-primary{background:#4a6cf7;color:#fff}
+.btn-primary:hover{background:#5a7cf7}
+.btn-secondary{background:#2a2a2a;color:#aaa;margin-top:8px}
+.btn-secondary:hover{background:#333}
+.err{color:#ff4444;font-size:12px;margin-top:8px;min-height:18px}
+.toggle{text-align:center;margin-top:16px;font-size:13px;color:#666}
+.toggle a{color:#88aaff;cursor:pointer;text-decoration:none}
+.toggle a:hover{text-decoration:underline}
+.info{text-align:center;color:#44cc66;font-weight:600;margin-top:8px;min-height:18px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🎮 游戏工坊</h1>
+  <div class="sub" id="modeTitle">登录你的账号</div>
+
+  <label>用户名</label>
+  <input type="text" id="username" placeholder="输入用户名" onkeydown="if(event.key==='Enter')submit()">
+
+  <label>密码</label>
+  <input type="password" id="password" placeholder="输入密码" onkeydown="if(event.key==='Enter')submit()">
+
+  <div id="confirmLabel" style="display:none">
+    <label>确认密码</label>
+    <input type="password" id="confirmPwd" placeholder="再次输入密码" onkeydown="if(event.key==='Enter')submit()">
+  </div>
+
+  <div class="err" id="errMsg"></div>
+  <div class="info" id="infoMsg"></div>
+
+  <button class="btn-primary" id="submitBtn" onclick="submit()">登录</button>
+  <div class="toggle">
+    <span id="toggleText">没有账号？</span>
+    <a id="toggleLink" onclick="toggleMode()">注册</a>
+  </div>
+</div>
+
+<script>
+var isRegister=false;
+function toggleMode(){
+  isRegister=!isRegister;
+  document.getElementById('modeTitle').textContent=isRegister?'创建新账号':'登录你的账号';
+  document.getElementById('submitBtn').textContent=isRegister?'注册':'登录';
+  document.getElementById('toggleText').textContent=isRegister?'已有账号？':'没有账号？';
+  document.getElementById('toggleLink').textContent=isRegister?'登录':'注册';
+  document.getElementById('confirmLabel').style.display=isRegister?'block':'none';
+  document.getElementById('errMsg').textContent='';
+  document.getElementById('infoMsg').textContent='';
+}
+
+async function submit(){
+  var u=document.getElementById('username').value.trim();
+  var p=document.getElementById('password').value;
+  var err=document.getElementById('errMsg');
+  var info=document.getElementById('infoMsg');
+  err.textContent='';info.textContent='';
+
+  if(!u||!p){err.textContent='请填写用户名和密码';return}
+  if(isRegister&&p!==document.getElementById('confirmPwd').value){
+    err.textContent='两次密码不一致';return
+  }
+
+  try{
+    var r=await fetch(isRegister?'/api/register':'/api/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:u,password:p})
+    });
+    var d=await r.json();
+    if(!r.ok){err.textContent=d.error;return}
+    if(isRegister){info.textContent='注册成功！正在跳转...'}
+    else{info.textContent='登录成功！正在跳转...'}
+    setTimeout(function(){window.location.href=d.username?'/platform/index.html':'/platform/'},600);
+  }catch(e){err.textContent='网络错误，请重试'}
+}
+</script>
+</body>
+</html>

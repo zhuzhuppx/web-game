@@ -1,10 +1,16 @@
 {
-  "name": "game-platform",
+  "name": "platform",
   "version": "1.0.0",
-  "private": true,
-  "scripts": { "start": "node server.js" },
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "cookie-parser": "^1.4.6"
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1"
   }
 }

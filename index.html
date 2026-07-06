@@ -69,6 +69,8 @@
 
   header nav a:hover { background: rgba(255,255,255,0.05); color: #fff; }
   header nav a.active { background: rgba(136,68,255,0.2); color: #b388ff; }
+  .ai-link{color:#ffcc44!important;background:rgba(255,200,60,0.08)!important;border:1px solid rgba(255,200,60,0.2);margin-left:auto}
+  .ai-link:hover{background:rgba(255,200,60,0.15)!important;color:#ffdd66!important}
 
   /* 搜索栏 */
   .search-section {
@@ -377,6 +379,7 @@
     <a href="#" onclick="return switchView('grid',this)" class="active">全部</a>
     <a href="#" onclick="return switchView('cat',this)">分类</a>
     <a href="#" onclick="return switchView('about',this)">关于</a>
+    <a href="/platform/" class="ai-link">🤖 AI 游戏工坊</a>
   </nav>
   <button onclick="sfxToggle();this.textContent=sfxMuted?'🔇':'🔊'" style="position:fixed;bottom:16px;right:16px;z-index:999;width:40px;height:40px;border:none;border-radius:50%;background:rgba(255,255,255,0.06);color:#8888bb;font-size:18px;cursor:pointer">🔊</button>
 </header>
