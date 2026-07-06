@@ -11,6 +11,8 @@ body{display:flex;flex-direction:column}
 .topbar .btn-save:hover{background:rgba(100,200,100,0.25)}
 .topbar .btn-logout{background:rgba(255,255,255,0.06);color:#888}
 .topbar .btn-logout:hover{background:rgba(255,255,255,0.1);color:#aaa}
+.topbar .btn-settings{background:rgba(255,255,255,0.06);color:#888;font-size:16px;padding:4px 8px}
+.topbar .btn-settings:hover{background:rgba(255,255,255,0.1);color:#aaa}
 .topbar .btn-preview{background:rgba(74,108,247,0.2);color:#88aaff;margin-left:4px}
 .topbar .btn-preview:hover{background:rgba(74,108,247,0.35)}
 .main{flex:1;display:flex;overflow:hidden;position:relative}
@@ -89,6 +91,7 @@ body{display:flex;flex-direction:column}
   <div class="btns">
     <button class="btn-preview" id="topPreviewBtn" onclick="openPreview()" style="display:none">👁️ 预览游戏</button>
     <button class="btn-save" onclick="openSave()">💾 保存</button>
+    <button class="btn-settings" onclick="openSettings()">⚙️</button>
     <button class="btn-logout" onclick="logout()">🚪 退出</button>
   </div>
 </div>
@@ -140,6 +143,23 @@ body{display:flex;flex-direction:column}
 </div>
 </div>
 
+<div class="save-popup" id="settingsPopup">
+  <div class="box" style="width:360px">
+    <h3>⚙️ DeepSeek API Key</h3>
+    <p style="font-size:12px;color:#888;margin-bottom:10px;line-height:1.6">
+      🔐 你的 Key 只存在浏览器本地（localStorage），</p>
+    <p style="font-size:12px;color:#888;margin-bottom:10px;line-height:1.6">绝不经过服务器，绝不用于其他用途。</p>
+    <p style="font-size:11px;color:#555;margin-bottom:12px">
+      没有 Key？去 <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:#4a6cf7">platform.deepseek.com</a> 免费注册获取
+    </p>
+    <input type="password" id="settingsKey" placeholder="sk-..." style="width:100%;padding:10px;border-radius:8px;border:1px solid #333;background:#252525;color:#fff;font-size:13px;outline:none;font-family:system-ui;margin-bottom:12px">
+    <div class="btns">
+      <button class="btn-confirm" onclick="saveSettings()">💾 保存</button>
+      <button class="btn-cancel" onclick="closeSettings()">取消</button>
+    </div>
+  </div>
+</div>
+
 <div class="save-popup" id="savePopup">
   <div class="box">
     <h3>💾 保存游戏</h3>
@@ -186,8 +206,14 @@ async function init(){
     if(!d.loggedIn){location.href='/login';return}
     username=d.username;
     document.getElementById('usernameLabel').textContent='👤 '+username+' 的工作台';
-    var cr=await fetch('/api/config');var cd=await cr.json();
-    DS_KEY=cd.apiKey;
+
+    // 优先用 localStorage 的 key
+    DS_KEY=localStorage.getItem('dsGameKey')||'';
+    if(!DS_KEY){
+      var cr=await fetch('/api/config');var cd=await cr.json();
+      DS_KEY=cd.apiKey||'';
+    }
+
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='flex';
     loadGameList();
@@ -237,6 +263,7 @@ function closePreview(){
 
 async function send(){
   window._cancelled=false;
+  if(!DS_KEY){addMsg('⚠️ 请先设置 DeepSeek API Key，点击右上角 ⚙️',false);return;}
   var input=document.getElementById('input');
   var text=input.value.trim();
   if(!text||turnCount>=maxTurns)return;
@@ -430,6 +457,20 @@ function toggleList(){document.getElementById('gamelist').classList.toggle('show
 
 function logout(){
   fetch('/api/logout',{method:'POST'}).then(function(){location.href='/login'});
+}
+
+function openSettings(){
+  document.getElementById('settingsKey').value=DS_KEY||'';
+  document.getElementById('settingsPopup').classList.add('show');
+  document.getElementById('settingsKey').focus();
+}
+function closeSettings(){document.getElementById('settingsPopup').classList.remove('show')}
+function saveSettings(){
+  var k=document.getElementById('settingsKey').value.trim();
+  if(k){localStorage.setItem('dsGameKey',k);DS_KEY=k}
+  else{localStorage.removeItem('dsGameKey');DS_KEY=''}
+  closeSettings();
+  if(!DS_KEY){alert('⚠️ 未设置 Key，AI 功能不可用')}
 }
 </script>
 </body></html>
