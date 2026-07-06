@@ -121,11 +121,13 @@ app.get('/play/:ucode/:gcode',function(req,res){
   if(!row)return res.status(404).send('游戏不存在');
   var author=row.username,title=row.title;
   var credit='<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'+
-    'background:rgba(0,0,0,0.85);padding:14px 16px;font-family:system-ui;pointer-events:none;'+
-    'display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(255,255,255,0.08)">'+
-    '<span style="font-size:20px">🎮</span>'+
-    '<div style="flex:1"><div style="color:#fff;font-size:16px;font-weight:700">'+title+'</div>'+
-    '<div style="color:#aaa;font-size:12px;margin-top:2px">👤 '+author+' &nbsp;|&nbsp; 🏭 AI 游戏工坊</div></div></div>';
+    'background:rgba(0,0,0,0.85);padding:12px 16px;font-family:system-ui;'+
+    'display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08)">'+
+    '<div style="display:flex;align-items:center;gap:10px;pointer-events:none">'+
+    '<span style="font-size:22px">🎮</span>'+
+    '<span style="color:#fff;font-size:15px;font-weight:700">'+title+'</span></div>'+
+    '<a href="https://studio.2u1.cn" target="_blank" style="text-decoration:none;color:#aaa;font-size:12px;display:flex;align-items:center;gap:4px">'+
+    '👤 '+author+' <span style="color:#4a6cf7">🏭 AI 游戏工坊</span></a></div>';
   var wrapper='<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">'+
     '<title>'+title+' - '+author+' - AI 游戏工坊</title>'+
