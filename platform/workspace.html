@@ -342,6 +342,8 @@ function cancelSend(){
   }
   window._cancelled=true;
 }
+
+function retryLast(){
   // 撤销出错的那条用户消息，重新发送
   if(messages.length>0){
     var last=messages[messages.length-1];
