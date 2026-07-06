@@ -720,7 +720,7 @@ function buildLobby(){
       var card=document.createElement('div');
       card.className='lobby-card';
       var icons=['🎮','🚀','👾','🐍','🏃','💎','🎯','⚔️','🌟','🎪'];
-      var icon=icons[Math.floor(Math.random()*icons.length)];
+      var icon=icons[g.id.charCodeAt(g.id.length-1)%icons.length];
       card.innerHTML='<button class="card-del" title="删除">🗑️</button>'+
         '<div class="card-icon">'+icon+'</div>'+
         '<div class="card-title">'+g.title+'</div>'+
