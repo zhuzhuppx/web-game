@@ -120,17 +120,16 @@ app.get('/play/:ucode/:gcode',function(req,res){
   `).get(req.params.ucode, req.params.gcode);
   if(!row)return res.status(404).send('游戏不存在');
   var author=row.username,title=row.title;
-  var credit='<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'+
-    'background:linear-gradient(180deg,rgba(0,0,0,0.8) 0%,rgba(0,0,0,0.4) 70%,transparent 100%);'+
-    'padding:10px 16px;font-family:system-ui;pointer-events:none;animation:fadeCredit 2s 3s forwards">'+
-    '<div style="color:#fff;font-size:16px;font-weight:700">🎮 '+title+'</div>'+
-    '<div style="color:#aaa;font-size:12px">创作者：'+author+' · AI 游戏工坊</div></div>'+
-    '<style>@keyframes fadeCredit{to{opacity:0}}#credit{animation:fadeCredit 2s 3s forwards}</style>';
+  var credit='<div style="position:fixed;bottom:12px;right:12px;z-index:9999;'+
+    'background:rgba(0,0,0,0.7);border-radius:12px;padding:8px 14px;font-family:system-ui;'+
+    'pointer-events:none;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)">'+
+    '<div style="color:#fff;font-size:14px;font-weight:600;margin-bottom:2px">🎮 '+title+'</div>'+
+    '<div style="color:#999;font-size:11px">👤 '+author+' · AI 游戏工坊</div></div>';
   var wrapper='<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">'+
     '<title>'+title+' - '+author+' - AI 游戏工坊</title>'+
     '<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;overflow:hidden;background:#000}'+
-    'canvas{display:block}@keyframes fadeCredit{to{opacity:0}}</style></head><body>'+credit;
+    'canvas{display:block}</style></head><body>'+credit;
   res.send(row.html.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'').replace(/<head>[\s\S]*?<\/head>/i,function(m){
     return wrapper+m.replace(/<\/head>/i,'');
   }));
