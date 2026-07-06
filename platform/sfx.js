@@ -6,8 +6,13 @@ var SFX = (function(){
   var bgmNode = null, bgmGain = null, bgmOn = false;
 
   function getCtx(){
-    if(!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)(); }
-    if(ctx.state==='suspended'){ ctx.resume(); }
+    if(!ctx){
+      try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }
+      catch(e){ console.warn('SFX: AudioContext not available'); return null; }
+    }
+    if(ctx && ctx.state==='suspended'){
+      ctx.resume().catch(function(){});
+    }
     return ctx;
   }
 
@@ -21,8 +26,11 @@ var SFX = (function(){
   }
 
   function playBuf(buf,opt){
+    if(!enabled)return;
     opt=opt||{};
-    var c=getCtx(), s=c.createBufferSource();
+    var c=getCtx();if(!c)return;
+    var s=c.createBufferSource();
+    var s=c.createBufferSource();
     s.buffer=buf;
     var g=c.createGain();
     g.gain.value=(opt.vol!=null?opt.vol:1)*volume;
@@ -35,8 +43,10 @@ var SFX = (function(){
   }
 
   function tone(freq,dur,type,opt){
+    if(!enabled)return;
     opt=opt||{};
-    var c=getCtx(), o=c.createOscillator();
+    var c=getCtx();if(!c)return;
+    var o=c.createOscillator();
     o.type=type||'square';
     o.frequency.value=freq;
     var g=c.createGain();
