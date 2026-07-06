@@ -849,6 +849,7 @@ function backToLobby(){
     var ok=confirm('你有未保存的游戏「'+gameTitle+'」，是否保存后再返回？');
     if(ok){openSave();return}
   }
+  closePreview();
   document.getElementById('viewWorkspace').classList.remove('show');
   document.getElementById('viewLobby').classList.add('show');
   document.getElementById('btnNewGameTop').style.display='inline-block';
@@ -857,7 +858,6 @@ function backToLobby(){
   document.getElementById('btnSaveTop').style.display='none';
   document.getElementById('btnSettingsTop').style.display='inline-block';
   document.getElementById('btnLogoutTop').style.display='inline-block';
-  closePreview();
   buildLobby();
   // 重置状态，下次新建游戏是干净的
   gameStarted=false;gameCode='';gameSaved=false;version=0;gameId='';
