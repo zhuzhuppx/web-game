@@ -217,9 +217,9 @@ body{display:flex;flex-direction:column}
     <p style="font-size:11px;color:#555;margin:8px 0">
       🔐 Key 只存在你的浏览器里，服务器看不到
     </p>
-    <div style="position:relative;margin-bottom:12px">
-      <input type="password" id="settingsKey" placeholder="sk-..." style="width:100%;padding:10px 36px 10px 10px;border-radius:8px;border:1px solid #333;background:#252525;color:#fff;font-size:13px;outline:none;font-family:system-ui">
-      <button onclick="toggleKeyEye()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#666;cursor:pointer;font-size:16px;padding:4px" id="keyEye">👁️</button>
+    <div style="display:flex;align-items:center;margin-bottom:12px;background:#252525;border:1px solid #333;border-radius:8px;padding-right:6px">
+      <input type="password" id="settingsKey" placeholder="sk-..." style="flex:1;padding:10px;border:none;background:none;color:#fff;font-size:13px;outline:none;font-family:system-ui;min-width:0">
+      <button onclick="toggleKeyEye()" style="background:none;border:none;color:#666;cursor:pointer;font-size:16px;padding:4px 6px;line-height:1" id="keyEye">👁️</button>
     </div>
     <div class="btns">
       <button class="btn-confirm" onclick="saveSettings()">💾 保存</button>
@@ -382,8 +382,18 @@ async function send(){
     var codeMatch=reply.match(/```html\n?([\s\S]*?)```/);
     if(codeMatch){
       gameCode=codeMatch[1];
-      if(!gameStarted){gameStarted=true;gameTitle=text.slice(0,20)}
-      version++;
+      if(!gameStarted){gameStarted=true;
+        // 自动取名：摘用户第一个消息的关键词
+        var firstMsg=messages.find(function(m){return m.role==='user'});
+        var raw=firstMsg?firstMsg.content:text;
+        var words=raw.match(/[\u4e00-\u9fa5]{2,}|[a-zA-Z]{3,}/g)||[];
+        // 过滤无意义词
+        var skip={'我想做':1,'我想要':1,'帮我做':1,'一个':1,'游戏':1,'我想':1,'做个':1,'做一个':1};
+        words=words.filter(function(w){return !skip[w]});
+        gameTitle=words.slice(0,3).join('')||'我的游戏';
+        if(gameTitle.length>12)gameTitle=gameTitle.slice(0,12);
+        document.getElementById('gameName').textContent=gameTitle;
+      }
       document.getElementById('gameName').textContent=gameTitle;
       document.getElementById('gameVer').textContent='🔄 第'+version+'次迭代';
       var frame=document.getElementById('previewFrame');
