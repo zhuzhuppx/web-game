@@ -1,112 +1,172 @@
-// DeepSeek proxy for AI 游戏工坊
-const http = require('http');
-const https = require('https');
+const express = require('express');
+const cookieParser = require('cookie-parser');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
-const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY_GAME;
-const MODEL = 'deepseek-chat';
 const PORT = 8765;
+const DATA_DIR = path.join(__dirname, 'data');
+const GAMES_DIR = path.join(DATA_DIR, 'games');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-const SYSTEM_PROMPT = `你是"游戏工坊"的AI助手，专门帮儿童设计和开发网页小游戏。
+// Ensure directories exist
+[DATA_DIR, GAMES_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '{}');
+function readUsers() { return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); }
+function writeUsers(u) { fs.writeFileSync(USERS_FILE, JSON.stringify(u, null, 2)); }
 
-你的规则：
-1. 只能做游戏相关的事。如果有人问其他问题，回复："我只会做游戏哦～说说你想做什么游戏吧！"
-2. 游戏必须是单文件 HTML（含 CSS + Canvas JS），直接输出完整代码
-3. 每次回复控制在合理长度（游戏代码不超过 300 行）
-4. 先确认需求再写代码。用简单的话跟小孩沟通
-5. 代码里不要用外部依赖，纯 HTML+Canvas
-6. 回复格式：先简短确认理解（一句话），然后用 \`\`\`html ... \`\`\` 包裹完整游戏代码
-7. 如果小孩要修改，只输出修改后的完整文件，不要只给 diff
-8. 游戏要能玩、要有分数/输赢条件
-9. 保持鼓励的语气，多夸小孩的想法
-10. 每次对话控制在 10 轮以内，到了提醒"今天做得很棒了！"`;
+const app = express();
+app.use(express.json({ limit: '2mb' }));
+app.use(cookieParser());
 
-function callDeepSeek(messages) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        ...messages
-      ],
-      max_tokens: 4096,
-      temperature: 0.7
-    });
+// ========== STATIC ==========
+app.use('/platform', express.static(__dirname));
 
-    const req = https.request({
-      hostname: 'api.deepseek.com',
-      path: '/v1/chat/completions',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_KEY}`,
-        'Content-Length': Buffer.byteLength(body)
-      },
-      timeout: 30000
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          if (json.error) {
-            reject(new Error(json.error.message || 'API error'));
-            return;
-          }
-          resolve(json.choices[0].message.content);
-        } catch (e) {
-          reject(new Error('Parse error: ' + data.slice(0, 200)));
-        }
-      });
-    });
-
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
-    req.write(body);
-    req.end();
-  });
-}
-
-const server = http.createServer(async (req, res) => {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-
-  if (req.method !== 'POST' || req.url !== '/chat') {
-    res.writeHead(404);
-    res.end('Not Found');
-    return;
-  }
-
-  let body = '';
-  req.on('data', chunk => body += chunk);
-  req.on('end', async () => {
-    try {
-      const { messages } = JSON.parse(body);
-      if (!messages || !Array.isArray(messages)) {
-        throw new Error('Invalid messages');
-      }
-
-      console.log(`[chat] ${messages.length} messages, last: "${(messages[messages.length-1]?.content||'').slice(0,50)}"`);
-      const reply = await callDeepSeek(messages);
-      console.log(`[reply] ${reply.slice(0,80)}...`);
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ reply }));
-    } catch (e) {
-      console.error('[error]', e.message);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: e.message }));
-    }
-  });
+// Serve saved games
+app.get('/p/:code/:slug', (req, res) => {
+  const file = path.join(GAMES_DIR, req.params.code, req.params.slug + '.html');
+  if (!fs.existsSync(file)) return res.status(404).send('游戏不存在');
+  res.sendFile(file);
 });
 
-server.listen(PORT, () => {
-  console.log(`游戏工坊 API 代理运行在 http://localhost:${PORT}/chat`);
+// ========== AUTH MIDDLEWARE ==========
+function requireCode(req, res, next) {
+  const code = req.cookies?.invite_code;
+  if (!code) return res.status(401).json({ error: '请先输入邀请码' });
+  const users = readUsers();
+  if (!users[code] || !users[code].active) return res.status(403).json({ error: '邀请码无效或已禁用' });
+  req.userCode = code;
+  req.userName = users[code].name;
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  const pass = req.headers['x-admin-password'] || req.cookies?.admin_password;
+  if (pass !== ADMIN_PASSWORD) return res.status(401).json({ error: '管理员密码错误' });
+  next();
+}
+
+// ========== USER API ==========
+app.post('/api/join', (req, res) => {
+  const { code } = req.body;
+  const users = readUsers();
+  if (!users[code]) return res.status(404).json({ error: '邀请码不存在' });
+  if (!users[code].active) return res.status(403).json({ error: '该账号已被禁用' });
+  res.cookie('invite_code', code, { maxAge: 30 * 24 * 3600 * 1000, httpOnly: false, sameSite: 'lax' });
+  res.json({ ok: true, name: users[code].name });
+});
+
+app.get('/api/user', requireCode, (req, res) => {
+  res.json({ code: req.userCode, name: req.userName });
+});
+
+// ========== GAME API ==========
+app.get('/api/my-games', requireCode, (req, res) => {
+  const dir = path.join(GAMES_DIR, req.userCode);
+  if (!fs.existsSync(dir)) return res.json({ games: [] });
+  const metaFile = path.join(dir, 'meta.json');
+  const meta = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, 'utf8')) : {};
+  const games = Object.values(meta).sort((a, b) => b.updated - a.updated);
+  res.json({ games });
+});
+
+app.post('/api/save-game', requireCode, (req, res) => {
+  const { slug, title, html } = req.body;
+  if (!slug || !html) return res.status(400).json({ error: '缺少 slug 或 html' });
+  const safeSlug = slug.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 40);
+  const dir = path.join(GAMES_DIR, req.userCode);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  // Read meta, increment version
+  const metaFile = path.join(dir, 'meta.json');
+  const meta = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, 'utf8')) : {};
+  const existing = meta[safeSlug];
+  const ver = existing ? existing.ver + 1 : 1;
+  meta[safeSlug] = { title: title || safeSlug, ver, slug: safeSlug, updated: Date.now() };
+  fs.writeFileSync(metaFile, JSON.stringify(meta, null, 2));
+
+  // Save HTML
+  fs.writeFileSync(path.join(dir, safeSlug + '.html'), html);
+
+  res.json({ ok: true, slug: safeSlug, ver });
+});
+
+app.get('/api/load-game/:slug', requireCode, (req, res) => {
+  const file = path.join(GAMES_DIR, req.userCode, req.params.slug + '.html');
+  if (!fs.existsSync(file)) return res.status(404).json({ error: '游戏不存在' });
+  res.json({ html: fs.readFileSync(file, 'utf8') });
+});
+
+app.post('/api/delete-game', requireCode, (req, res) => {
+  const { slug } = req.body;
+  if (!slug) return res.status(400).json({ error: '缺少 slug' });
+  const dir = path.join(GAMES_DIR, req.userCode);
+  const file = path.join(dir, slug + '.html');
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+  const metaFile = path.join(dir, 'meta.json');
+  if (fs.existsSync(metaFile)) {
+    const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+    delete meta[slug];
+    fs.writeFileSync(metaFile, JSON.stringify(meta, null, 2));
+  }
+  res.json({ ok: true });
+});
+
+// ========== ADMIN API ==========
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: '密码错误' });
+  res.cookie('admin_password', password, { maxAge: 8 * 3600 * 1000, httpOnly: false, sameSite: 'lax' });
+  res.json({ ok: true });
+});
+
+app.post('/api/create-invite', requireAdmin, (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: '请输入姓名' });
+  const users = readUsers();
+  let code;
+  do { code = crypto.randomBytes(3).toString('hex'); } while (users[code]);
+  users[code] = { name, active: true, created: new Date().toISOString().slice(0, 10) };
+  writeUsers(users);
+  res.json({ code, name, url: `/platform/?code=${code}` });
+});
+
+app.get('/api/admin/users', requireAdmin, (req, res) => {
+  const users = readUsers();
+  const result = [];
+  for (const [code, u] of Object.entries(users)) {
+    const dir = path.join(GAMES_DIR, code);
+    const meta = fs.existsSync(path.join(dir, 'meta.json'))
+      ? JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')) : {};
+    result.push({ code, name: u.name, active: u.active, created: u.created, gameCount: Object.keys(meta).length });
+  }
+  res.json({ users: result });
+});
+
+app.post('/api/admin/toggle-user', requireAdmin, (req, res) => {
+  const { code } = req.body;
+  const users = readUsers();
+  if (!users[code]) return res.status(404).json({ error: '用户不存在' });
+  users[code].active = !users[code].active;
+  writeUsers(users);
+  res.json({ ok: true, active: users[code].active });
+});
+
+app.get('/api/stats', requireAdmin, (req, res) => {
+  const users = readUsers();
+  let totalGames = 0;
+  for (const code of Object.keys(users)) {
+    const dir = path.join(GAMES_DIR, code);
+    const meta = fs.existsSync(path.join(dir, 'meta.json'))
+      ? JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')) : {};
+    totalGames += Object.keys(meta).length;
+  }
+  res.json({ userCount: Object.keys(users).length, gameCount: totalGames, activeUsers: Object.values(users).filter(u => u.active).length });
+});
+
+app.listen(PORT, () => {
+  console.log(`🎮 游戏工坊运行在 http://localhost:${PORT}`);
+  console.log(`   平台: http://localhost:${PORT}/platform/`);
+  console.log(`   管理: http://localhost:${PORT}/platform/admin.html`);
 });

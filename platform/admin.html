@@ -1,0 +1,145 @@
+<!DOCTYPE html><html lang="zh-CN"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>管理后台 · 游戏工坊</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui;background:#0f0f0f;color:#e0e0e0;min-height:100vh;padding:24px;max-width:800px;margin:0 auto}
+h1{font-size:22px;margin-bottom:20px;color:#fff}
+.card{background:#1a1a1a;border:1px solid #222;border-radius:12px;padding:20px;margin-bottom:16px}
+.card h2{font-size:15px;color:#88aaff;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input,button{font-family:system-ui}
+input{padding:8px 12px;border-radius:8px;border:1px solid #333;background:#2a2a2a;color:#fff;font-size:13px;outline:none;flex:1;min-width:120px}
+input:focus{border-color:#667eea}
+button{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s}
+.btn-blue{background:#4a6cf7;color:#fff}
+.btn-blue:hover{background:#5a7cf7}
+.btn-red{background:rgba(255,60,40,0.2);color:#ff6644}
+.btn-red:hover{background:rgba(255,60,40,0.35)}
+.btn-green{background:rgba(60,200,60,0.2);color:#88cc88}
+.btn-green:hover{background:rgba(60,200,60,0.35)}
+.btn-gray{background:#2a2a2a;color:#888}
+.result{padding:12px;border-radius:8px;background:#161616;margin-top:10px;font-size:13px;word-break:break-all}
+.result .url{color:#88aaff;font-size:14px}
+.result .copy{cursor:pointer;color:#888;margin-left:8px;font-size:11px}
+.result .copy:hover{color:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid #222}
+th{color:#888;font-weight:500}
+td .badge{padding:2px 8px;border-radius:10px;font-size:11px}
+td .badge.active{background:rgba(60,200,100,0.15);color:#88cc88}
+td .badge.inactive{background:rgba(255,100,60,0.15);color:#ff8866}
+.stats{display:flex;gap:16px}
+.stat{flex:1;background:#161616;border-radius:10px;padding:16px;text-align:center}
+.stat .n{font-size:28px;font-weight:700;color:#fff}
+.stat .l{font-size:11px;color:#888;margin-top:4px}
+.err{color:#ff4444;font-size:12px;margin-top:6px;min-height:18px}
+/* Login */
+.login-box{max-width:360px;margin:80px auto}
+</style>
+
+<!-- Login -->
+<div class="login-box card" id="loginBox">
+  <h2>🔐 管理员登录</h2>
+  <div class="row"><input type="password" id="loginPwd" placeholder="管理员密码" onkeydown="if(event.key==='Enter')doLogin()"><button class="btn-blue" onclick="doLogin()">登录</button></div>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<!-- Dashboard (hidden until login) -->
+<div id="dashboard" style="display:none">
+
+<h1>🎮 游戏工坊 · 管理后台</h1>
+
+<!-- Stats -->
+<div class="card">
+  <div class="stats">
+    <div class="stat"><div class="n" id="statUsers">-</div><div class="l">用户总数</div></div>
+    <div class="stat"><div class="n" id="statActive">-</div><div class="l">活跃用户</div></div>
+    <div class="stat"><div class="n" id="statGames">-</div><div class="l">游戏总数</div></div>
+  </div>
+</div>
+
+<!-- Create invite -->
+<div class="card">
+  <h2>📨 创建邀请码</h2>
+  <div class="row">
+    <input type="text" id="inviteName" placeholder="输入姓名（如：小明）">
+    <button class="btn-blue" onclick="createInvite()">生成邀请码</button>
+  </div>
+  <div class="err" id="inviteErr"></div>
+  <div class="result" id="inviteResult" style="display:none">
+    <div>姓名: <b id="resName"></b> | 邀请码: <b id="resCode"></b></div>
+    <div class="url">🔗 <span id="resUrl"></span><span class="copy" onclick="copyUrl()">📋 复制</span></div>
+  </div>
+</div>
+
+<!-- User list -->
+<div class="card">
+  <h2>👥 用户列表</h2>
+  <table><thead><tr><th>姓名</th><th>邀请码</th><th>创建</th><th>游戏</th><th>状态</th><th>操作</th></tr></thead>
+  <tbody id="userTable"><tr><td colspan="6" style="text-align:center;color:#555">加载中...</td></tr></tbody></table>
+</div>
+
+</div>
+
+<script>
+var adminPass='';
+
+async function api(path,method,body){
+  var opts={method,headers:{'Content-Type':'application/json','x-admin-password':adminPass}};
+  if(body)opts.body=JSON.stringify(body);
+  var r=await fetch(path,opts);
+  return r.json();
+}
+
+async function doLogin(){
+  var pwd=document.getElementById('loginPwd').value;
+  var err=document.getElementById('loginErr');
+  try{
+    var d=await api('/api/admin/login','POST',{password:pwd});
+    if(d.ok){adminPass=pwd;document.getElementById('loginBox').style.display='none';document.getElementById('dashboard').style.display='block';loadAll()}
+    else err.textContent=d.error;
+  }catch(e){err.textContent='网络错误'}
+}
+
+async function loadAll(){loadStats();loadUsers()}
+async function loadStats(){
+  var d=await api('/api/stats','GET');
+  document.getElementById('statUsers').textContent=d.userCount;
+  document.getElementById('statActive').textContent=d.activeUsers;
+  document.getElementById('statGames').textContent=d.gameCount;
+}
+async function loadUsers(){
+  var d=await api('/api/admin/users','GET');
+  var rows=d.users.map(function(u){
+    return '<tr><td>'+u.name+'</td><td>'+u.code+'</td><td>'+u.created+'</td><td>'+u.gameCount+'</td>'+
+      '<td><span class="badge '+(u.active?'active':'inactive')+'">'+(u.active?'正常':'已禁用')+'</span></td>'+
+      '<td><button class="'+(u.active?'btn-red':'btn-green')+'" onclick="toggleUser(\''+u.code+'\')">'+(u.active?'禁用':'启用')+'</button></td></tr>';
+  }).join('');
+  document.getElementById('userTable').innerHTML=rows||'<tr><td colspan="6" style="text-align:center;color:#555">暂无用户</td></tr>';
+}
+
+async function createInvite(){
+  var name=document.getElementById('inviteName').value.trim();
+  var err=document.getElementById('inviteErr');
+  if(!name){err.textContent='请输入姓名';return}
+  var d=await api('/api/create-invite','POST',{name});
+  if(d.error){err.textContent=d.error;return}
+  document.getElementById('inviteResult').style.display='block';
+  document.getElementById('resName').textContent=d.name;
+  document.getElementById('resCode').textContent=d.code;
+  document.getElementById('resUrl').textContent='game.2u1.cn/platform/?code='+d.code;
+  document.getElementById('inviteName').value='';
+  err.textContent='';
+  loadAll();
+}
+
+async function toggleUser(code){
+  var d=await api('/api/admin/toggle-user','POST',{code});
+  if(d.ok)loadUsers();
+}
+
+function copyUrl(){
+  var url=document.getElementById('resUrl').textContent;
+  navigator.clipboard.writeText(url).then(function(){alert('已复制到剪贴板！')});
+}
+</script>
+</html>
