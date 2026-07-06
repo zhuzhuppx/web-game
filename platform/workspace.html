@@ -195,7 +195,8 @@ var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，帮小朋友把游戏想法
 "1. 画布自适应屏幕，Canvas 绘制，单文件 HTML\n"+
 "2. 完整代码用 ```html ... ``` 包裹，控制在250行内\n"+
 "3. 必须有：得分显示、生命值、胜负条件、操控提示\n"+
-"4. 必须完全基于小朋友前面四步的设计，不要自作主张加东西\n\n"+
+"4. 必须完全基于小朋友前面四步的设计\n"+
+"5. ⚠️ 代码放在回复的最后面，前面简要说明改了什么即可\n\n"+
 "## 迭代模式\n"+
 "代码给出后，追问：「试试你的游戏！这是你设计的，想加什么新功能？」举2个紧扣当前游戏的具体建议\n\n"+
 "## 语气\n"+
@@ -313,7 +314,10 @@ async function send(){
       document.getElementById('previewFrame').srcdoc=gameCode;
       document.getElementById('topPreviewBtn').style.display='inline-block';
     }
+    // 有代码 → 只显示文字不显示代码
     var display=reply.replace(/```html[\s\S]*?```/g,'');
+    // 如果去掉代码后只剩空格/换行，给个简短提示
+    if(!display.trim()){display='✅ 游戏已更新！'}
     addMsg(display,false);
 
     // 代码生成后，在聊天区追加预览按钮
