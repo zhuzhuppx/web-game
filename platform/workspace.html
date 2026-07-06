@@ -204,13 +204,18 @@ body{display:flex;flex-direction:column}
 </div>
 
 <div class="save-popup" id="settingsPopup">
-  <div class="box" style="width:360px">
-    <h3>⚙️ DeepSeek API Key</h3>
-    <p style="font-size:12px;color:#888;margin-bottom:10px;line-height:1.6">
-      🔐 你的 Key 只存在浏览器本地（localStorage），</p>
-    <p style="font-size:12px;color:#888;margin-bottom:10px;line-height:1.6">绝不经过服务器，绝不用于其他用途。</p>
-    <p style="font-size:11px;color:#555;margin-bottom:12px">
-      没有 Key？去 <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:#4a6cf7">platform.deepseek.com</a> 免费注册获取
+  <div class="box" style="width:380px;text-align:center">
+    <div style="font-size:48px;margin-bottom:8px">🔑</div>
+    <h3>设置你的 DeepSeek Key</h3>
+    <div style="background:#1a1a1a;border-radius:10px;padding:12px;margin:10px 0;text-align:left;font-size:12px;color:#aaa;line-height:1.8">
+      <b style="color:#fff">📋 获取方式：</b><br>
+      1️⃣ 打开 <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:#4a6cf7">platform.deepseek.com</a><br>
+      2️⃣ 注册/登录后点击「创建 API Key」<br>
+      3️⃣ 复制 sk- 开头的 Key 粘贴到下方<br>
+      <span style="color:#666">💡 新用户免费送额度，够玩好久！</span>
+    </div>
+    <p style="font-size:11px;color:#555;margin:8px 0">
+      🔐 Key 只存在你的浏览器里，服务器看不到
     </p>
     <div style="position:relative;margin-bottom:12px">
       <input type="password" id="settingsKey" placeholder="sk-..." style="width:100%;padding:10px 36px 10px 10px;border-radius:8px;border:1px solid #333;background:#252525;color:#fff;font-size:13px;outline:none;font-family:system-ui">
