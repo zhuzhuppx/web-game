@@ -133,15 +133,12 @@ body{display:flex;flex-direction:column}
 <div class="lobby show" id="viewLobby">
   <div class="lobby-header">
     <h2>🎮 我的游戏工坊</h2>
-    <p id="lobbySubtitle">还没有游戏，点击下方按钮开始创作吧！</p>
-  </div>
-  <div style="text-align:center;margin-bottom:20px">
-    <button class="btn-new-game" onclick="enterWorkspace()">➕ 新建游戏</button>
+    <p id="lobbySubtitle">还没有游戏，点击右上角「➕ 新建游戏」开始创作吧！</p>
   </div>
   <div class="lobby-grid" id="lobbyGrid"></div>
   <div class="lobby-empty" id="lobbyEmpty">
     <div class="big">🎨</div>
-    <p>还没有游戏<br>点击「新建游戏」开始你的第一个作品！</p>
+    <p>还没有游戏，点击右上角「➕ 新建游戏」开始吧！</p>
   </div>
 </div>
 
@@ -608,7 +605,7 @@ function buildLobby(){
     var empty=document.getElementById('lobbyEmpty');
     if(!d.games||!d.games.length){
       empty.style.display='block';
-      document.getElementById('lobbySubtitle').textContent='还没有游戏，点击下方按钮开始创作吧！';
+      document.getElementById('lobbySubtitle').textContent='还没有游戏，点击右上角「➕ 新建游戏」开始创作吧！';
       return;
     }
     empty.style.display='none';
