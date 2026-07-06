@@ -418,13 +418,18 @@ function addMsg(text,isUser){
   var old=document.getElementById('suggestions');
   if(old)old.remove();
 
-  // AI消息做打字效果
+  // AI消息做打字效果（太长的直接显示）
   if(!isUser && text){
-    div._typing=true;
-    typeText(div,text,0,function(){
-      div._typing=false;
-      if(div._typingCb){div._typingCb();div._typingCb=null}
-    });
+    if(text.length>2000){
+      div.textContent=text;
+      document.getElementById('msgs').scrollTop=document.getElementById('msgs').scrollHeight;
+    }else{
+      div._typing=true;
+      typeText(div,text,0,function(){
+        div._typing=false;
+        if(div._typingCb){div._typingCb();div._typingCb=null}
+      });
+    }
   }else if(isUser){
     div.textContent=text;
   }
@@ -618,12 +623,8 @@ async function send(){
       // 首次生成或有新代码时自动打开预览
       openPreview();
     }
-    // 有代码 → 只显示文字，去掉所有代码块
-    // 切掉代码块：找第一个 ``` 出现的位置
-    var codeIdx=reply.indexOf('\n```');
-    var display=codeIdx>=0?reply.slice(0,codeIdx):reply;
-    if(!display.trim()){display='✅ 游戏已更新！点击 👁️ 预览'}
-    var msgEl=addMsg(display,false);
+    // 完整显示 AI 回复
+    var msgEl=addMsg(reply,false);
 
     // 代码生成后，打字结束再追加按钮
     if(codeMatch){
@@ -652,7 +653,7 @@ async function send(){
             }
           },30000);
         }
-        if(msgEl&&msgEl._typing){msgEl._typing=showBtns}
+        if(msgEl&&msgEl._typing){msgEl._typingCb=showBtns}
         else{showBtns()}
       })();
     }
