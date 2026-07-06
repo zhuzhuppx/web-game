@@ -686,6 +686,9 @@ function backToLobby(){
   document.getElementById('topPreviewBtn').style.display='none';
   closePreview();
   buildLobby();
+  // 重置状态，下次新建游戏是干净的
+  gameStarted=false;gameCode='';gameSaved=false;version=0;
+  gameTitle='我的游戏';
 }
 
 function buildLobby(){
