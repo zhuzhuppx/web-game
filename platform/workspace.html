@@ -341,7 +341,7 @@ var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，帮小朋友把游戏想法
 "🔊 第5步/5：\n\n"+
 "## 代码规则\n"+
 "1. 画布自适应屏幕，Canvas 绘制，单文件 HTML\n"+
-"2. 完整代码用 ```html ... ``` 包裹，控制在250行内\n"+
+"2. 完整代码用 ```html ... ``` 包裹，控制在200行内，精简高效\n"+
 "3. 必须有：得分显示、生命值、胜负条件、操控提示\n"+
 "4. 必须完全基于小朋友前面五步的设计\n"+
 "5. ⚠️ 代码放在回复的最后面，前面简要说明改了什么即可\n"+
@@ -554,12 +554,12 @@ async function send(){
   try{
     var controller=new AbortController();
     window._controller=controller;
-    var timeout=setTimeout(function(){controller.abort()},45000);
+    var timeout=setTimeout(function(){controller.abort()},120000);
 
     var resp=await fetch('https://api.deepseek.com/v1/chat/completions',{
       method:'POST',signal:controller.signal,
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+DS_KEY},
-      body:JSON.stringify({model:'deepseek-v4-flash',messages:[{role:'system',content:SYSTEM_PROMPT},...messages],max_tokens:4096,temperature:0.7})
+      body:JSON.stringify({model:'deepseek-v4-flash',messages:[{role:'system',content:SYSTEM_PROMPT},...messages],max_tokens:8192,temperature:0.7})
     });
     clearTimeout(timeout);
     window._controller=null;
@@ -568,12 +568,21 @@ async function send(){
 
     if(data.error){addMsg('出错了：'+data.error.message+', 换种说法试试？',false);return}
     var reply=data.choices[0].message.content;
+    // 检测 API 层面截断
+    if(data.choices[0].finish_reason==='length'){
+      addMsg('⚠️ 输出被截断（达到上限），试试让AI精简代码',false);
+    }
     messages.push({role:'assistant',content:reply});
 
     var codeMatch=reply.match(/```html[ \t]*\r?\n([\s\S]*?)\r?\n\s*```/);
     if(!codeMatch){codeMatch=reply.match(/```html\s*\n?([\s\S]*?)```/)}
     if(!codeMatch){codeMatch=reply.match(/```\s*\r?\n([\s\S]*?)\r?\n\s*```/)}
     if(!codeMatch){codeMatch=reply.match(/```\n?([\s\S]*?)```/)}
+    // 检测是否被截断（有 ```html 但没闭合 ```）
+    var truncated=!/```\s*$/.test(reply) && /```html/.test(reply) && !/```[\s\S]*```/.test(reply.replace(/```html/,''));
+    if(truncated && !codeMatch){
+      addMsg('⚠️ 代码太长被截断了，试试说「精简一下」或分步生成',false);
+    }
     // 最后兜底：如果回复里直接包含完整的 <!DOCTYPE html> 或 <html>
     if(!codeMatch){
       var m=reply.match(/(<!DOCTYPE html[\s\S]*<\/html>)/i);
