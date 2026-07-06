@@ -122,158 +122,66 @@ function addMsg(text,isUser){
   msgs.scrollTop=msgs.scrollHeight;
 }
 
-// Simulate AI thinking + responding
-function aiRespond(userText){
-  // Show typing indicator
-  var typing=document.createElement('div');
-  typing.className='msg ai';
-  typing.textContent='...';
-  typing.id='typing';
-  msgs.appendChild(typing);
-  msgs.scrollTop=msgs.scrollHeight;
+var messages=[];
+var turnCount=0;
+var maxTurns=15;
 
-  setTimeout(function(){
+var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，专门帮儿童设计和开发网页小游戏。\n"+
+"你的规则：\n"+
+"1. 只能做游戏。非游戏问题回复：'我只会做游戏哦～说说你想做什么吧！'\n"+
+"2. 游戏用 Canvas 绘制，单文件 HTML，不要外部依赖\n"+
+"3. 完整代码用 ```html ... ``` 包裹，每次输出完整可运行文件\n"+
+"4. 代码控制在200行以内，简洁好玩\n"+
+"5. 先简短确认需求（一句话），再给代码\n"+
+"6. 要有分数/输赢条件\n"+
+"7. 多鼓励小孩，语气友好\n"+
+"8. 游戏要有WASD或方向键操控说明\n"+
+"9. 画布自适应屏幕，手机也能玩";
+
+async function aiRespond(userText){
+  turnCount++;
+  if(turnCount>maxTurns){addMsg('🎉 今天做得很棒了！<br>游戏已经保存在右边，明天继续改进吧～',false);return}
+
+  var typing=document.createElement('div');
+  typing.className='msg ai';typing.textContent='...';typing.id='typing';
+  msgs.appendChild(typing);msgs.scrollTop=msgs.scrollHeight;
+
+  messages.push({role:'user',content:userText});
+
+  try{
+    var resp=await fetch('https://api.deepseek.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer sk-9f144fd5a6af47919a1875cfc019511e'},
+      body:JSON.stringify({model:'deepseek-chat',messages:[{role:'system',content:SYSTEM_PROMPT},...messages],max_tokens:4096,temperature:0.7})
+    });
+    var data=await resp.json();
     typing.remove();
-    var resp=processAI(userText);
-    addMsg(resp,false);
-    
-    // Update preview if game was created/modified
-    if(gameStarted&&gameCode){
+
+    if(data.error){addMsg('出错了：'+data.error.message+'<br>换种说法试试？',false);return}
+    var reply=data.choices[0].message.content;
+    messages.push({role:'assistant',content:reply});
+
+    // Extract HTML code block
+    var codeMatch=reply.match(/```html\n?([\s\S]*?)```/);
+    if(codeMatch){
+      gameCode=codeMatch[1];
+      if(!gameStarted){gameStarted=true;gameTitle=userText.slice(0,20);gameName.textContent=gameTitle}
+      version++;gameVer.textContent='v'+version;
+      emptyState.style.display='none';previewFrame.style.display='block';
       updatePreview();
     }
-  },600+Math.random()*800);
-}
 
-function processAI(text){
-  var t=text.toLowerCase();
-
-  // First message: create game
-  if(!gameStarted){
-    gameStarted=true;
-    gameTitle=text.slice(0,20)||'我的游戏';
-    gameName.textContent=gameTitle;
-    gameVer.textContent='v1';
-    gameCode=generateGame(text);
-    emptyState.style.display='none';
-    previewFrame.style.display='block';
-    updatePreview();
-    return '好的！我先做一个初始版本，你可以在右边试玩。<br><br>试试看，然后告诉我哪里需要改：<br><div class="card"><span class="act" onclick="quickReply(\'走得太快了\')">🏃 太快了</span><span class="act" onclick="quickReply(\'太慢了\')">🐢 太慢了</span><span class="act" onclick="quickReply(\'角色太小了\')">🔍 太小了</span><span class="act" onclick="quickReply(\'敌人太弱了\')">💪 太弱了</span></div>';
+    // Display reply without code block
+    var display=reply.replace(/```html[\s\S]*?```/g,'[游戏已更新到左边]');
+    addMsg(display,false);
+  }catch(e){
+    typing.remove();
+    addMsg('网络出错了，再试一次吧～',false);
   }
-
-  // Modify game based on feedback
-  var mod=parseModification(text);
-  if(mod){
-    gameCode=applyMod(gameCode,mod);
-    version++;
-    gameVer.textContent='v'+version;
-    return '已修改：'+mod.desc+'<br><br>右边看看效果，不满意继续改～';
-  }
-
-  return '嗯…我没太理解，能换个说法吗？比如：<br><div class="card"><span class="act" onclick="quickReply(\'让它更快\')">让它更快</span><span class="act" onclick="quickReply(\'加更多敌人\')">加更多敌人</span><span class="act" onclick="quickReply(\'颜色换个\')">换个颜色</span></div>';
-}
-
-function quickReply(text){
-  input.value=text;
-  send();
-}
-
-function parseModification(text){
-  var t=text.toLowerCase();
-  // Simple pattern matching for demo
-  if(/快|加速/.test(t)) return {desc:'速度提升 2.5→3.5',code:'speed',val:3.5};
-  if(/慢|减速/.test(t)) return {desc:'速度降低到 1.5',code:'speed',val:1.5};
-  if(/小/.test(t)) return {desc:'角色体积增大 50%',code:'size',val:18};
-  if(/大/.test(t)) return {desc:'角色体积缩小',code:'size',val:8};
-  if(/弱|简单|太菜|菜/.test(t)) return {desc:'敌人更强了',code:'weak',val:false};
-  if(/强|难|太难/.test(t)) return {desc:'敌人变弱了',code:'weak',val:true};
-  if(/多/.test(t)) return {desc:'敌人数量增加',code:'count',val:8};
-  if(/少/.test(t)) return {desc:'敌人数量减少',code:'count',val:1};
-  if(/颜色|红|蓝|绿|紫|粉/.test(t)) return {desc:'更改了外观颜色',code:'color',val:getColor(t)};
-  if(/射击|开火|打|子弹|开枪/.test(t)) return {desc:'加入射击系统！点击屏幕开枪',code:'shoot',val:true};
-  if(/跳|弹跳|蹦/.test(t)) return {desc:'加入跳跃功能！按空格跳跃',code:'jump',val:true};
-  return null;
-}
-
-function getColor(t){
-  if(/红/.test(t))return'#ff4444';if(/蓝/.test(t))return'#4488ff';
-  if(/绿/.test(t))return'#44cc44';if(/紫/.test(t))return'#aa44ff';
-  if(/粉/.test(t))return'#ff88cc';return'#ffcc44';
-}
-
-function generateGame(text){
-  var t=text.toLowerCase();
-  var playerColor='#44cc44',enemyColor='#cc4444',playerSpeed=2.5,enemySpeed=1.2,playerSize=12,enemySize=12;
-  var canShoot=false,canJump=false,enemyCount=3;
-
-  if(/快/.test(t))playerSpeed=3.5;
-  if(/慢/.test(t))playerSpeed=1.5;
-  if(/大/.test(t)){playerSize=18;enemySize=18}
-  if(/小/.test(t)){playerSize=8;enemySize=8}
-  if(/射击|开枪|打/.test(t))canShoot=true;
-  if(/跳|弹跳/.test(t))canJump=true;
-  if(/多/.test(t))enemyCount=6;
-  if(/红/.test(t))playerColor='#ff4444';
-  if(/蓝/.test(t))playerColor='#4488ff';
-  if(/紫/.test(t))playerColor='#aa44ff';
-  if(/粉/.test(t))playerColor='#ff88cc';
-
-  return JSON.stringify({
-    playerColor,enemyColor,playerSpeed,enemySpeed,playerSize,enemySize,
-    canShoot,canJump,enemyCount
-  });
-}
-
-function applyMod(code,mod){
-  var data=JSON.parse(code);
-  switch(mod.code){
-    case'speed':data.playerSpeed=mod.val;break;
-    case'size':data.playerSize=mod.val;data.enemySize=mod.val;break;
-    case'weak':if(mod.val)data.enemySpeed=0.8;else data.enemySpeed=1.8;break;
-    case'count':data.enemyCount=mod.val;break;
-    case'color':data.playerColor=mod.val;break;
-    case'shoot':data.canShoot=true;break;
-    case'jump':data.canJump=true;break;
-  }
-  return JSON.stringify(data);
 }
 
 function updatePreview(){
-  var data=JSON.parse(gameCode);
-  var html=buildGameHTML(data);
-  previewFrame.srcdoc=html;
-}
-
-function buildGameHTML(d){
-  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0}canvas{display:block;background:#1a2a1a}</style></head><body>'+
-'<canvas id="c"></canvas><script>'+
-'var W=Math.min(600,innerWidth),H=Math.min(400,innerHeight);'+
-'var c=document.getElementById("c"),ctx=c.getContext("2d");c.width=W;c.height=H;'+
-'var p={x:W/2,y:H-50,s:'+d.playerSpeed+',r:'+d.playerSize+',hp:3};'+
-'var enemies=[],keys={},bullets=[],particles=[];'+
-'for(var i=0;i<'+d.enemyCount+';i++)enemies.push({x:Math.random()*W,y:-20-Math.random()*200,r:12,s:'+d.enemySpeed+',hp:1});'+
-'document.addEventListener("keydown",function(e){keys[e.key]=true});'+
-'document.addEventListener("keyup",function(e){keys[e.key]=false});'+
-'c.addEventListener("mousedown",function(e){'+(d.canShoot?'bullets.push({x:p.x,y:p.y-10,vx:(e.clientX-W/2)/20,vy:-4,life:30});':'')+'});'+
-'c.addEventListener("touchstart",function(e){e.preventDefault();'+(d.canShoot?'bullets.push({x:p.x,y:p.y-10,vx:0,vy:-4,life:30});':'')+'});'+
-'function loop(){'+
-'if(keys["ArrowLeft"]||keys["a"])p.x-=p.s;if(keys["ArrowRight"]||keys["d"])p.x+=p.s;'+
-'if(keys["ArrowUp"]||keys["w"])p.y-=p.s;if(keys["ArrowDown"]||keys["s"])p.y+=p.s;'+
-(d.canJump?'if(keys[" "]&&p.y>=H-p.r){p.vy=-8;keys[" "]=false}p.vy=(p.vy||0)+0.5;p.y+=p.vy;if(p.y>H-p.r){p.y=H-p.r;p.vy=0}':'')+
-'p.x=Math.max(p.r,Math.min(W-p.r,p.x));p.y=Math.max(p.r,Math.min(H-p.r,p.y));'+
-'for(var i=bullets.length-1;i>=0;i--){var b=bullets[i];b.life--;b.x+=b.vx;b.y+=b.vy;if(b.life<=0||b.y<0){bullets.splice(i,1);continue};'+
-'for(var j=enemies.length-1;j>=0;j--){var e=enemies[j],dx=b.x-e.x,dy=b.y-e.y;if(dx*dx+dy*dy<e.r*e.r){bullets.splice(i,1);e.hp--;if(e.hp<=0){enemies.splice(j,1);enemies.push({x:Math.random()*W,y:-30,r:12,s:'+d.enemySpeed+',hp:1});for(var k=0;k<5;k++)particles.push({x:e.x,y:e.y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3,life:10})}break}}}'+
-'for(var i=0;i<enemies.length;i++){var e=enemies[i];e.y+=e.s;if(e.y>H+20){e.y=-20;e.x=Math.random()*W};'+
-'var dx2=p.x-e.x,dy2=p.y-e.y,dd=Math.sqrt(dx2*dx2+dy2*dy2);if(dd<p.r+e.r){p.hp--;e.y=-20;e.x=Math.random()*W;if(p.hp<=0){ctx.fillStyle="rgba(255,0,0,0.5)";ctx.fillRect(0,0,W,H);ctx.fillStyle="#fff";ctx.font="20px system-ui";ctx.textAlign="center";ctx.fillText("游戏结束",W/2,H/2);return}}}'+
-'for(var i=particles.length-1;i>=0;i--){var pt=particles[i];pt.life--;pt.x+=pt.vx;pt.y+=pt.vy;if(pt.life<=0)particles.splice(i,1)}'+
-'ctx.clearRect(0,0,W,H);'+
-'ctx.fillStyle="'+d.playerColor+'";ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();'+
-'ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(p.x-3,p.y-3,3,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(p.x+3,p.y-3,3,0,Math.PI*2);ctx.fill();'+
-'ctx.fillStyle="#222";ctx.beginPath();ctx.arc(p.x-2,p.y-3,1.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(p.x+4,p.y-3,1.5,0,Math.PI*2);ctx.fill();'+
-'for(var i=0;i<enemies.length;i++){var e=enemies[i];ctx.fillStyle="'+d.enemyColor+'";ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(e.x-2,e.y-2,2,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(e.x+2,e.y-2,2,0,Math.PI*2);ctx.fill()}'+
-'for(var i=0;i<bullets.length;i++){var bl=bullets[i];ctx.fillStyle="#ffcc44";ctx.beginPath();ctx.arc(bl.x,bl.y,3,0,Math.PI*2);ctx.fill()}'+
-'for(var i=0;i<particles.length;i++){var pt2=particles[i];ctx.fillStyle="rgba(255,200,50,"+(pt2.life/10)+")";ctx.beginPath();ctx.arc(pt2.x,pt2.y,2,0,Math.PI*2);ctx.fill()}'+
-'ctx.fillStyle="#fff";ctx.font="12px system-ui";ctx.textAlign="left";ctx.fillText("❤️ ".repeat(Math.max(0,p.hp)),8,18);'+
-'requestAnimationFrame(loop)}loop()</script></body></html>';
+  previewFrame.srcdoc=gameCode;
 }
 
 function send(){
