@@ -397,6 +397,7 @@ document.addEventListener('keydown',function(e){
     forwardKeyToGame(e.key,keyMap[e.key]||e.key);
   }
 });
+async function send(){
   window._cancelled=false;
   if(!DS_KEY){addMsg('⚠️ 请先设置 DeepSeek API Key，点击右上角 ⚙️',false);return;}
   var input=document.getElementById('input');
