@@ -576,11 +576,15 @@ async function send(){
     if(codeMatch && codeMatch[1].trim()){
       if(codeMatch[1].trim().length<50){codeMatch=null}
     }
+    if(!codeMatch){
+      console.warn('⚠️ 未提取到代码！AI回复前200字符:',reply.slice(0,200));
+    }
     if(codeMatch){
       gameCode=codeMatch[1];
       gameSaved=false;
       version++;
       SFX.powerup();
+      console.log('✅ 代码已提取 ('+codeMatch[1].length+'字符) version='+version);
       if(!gameStarted){gameStarted=true;
         // 自动取名：从第一条用户消息提取关键词
         var firstMsg=messages.find(function(m){return m.role==='user'});
@@ -722,6 +726,7 @@ async function doSave(){
   document.getElementById('gameName').textContent=gameTitle;
   // 始终从 iframe 取最新代码，避免 gameCode 变量是旧值
   var html=document.getElementById('previewFrame').srcdoc;
+  console.log('💾 doSave: iframe srcdoc长度='+(html?html.length:0)+', gameCode长度='+(gameCode?gameCode.length:0)+', gameId='+gameId+', version='+version);
   if(!html||html.length<50)html=gameCode;
   if(!html||html.length<50){alert('还没有生成游戏呢');return}
   try{
