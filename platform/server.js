@@ -98,38 +98,68 @@ app.get('/api/me',function(req,res){
 });
 
 app.get('/api/my-games',requireAuth,function(req,res){
+  listGames(req,res);
+});
+app.get('/api/games',requireAuth,function(req,res){
+  listGames(req,res);
+});
+function listGames(req,res){
   var dir=path.join(GAMES_DIR,req.userName);
   if(!fs.existsSync(dir))return res.json({games:[]});
   var metaFile=path.join(dir,'meta.json');
   var meta=fs.existsSync(metaFile)?JSON.parse(fs.readFileSync(metaFile,'utf8')):{};
   var games=Object.values(meta).sort(function(a,b){return b.updated-a.updated});
   res.json({games:games});
-});
+}
 
 app.post('/api/save-game',requireAuth,function(req,res){
-  var slug=req.body.slug||'',title=req.body.title||'',html=req.body.html||'';
-  if(!slug||!html)return res.status(400).json({error:'缺少参数'});
-  slug=slug.replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,40);
+  saveGame(req,res);
+});
+app.post('/api/save',requireAuth,function(req,res){
+  saveGame(req,res);
+});
+function saveGame(req,res){
+  var title=req.body.title||'',html=req.body.html||'';
+  if(!title||!html)return res.status(400).json({error:'缺少参数'});
+  var slug=title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g,'-').slice(0,40);
   var dir=path.join(GAMES_DIR,req.userName);
   if(!fs.existsSync(dir))fs.mkdirSync(dir,{recursive:true});
   var metaFile=path.join(dir,'meta.json');
   var meta=fs.existsSync(metaFile)?JSON.parse(fs.readFileSync(metaFile,'utf8')):{};
   var existing=meta[slug],ver=existing?existing.ver+1:1;
-  meta[slug]={title:title||slug,ver:ver,slug:slug,updated:Date.now()};
+  meta[slug]={title:title,ver:ver,slug:slug,updated:Date.now()};
   fs.writeFileSync(metaFile,JSON.stringify(meta,null,2));
   fs.writeFileSync(path.join(dir,slug+'.html'),html);
   res.json({ok:true,slug:slug,ver:ver});
-});
+}
 
 app.get('/api/load-game/:slug',requireAuth,function(req,res){
-  var file=path.join(GAMES_DIR,req.userName,req.params.slug+'.html');
-  if(!fs.existsSync(file))return res.status(404).json({error:'游戏不存在'});
-  res.json({html:fs.readFileSync(file,'utf8')});
+  loadGame(req,res);
 });
+app.get('/api/game/:title',requireAuth,function(req,res){
+  loadGame(req,res);
+});
+function loadGame(req,res){
+  var id=req.params.slug||req.params.title;
+  var slug=id.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g,'-').slice(0,40);
+  var file=path.join(GAMES_DIR,req.userName,slug+'.html');
+  if(!fs.existsSync(file))return res.status(404).json({error:'游戏不存在'});
+  var metaFile=path.join(GAMES_DIR,req.userName,'meta.json');
+  var meta=fs.existsSync(metaFile)?JSON.parse(fs.readFileSync(metaFile,'utf8')):{};
+  var info=meta[slug]||{};
+  res.json({ok:true,html:fs.readFileSync(file,'utf8'),title:info.title||id,version:info.ver||1});
+}
 
 app.post('/api/delete-game',requireAuth,function(req,res){
-  var slug=req.body.slug;
-  if(!slug)return res.status(400).json({error:'缺少slug'});
+  deleteGame(req,res);
+});
+app.post('/api/delete',requireAuth,function(req,res){
+  deleteGame(req,res);
+});
+function deleteGame(req,res){
+  var id=req.body.slug||req.body.title;
+  if(!id)return res.status(400).json({error:'缺少参数'});
+  var slug=id.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g,'-').slice(0,40);
   var dir=path.join(GAMES_DIR,req.userName);
   var file=path.join(dir,slug+'.html');
   if(fs.existsSync(file))fs.unlinkSync(file);
@@ -140,7 +170,7 @@ app.post('/api/delete-game',requireAuth,function(req,res){
     fs.writeFileSync(metaFile,JSON.stringify(meta,null,2));
   }
   res.json({ok:true});
-});
+}
 
 app.post('/api/admin/login',function(req,res){
   if(req.body.password!==ADMIN_PASSWORD)return res.status(401).json({error:'密码错误'});
