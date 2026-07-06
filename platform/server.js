@@ -37,12 +37,8 @@ app.get('/admin', function(req,res){
   res.type('html').send(fs.readFileSync(path.join(__dirname,'admin.html'),'utf8'));
 });
 app.get('/api/config', function(req,res){
-  // 优先推荐用户使用自己的 Key（浏览器 localStorage）
-  // 服务端 Key 仅作为默认值，绝不记录、不泄露
-  res.json({
-    apiKey:process.env.DEEPSEEK_API_KEY_GAME||'',
-    notice:'你的 Key 只存在浏览器本地，服务器绝不存储或使用。建议使用自己的 Key 以获得更好体验。'
-  });
+  // 不使用服务端 Key，用户需自行设置
+  res.json({apiKey:'',notice:'请点击右上角 ⚙️ 设置你的 DeepSeek API Key'});
 });
 app.use('/platform', express.static(__dirname, {index: false}));
 
