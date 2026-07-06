@@ -198,7 +198,10 @@ body{display:flex;flex-direction:column}
 <div class="play-overlay" id="playOverlay">
   <div class="play-bar">
     <span class="pl-title" id="playTitle">游戏</span>
-    <button onclick="closePlay()">✕ 返回大厅</button>
+    <div style="display:flex;gap:8px">
+      <button onclick="editCurrentGame()" style="background:#4a6cf7;color:#fff;border-color:#4a6cf7">✏️ 继续创作</button>
+      <button onclick="closePlay()">✕ 返回大厅</button>
+    </div>
   </div>
   <iframe id="playFrame"></iframe>
 </div>
@@ -675,9 +678,11 @@ function buildLobby(){
   });
 }
 
+var _editingGame=null;
 function playGame(title,slug){
   fetch('/api/game/'+encodeURIComponent(title)).then(function(r){return r.json()}).then(function(d){
     if(!d.ok)return;
+    _editingGame=d;
     document.getElementById('playTitle').textContent='🎮 '+title;
     document.getElementById('playFrame').srcdoc=d.html;
     document.getElementById('playOverlay').classList.add('show');
@@ -686,6 +691,26 @@ function playGame(title,slug){
 
 function closePlay(){
   document.getElementById('playOverlay').classList.remove('show');
+}
+
+function editCurrentGame(){
+  closePlay();
+  enterWorkspace();
+  if(_editingGame){
+    gameCode=_editingGame.html;
+    gameTitle=_editingGame.title;
+    version=_editingGame.version||1;
+    gameStarted=true;
+    document.getElementById('gameName').textContent=gameTitle;
+    document.getElementById('gameVer').textContent='🔄 第'+version+'次迭代';
+    var frame=document.getElementById('previewFrame');
+    frame.srcdoc='';setTimeout(function(){frame.srcdoc=gameCode},50);
+    document.getElementById('topPreviewBtn').style.display='inline-block';
+    messages=[{role:'user',content:'我想优化「'+gameTitle+'」'}];
+    turnCount=0;
+    addMsg('📂 继续创作「'+gameTitle+'」',false);
+    addMsg('好的！你想给「'+gameTitle+'」加什么新功能？或者改什么？',false);
+  }
 }
 
 function deleteFromLobby(title){
