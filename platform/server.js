@@ -115,15 +115,22 @@ app.use('/platform', express.static(__dirname, {index: false}));
 // 独立游戏播放页（分享用）
 app.get('/play/:ucode/:gcode',function(req,res){
   var row=db.prepare(`
-    SELECT g.* FROM games g JOIN users u ON g.username=u.username
+    SELECT g.*, u.username FROM games g JOIN users u ON g.username=u.username
     WHERE u.code=? AND g.id=?
   `).get(req.params.ucode, req.params.gcode);
   if(!row)return res.status(404).send('游戏不存在');
+  var author=row.username,title=row.title;
+  var credit='<div style="position:fixed;top:0;left:0;right:0;z-index:9999;'+
+    'background:linear-gradient(180deg,rgba(0,0,0,0.8) 0%,rgba(0,0,0,0.4) 70%,transparent 100%);'+
+    'padding:10px 16px;font-family:system-ui;pointer-events:none;animation:fadeCredit 2s 3s forwards">'+
+    '<div style="color:#fff;font-size:16px;font-weight:700">🎮 '+title+'</div>'+
+    '<div style="color:#aaa;font-size:12px">创作者：'+author+' · AI 游戏工坊</div></div>'+
+    '<style>@keyframes fadeCredit{to{opacity:0}}#credit{animation:fadeCredit 2s 3s forwards}</style>';
   var wrapper='<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">'+
-    '<title>'+row.title+' - AI 游戏工坊</title>'+
+    '<title>'+title+' - '+author+' - AI 游戏工坊</title>'+
     '<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;overflow:hidden;background:#000}'+
-    'canvas{display:block}</style></head><body>';
+    'canvas{display:block}@keyframes fadeCredit{to{opacity:0}}</style></head><body>'+credit;
   res.send(row.html.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'').replace(/<head>[\s\S]*?<\/head>/i,function(m){
     return wrapper+m.replace(/<\/head>/i,'');
   }));
