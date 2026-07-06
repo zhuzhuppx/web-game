@@ -130,6 +130,7 @@ body{display:flex;flex-direction:column}
     <button class="btn-preview" id="topPreviewBtn" onclick="openPreview()" style="display:none">👁️ 预览游戏</button>
     <button class="btn-back-lobby" id="btnBackLobby" onclick="backToLobby()" style="display:none">🏠 我的游戏</button>
     <button class="btn-save" onclick="openSave()">💾 保存</button>
+    <button class="btn-settings" onclick="SFX.enabled(!SFX.enabled());this.textContent=SFX.enabled()?'🔊':'🔇'" id="sfxBtn">🔊</button>
     <button class="btn-settings" onclick="openSettings()">🔑 接入AI</button>
     <button class="btn-logout" onclick="logout()">🚪 退出</button>
   </div>
@@ -340,6 +341,7 @@ function quickSend(text){
   document.getElementById('previewHints').style.display='none';
   document.getElementById('hintInput').value='';
   document.getElementById('input').value=text;
+  SFX.tap();
   send();
 }
 
@@ -397,6 +399,8 @@ document.addEventListener('keydown',function(e){
     forwardKeyToGame(e.key,keyMap[e.key]||e.key);
   }
 });
+// 首次点击激活音频上下文（浏览器安全策略）
+document.addEventListener('click',function(){SFX.resume()},{once:true});
 async function send(){
   window._cancelled=false;
   if(!DS_KEY){addMsg('⚠️ 请先设置 DeepSeek API Key，点击右上角 ⚙️',false);return;}
@@ -444,6 +448,7 @@ async function send(){
       gameCode=codeMatch[1];
       gameSaved=false;
       version++;
+      SFX.powerup();
       if(!gameStarted){gameStarted=true;
         // 自动取名：摘用户第一个消息的关键词
         var firstMsg=messages.find(function(m){return m.role==='user'});
@@ -525,6 +530,7 @@ async function send(){
     window._controller=null;
     if(window._cancelled){window._cancelled=false;return}
     var msg=e.name==='AbortError'?'⏰ 响应超时':'😣 网络出错了';
+    SFX.fail();
     var errDiv=document.createElement('div');
     errDiv.className='msg ai';
     errDiv.innerHTML=msg+' <button onclick="retryLast()" style="margin-left:6px;padding:4px 10px;border-radius:12px;border:1px solid #555;background:#333;color:#fff;cursor:pointer;font-size:12px;font-family:system-ui">🔄 再试一次</button>';
@@ -580,8 +586,8 @@ async function doSave(){
   try{
     var r=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:gameTitle,html:gameCode,version:version})});
     var d=await r.json();
-    if(d.ok){closeSave();gameSaved=true;alert('保存成功！✌️')}else{alert('保存失败：'+d.error)}
-  }catch(e){alert('保存失败')}
+    if(d.ok){closeSave();gameSaved=true;SFX.success();alert('保存成功！✌️')}else{SFX.fail();alert('保存失败：'+d.error)}
+  }catch(e){SFX.fail();alert('保存失败')}
 }
 
 async function loadGameList(){
