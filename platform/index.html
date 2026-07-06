@@ -1,279 +1,263 @@
-<!DOCTYPE html><html lang="zh-CN"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no"><title>AI 游戏工坊</title>
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>AI 游戏工坊</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100dvh;overflow:hidden;font-family:system-ui;background:#0f0f0f;color:#e0e0e0}
+body{font-family:system-ui;background:#0f0f0f;color:#e0e0e0;height:100dvh;overflow:hidden}
 .app{display:flex;height:100dvh}
-
-/* Preview */
-.preview-panel{flex:1;display:flex;flex-direction:column;background:#111}
-.preview-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #222;background:#1a1a1a;flex-shrink:0}
-.preview-header .name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
-.preview-header .dot{width:8px;height:8px;border-radius:50%;background:#44cc44}
-.preview-header .vers{font-size:11px;color:#888}
+.preview-panel{flex:1;display:flex;flex-direction:column;background:#111;min-width:0}
+.preview-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #222;background:#1a1a1a;flex-shrink:0}
+.preview-header .name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.preview-header .dot{width:7px;height:7px;border-radius:50%;background:#44cc44}
+.preview-header .vers{font-size:11px;color:#666}
 .preview-header .btns{display:flex;gap:6px}
-.preview-header .btns button{padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-family:system-ui;transition:all 0.2s}
-.btn-save{background:rgba(100,200,100,0.2);color:#88cc88;border:1px solid rgba(100,200,100,0.3)}
-.btn-save:hover{background:rgba(100,200,100,0.35)}
-.preview-frame{flex:1;border:none;background:#1a2a1a}
-.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#444;gap:12px}
-.empty-state .big{font-size:64px}
-.empty-state p{font-size:15px}
+.preview-header .btns button{padding:4px 10px;border-radius:6px;border:1px solid #333;background:#2a2a2a;color:#ccc;cursor:pointer;font-size:12px;font-family:system-ui;transition:all 0.15s}
+.preview-header .btns button:hover{background:#3a3a3a}
+.preview-header .btns .save-btn{background:#4a6cf7;color:#fff;border-color:#4a6cf7}
+.preview-header .btns .save-btn:hover{background:#5a7cf7}
+.preview-frame{flex:1;border:none;background:#0a1a0a}
+.empty-preview{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#333;gap:12px;font-size:14px}
+.empty-preview .icon{font-size:56px}
 
-/* Games sidebar */
-.games-sidebar{width:200px;min-width:180px;background:#161616;border-right:1px solid #222;display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
-.games-sidebar .head{font-size:13px;font-weight:600;padding:12px;border-bottom:1px solid #222;color:#888;display:flex;align-items:center;justify-content:space-between}
-.games-sidebar .list{flex:1;overflow-y:auto;padding:6px}
-.games-sidebar .item{padding:8px 10px;border-radius:8px;margin-bottom:4px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:space-between;font-size:12px;border:1px solid transparent}
-.games-sidebar .item:hover{background:rgba(255,255,255,0.05);border-color:#333}
-.games-sidebar .item .tn{font-weight:600;color:#ddd;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.games-sidebar .item .vn{font-size:10px;color:#666;margin-left:6px;flex-shrink:0}
-.games-sidebar .item .del{color:#666;cursor:pointer;padding:2px 4px;font-size:10px;margin-left:4px;opacity:0;transition:all 0.2s}
-.games-sidebar .item:hover .del{opacity:1}
-.games-sidebar .item .del:hover{color:#ff4444}
-.games-sidebar .item.active{background:rgba(100,140,255,0.1);border-color:rgba(100,140,255,0.3)}
-.games-sidebar .empty{text-align:center;color:#555;font-size:11px;padding:20px 10px}
+.chat-panel{width:380px;min-width:320px;display:flex;flex-direction:column;border-left:1px solid #222;background:#1a1a1a;flex-shrink:0}
+.chat-top{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #222;background:#1e1e1e}
+.chat-top .avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.chat-top .info{flex:1;min-width:0}
+.chat-top .uname{font-size:13px;font-weight:600;color:#fff}
+.chat-top .sub{font-size:11px;color:#666}
+.chat-top .logout{font-size:11px;color:#888;cursor:pointer;background:none;border:1px solid #333;padding:3px 8px;border-radius:4px;font-family:system-ui}
+.chat-top .logout:hover{color:#ff4444;border-color:#ff4444}
 
-/* Chat */
-.chat-panel{width:360px;min-width:300px;display:flex;flex-direction:column;border-left:1px solid #222;background:#1a1a1a;flex-shrink:0}
-.chat-header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #222;background:#1e1e1e}
-.chat-header .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:16px}
-.chat-header .title{font-weight:600;font-size:14px}
-.chat-header .sub{font-size:10px;color:#888}
+.games-section{border-bottom:1px solid #222;padding:6px 14px;flex-shrink:0}
+.games-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:12px;color:#888;padding:4px 0}
+.games-toggle:hover{color:#ccc}
+.games-toggle .arrow{transition:transform 0.2s}
+.games-toggle.open .arrow{transform:rotate(90deg)}
+.games-list{display:none;max-height:120px;overflow-y:auto;margin-top:4px}
+.games-list.open{display:block}
+.game-item{display:flex;align-items:center;justify-content:space-between;padding:4px 8px;margin:2px 0;background:rgba(255,255,255,0.03);border-radius:4px;font-size:11px;transition:all 0.15s;cursor:pointer}
+.game-item:hover{background:rgba(255,255,255,0.08)}
+.game-item .gtitle{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ccc}
+.game-item .gver{font-size:10px;color:#555;margin:0 8px}
+.game-item .gdel{color:#666;cursor:pointer;padding:2px 4px;font-size:14px;border-radius:2px;opacity:0;transition:all 0.15s}
+.game-item:hover .gdel{opacity:1}
+.game-item .gdel:hover{color:#ff4444;background:rgba(255,0,0,0.1)}
+.no-games{font-size:11px;color:#444;text-align:center;padding:8px}
+
 .chat-msgs{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
-.chat-msgs .time{text-align:center;font-size:10px;color:#555;margin:4px 0}
+.chat-msgs .time{text-align:center;font-size:10px;color:#444;margin:4px 0}
 .msg{max-width:85%;padding:8px 12px;border-radius:16px;font-size:13px;line-height:1.5;word-break:break-word;animation:fadeIn 0.2s}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .msg.ai{align-self:flex-start;background:#2a2a2a;border-bottom-left-radius:4px}
 .msg.user{align-self:flex-end;background:#4a6cf7;border-bottom-right-radius:4px;color:#fff}
-.chat-input{display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid #222;background:#1e1e1e}
+.chat-input{display:flex;align-items:center;gap:6px;padding:8px 12px;border-top:1px solid #222;background:#1e1e1e}
 .chat-input input{flex:1;padding:8px 14px;border-radius:18px;border:none;background:#2a2a2a;color:#e0e0e0;font-size:13px;outline:none;font-family:system-ui}
-.chat-input input::placeholder{color:#555}
-.chat-input .btn{width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
-.chat-input .btn-voice{background:#2a2a2a;color:#888}
-.chat-input .btn-voice:hover{background:#333}
+.chat-input input::placeholder{color:#444}
+.chat-input .btn{width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .chat-input .btn-send{background:#4a6cf7;color:#fff}
 .chat-input .btn-send:hover{background:#5a7cf7}
-
-/* Join screen */
-.overlay{position:fixed;top:0;left:0;width:100vw;height:100dvh;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center}
-.overlay .box{background:#1e1e1e;border:1px solid #333;border-radius:16px;padding:30px;text-align:center;max-width:360px;width:90%}
-.overlay .box h2{font-size:20px;margin-bottom:6px}
-.overlay .box p{font-size:13px;color:#888;margin-bottom:16px}
-.overlay .box input{padding:10px 14px;border-radius:10px;border:1px solid #444;background:#2a2a2a;color:#fff;font-size:15px;width:100%;text-align:center;outline:none;font-family:system-ui;letter-spacing:2px}
-.overlay .box input::placeholder{color:#555;letter-spacing:0}
-.overlay .box button{margin-top:12px;padding:8px 28px;border-radius:10px;border:none;background:#4a6cf7;color:#fff;font-size:14px;cursor:pointer;font-family:system-ui}
-.overlay .box .err{color:#ff4444;font-size:12px;margin-top:8px;min-height:16px}
+.chat-input .btn-send:disabled{background:#2a2a2a;color:#444;cursor:default}
+.turn-warn{text-align:center;font-size:10px;color:#664400;padding:4px}
 
 @media(max-width:768px){
-  .games-sidebar{display:none}
-  .chat-panel{width:100%;min-width:unset}
+  .app{flex-direction:column}
+  .chat-panel{width:100%;min-width:unset;flex:1;border-left:none}
   .preview-panel{position:fixed;top:0;left:0;width:100vw;height:100dvh;z-index:50;display:none}
   .preview-panel.show{display:flex}
 }
+.mobile-toggle{display:none;position:fixed;bottom:16px;right:16px;z-index:60;background:rgba(0,0,0,0.7);color:#fff;border:1px solid #333;border-radius:20px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:system-ui}
+@media(max-width:768px){.mobile-toggle{display:block}}
 </style>
-
-<div class="app" id="app">
-  <!-- Games Sidebar -->
-  <div class="games-sidebar" id="sidebar">
-    <div class="head">📁 我的游戏 <span id="sidebarName"></span></div>
-    <div class="list" id="gameList"><div class="empty">还没有保存的游戏</div></div>
-  </div>
-
-  <!-- Preview -->
+</head>
+<body>
+<div class="app">
+  <!-- Preview Panel -->
   <div class="preview-panel" id="previewPanel">
     <div class="preview-header">
       <div class="name"><span class="dot" id="liveDot"></span><span id="gameName">我的游戏</span></div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div class="vers" id="gameVer">v0</div>
-        <div class="btns">
-          <button class="btn-save" onclick="saveGame()" title="保存游戏">💾 保存</button>
-        </div>
+      <div class="btns">
+        <span class="vers" id="gameVer">v0</span>
+        <button class="save-btn" id="saveBtn" onclick="saveGame()">💾 保存</button>
       </div>
     </div>
-    <div class="empty-state" id="emptyState">
-      <div class="big">🎮</div>
+    <div class="empty-preview" id="emptyState">
+      <div class="icon">🎮</div>
       <p>在右边聊天，游戏会在这里显示</p>
     </div>
     <iframe class="preview-frame" id="previewFrame" style="display:none"></iframe>
   </div>
 
-  <!-- Chat -->
-  <div class="chat-panel" id="chatPanel">
-    <div class="chat-header">
+  <!-- Chat Panel -->
+  <div class="chat-panel">
+    <div class="chat-top">
       <div class="avatar">🤖</div>
-      <div><div class="title">AI 游戏工坊</div><div class="sub" id="userNameSub">说出你的游戏想法</div></div>
+      <div class="info">
+        <div class="uname" id="userName">加载中...</div>
+        <div class="sub">AI 游戏开发助手</div>
+      </div>
+      <button class="logout" onclick="logout()">🚪 退出</button>
     </div>
+
+    <div class="games-section">
+      <div class="games-toggle" id="gamesToggle" onclick="toggleGames()">
+        <span>📂 我的游戏</span><span class="arrow">▶</span>
+      </div>
+      <div class="games-list" id="gamesList">
+        <div class="no-games" id="noGames">还没有保存的游戏</div>
+      </div>
+    </div>
+
     <div class="chat-msgs" id="msgs">
-      <div class="msg ai">嗨！告诉我你想做什么游戏，咱们一起做出来！</div>
+      <div class="time">今天</div>
+      <div class="msg ai">嗨！我是你的游戏开发助手 🎮<br>告诉我你想做什么游戏，咱们一起做出来！</div>
     </div>
     <div class="chat-input">
-      <button class="btn btn-voice" id="voiceBtn" title="按住说话">🎤</button>
       <input type="text" id="input" placeholder="说说你的游戏想法..." onkeydown="if(event.key==='Enter')send()">
       <button class="btn btn-send" id="sendBtn" onclick="send()">➤</button>
     </div>
   </div>
 </div>
 
-<!-- Join overlay -->
-<div class="overlay" id="joinOverlay">
-  <div class="box">
-    <h2>🎮 游戏工坊</h2>
-    <p>请输入你的邀请码</p>
-    <input type="text" id="codeInput" placeholder="例如: a7k2x" maxlength="6" autocomplete="off">
-    <button onclick="join()">进入</button>
-    <div class="err" id="joinErr"></div>
-  </div>
-</div>
+<button class="mobile-toggle" id="mobileToggle" onclick="toggleMobile()">🎮 预览</button>
 
 <script>
-// ========== AUTH ==========
-var userCode,userName;
-var params=new URLSearchParams(location.search);
-var codeParam=params.get('code');
-
-async function init(){
-  if(codeParam){
-    try{
-      var r=await fetch('/api/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:codeParam})});
-      var d=await r.json();
-      if(d.ok){userCode=codeParam;userName=d.name;onJoined();return}
-    }catch(e){}
-  }
-  // Check cookie
-  try{
-    var r2=await fetch('/api/user');
-    var d2=await r2.json();
-    if(d2.code){userCode=d2.code;userName=d2.name;onJoined();return}
-  }catch(e){}
-  document.getElementById('joinOverlay').style.display='flex';
-}
-
-async function join(){
-  var code=document.getElementById('codeInput').value.trim().toLowerCase();
-  var err=document.getElementById('joinErr');
-  if(!code){err.textContent='请输入邀请码';return}
-  try{
-    var r=await fetch('/api/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
-    var d=await r.json();
-    if(d.ok){userCode=code;userName=d.name;onJoined();return}
-    err.textContent=d.error||'邀请码无效';
-  }catch(e){err.textContent='网络错误，再试一次'}
-}
-
-function onJoined(){
-  document.getElementById('joinOverlay').style.display='none';
-  document.getElementById('userNameSub').textContent=userName+'的工作台';
-  document.getElementById('sidebarName').textContent=userName;
-  if(codeParam) history.replaceState({},'','/platform/');
-  loadGameList();
-}
-
-// ========== GAME STORE ==========
-function loadGameList(){
-  fetch('/api/my-games').then(r=>r.json()).then(d=>{
-    var list=document.getElementById('gameList');
-    if(!d.games||d.games.length===0){
-      list.innerHTML='<div class="empty">还没有保存的游戏<br>开始聊天创作吧！</div>';
-      return;
-    }
-    list.innerHTML=d.games.map(function(g,i){
-      return '<div class="item'+(i===0?' active':'')+'" data-slug="'+g.slug+'" onclick="loadGame(\''+g.slug+'\')">'+
-        '<span class="tn">'+g.title+'</span>'+
-        '<span class="vn">v'+g.ver+'</span>'+
-        '<span class="del" onclick="event.stopPropagation();deleteGame(\''+g.slug+'\')">✕</span>'+
-        '</div>';
-    }).join('');
-  });
-}
-
-function loadGame(slug){
-  fetch('/api/load-game/'+slug).then(r=>r.json()).then(d=>{
-    if(d.html){gameCode=d.html;version=0;gameStarted=true;
-      document.querySelectorAll('#gameList .item').forEach(function(el){el.classList.toggle('active',el.dataset.slug===slug)});
-      gameName.textContent=slug;gameVer.textContent='v'+0;
-      emptyState.style.display='none';previewFrame.style.display='block';
-      updatePreview();
-    }
-  });
-}
-
-function saveGame(){
-  if(!gameCode){alert('还没有游戏可保存');return}
-  var slug=prompt('游戏名字（英文或拼音）:','my-game');
-  if(!slug)return;
-  fetch('/api/save-game',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({slug:slug,title:slug,html:gameCode})
-  }).then(r=>r.json()).then(function(d){
-    if(d.ok){addMsg('💾 已保存！（v'+d.ver+'）',false);loadGameList()}
-    else addMsg('保存失败：'+d.error,false);
-  });
-}
-
-function deleteGame(slug){
-  if(!confirm('确定删除 '+slug+'？'))return;
-  fetch('/api/delete-game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})})
-    .then(function(r){return r.json()}).then(function(d){if(d.ok)loadGameList()});
-}
-
-// ========== CHAT + AI ==========
 var msgs=document.getElementById('msgs'),input=document.getElementById('input');
-var gameCode='',gameStarted=false,version=0;
-var gameName=document.getElementById('gameName'),gameVer=document.getElementById('gameVer');
 var previewFrame=document.getElementById('previewFrame'),emptyState=document.getElementById('emptyState');
+var gameName=document.getElementById('gameName'),gameVer=document.getElementById('gameVer');
+var version=0,gameStarted=false,gameCode='',currentSlug='';
 var messages=[],turnCount=0,maxTurns=15;
+var DS_KEY='sk-9f144fd5a6af47919a1875cfc019511e';
 
 var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，专门帮儿童设计和开发网页小游戏。\n"+
 "规则：\n"+
-"1. 只能做游戏相关的事。非游戏问题回复：'我只会做游戏哦～说说你想做什么吧！'\n"+
-"2. 游戏用Canvas绘制，单文件HTML，不依赖外部资源\n"+
-"3. 完整代码用 ```html ... ``` 包裹，每次输出完整可运行文件\n"+
+"1. 只能做游戏。非游戏问题回复：'我只会做游戏哦～说说你想做什么吧！'\n"+
+"2. 完整可运行的单文件HTML，用Canvas绘制，零外部依赖\n"+
+"3. 完整代码用 ```html ... ``` 包裹\n"+
 "4. 代码控制在200行以内，简洁好玩\n"+
 "5. 先简短确认需求（一句话），再给代码\n"+
-"6. 要有分数、血量或输赢条件\n"+
-"7. 鼓励的语气，友好\n"+
-"8. 支持WASD/方向键，Canvas自适应屏幕";
+"6. 要有操作说明和输赢条件\n"+
+"7. 多鼓励，语气友好\n"+
+"8. 画布自适应，手机也能玩";
 
+// === Auth ===
+async function checkAuth(){
+  try{
+    var r=await fetch('/api/me');var d=await r.json();
+    if(!d.loggedIn){location.href='/platform/login.html';return}
+    document.getElementById('userName').textContent='👤 '+d.username+' 的工作台';
+    loadGameList();
+  }catch(e){location.href='/platform/login.html'}
+}
+
+async function logout(){
+  await fetch('/api/logout',{method:'POST'});
+  location.href='/platform/login.html';
+}
+
+// === Game List ===
+function toggleGames(){
+  var list=document.getElementById('gamesList'),tog=document.getElementById('gamesToggle');
+  list.classList.toggle('open');tog.classList.toggle('open');
+}
+
+async function loadGameList(){
+  try{
+    var r=await fetch('/api/my-games');var d=await r.json();
+    var list=document.getElementById('gamesList'),no=document.getElementById('noGames');
+    list.querySelectorAll('.game-item').forEach(function(el){el.remove()});
+    if(!d.games||d.games.length===0){no.style.display='block';return}
+    no.style.display='none';
+    d.games.forEach(function(g){
+      var item=document.createElement('div');item.className='game-item';
+      item.innerHTML='<span class="gtitle">'+esc(g.title)+'</span><span class="gver">v'+g.ver+'</span><span class="gdel" title="删除">🗑️</span>';
+      item.querySelector('.gtitle').onclick=function(){loadGame(g.slug)};
+      item.querySelector('.gdel').onclick=function(e){e.stopPropagation();deleteGame(g.slug)};
+      list.appendChild(item);
+    });
+  }catch(e){}
+}
+
+async function saveGame(){
+  if(!gameCode)return addMsg('还没有游戏可以保存',false);
+  var title=prompt('给游戏起个名字：',gameName.textContent==='我的游戏'?'':gameName.textContent);
+  if(!title)return;
+  var slug=title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g,'-').slice(0,30)||'game'+Date.now();
+  try{
+    var r=await fetch('/api/save-game',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({slug:slug,title:title,html:gameCode})});
+    var d=await r.json();
+    if(d.ok){currentSlug=slug;gameName.textContent=title;addMsg('✅ 已保存：「'+title+'」',false);loadGameList()}
+    else addMsg('保存失败：'+d.error,false);
+  }catch(e){addMsg('保存失败，请重试',false)}
+}
+
+async function loadGame(slug){
+  try{
+    var r=await fetch('/api/load-game/'+slug);var d=await r.json();
+    if(d.html){gameCode=d.html;currentSlug=slug;gameStarted=true;version++;
+      emptyState.style.display='none';previewFrame.style.display='block';
+      gameName.textContent=slug;gameVer.textContent='已加载';
+      updatePreview();addMsg('📂 已加载游戏',false)}
+  }catch(e){addMsg('加载失败',false)}
+}
+
+async function deleteGame(slug){
+  if(!confirm('确定删除这个游戏？'))return;
+  try{
+    await fetch('/api/delete-game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:slug})});
+    loadGameList();
+    if(currentSlug===slug){currentSlug='';addMsg('已删除',false)}
+  }catch(e){}
+}
+
+// === Chat ===
 function addMsg(text,isUser){
   var div=document.createElement('div');
   div.className='msg '+(isUser?'user':'ai');
-  div.innerHTML=text;msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+  div.innerHTML=text;
+  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
 }
 
-async function aiRespond(userText){
-  turnCount++;
-  if(turnCount>maxTurns){addMsg('🎉 今天做得很棒了！<br>游戏已保存，明天继续改进吧～',false);return}
-  var typing=document.createElement('div');typing.className='msg ai';typing.textContent='...';typing.id='typing';
+async function send(){
+  var text=input.value.trim();if(!text)return;
+  if(turnCount>=maxTurns){addMsg('🎉 今天做得很棒了！游戏已保存在左边，明天继续～',false);return}
+  addMsg(text,true);input.value='';turnCount++;
+
+  var typing=document.createElement('div');
+  typing.className='msg ai';typing.textContent='...';typing.id='typing';
   msgs.appendChild(typing);msgs.scrollTop=msgs.scrollHeight;
-  messages.push({role:'user',content:userText});
+  messages.push({role:'user',content:text});
+
   try{
     var resp=await fetch('https://api.deepseek.com/v1/chat/completions',{
-      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer sk-9f144fd5a6af47919a1875cfc019511e'},
-      body:JSON.stringify({model:'deepseek-chat',messages:[{role:'system',content:SYSTEM_PROMPT},...messages],max_tokens:4096,temperature:0.7})
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+DS_KEY},
+      body:JSON.stringify({model:'deepseek-chat',messages:[{role:'system',content:SYSTEM_PROMPT}].concat(messages),max_tokens:4096,temperature:0.7})
     });
     var data=await resp.json();typing.remove();
     if(data.error){addMsg('出错了：'+data.error.message,false);return}
     var reply=data.choices[0].message.content;
     messages.push({role:'assistant',content:reply});
+
     var codeMatch=reply.match(/```html\n?([\s\S]*?)```/);
     if(codeMatch){
-      gameCode=codeMatch[1];
-      if(!gameStarted){gameStarted=true;gameName.textContent=userText.slice(0,20)}
+      gameCode=codeMatch[1];currentSlug='';
+      if(!gameStarted){gameStarted=true;gameName.textContent='我的游戏'}
       version++;gameVer.textContent='v'+version;
       emptyState.style.display='none';previewFrame.style.display='block';updatePreview();
     }
-    addMsg(reply.replace(/```html[\s\S]*?```/g,'[游戏已更新到左边]'),false);
-  }catch(e){typing.remove();addMsg('网络出错了，再试一次吧～',false);}
+    var display=reply.replace(/```html[\s\S]*?```/g,'[🎮 游戏已更新到左边预览区]');
+    addMsg(display,false);
+  }catch(e){typing.remove();addMsg('网络出错了，再试一次吧～',false)}
 }
 
 function updatePreview(){previewFrame.srcdoc=gameCode}
-function send(){var text=input.value.trim();if(!text)return;addMsg(text,true);input.value='';aiRespond(text)}
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
 
-// Voice placeholder
-var voiceBtn=document.getElementById('voiceBtn');
-voiceBtn.addEventListener('mousedown',function(){voiceBtn.style.color='#ff4444'});
-voiceBtn.addEventListener('mouseup',function(){voiceBtn.style.color='#888'});
-voiceBtn.addEventListener('mouseleave',function(){voiceBtn.style.color='#888'});
+function toggleMobile(){
+  var panel=document.getElementById('previewPanel'),btn=document.getElementById('mobileToggle');
+  panel.classList.toggle('show');btn.textContent=panel.classList.contains('show')?'💬 聊天':'🎮 预览';
+}
 
-init();
+checkAuth();
 </script>
 </html>
