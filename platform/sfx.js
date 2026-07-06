@@ -1,8 +1,9 @@
-// 🎵 sfx.js - 游戏音效系统 (Web Audio API 合成，无需音频文件)
+// 🎵 sfx.js - 游戏音效&背景音乐系统 (Web Audio API 合成，无需音频文件)
 var SFX = (function(){
   var ctx = null;
   var enabled = true;
   var volume = 0.3;
+  var bgmNode = null, bgmGain = null, bgmOn = false;
 
   function getCtx(){
     if(!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)(); }
@@ -47,99 +48,192 @@ var SFX = (function(){
     o.stop(c.currentTime+(opt.delay||0)+dur);
   }
 
-  // ===== 音效预设 =====
+  // ===== 背景音乐 (BGM) =====
 
-  // UI 点击
+  // 8-bit 风格冒险 BGM
+  function bgmAdventure(){
+    stopBGM();
+    var c=getCtx();
+    bgmGain = c.createGain();
+    bgmGain.gain.value = volume * 0.25;
+    bgmGain.connect(c.destination);
+
+    var notes = [262,294,330,349,392,349,330,294, 262,330,392,523, 392,330,349,294];
+    var dur = 0.2;
+    var i = 0;
+    function playNote(){
+      if(!bgmOn)return;
+      var o=c.createOscillator();o.type='square';
+      var g=c.createGain();g.gain.setValueAtTime(0.3,c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+dur*0.9);
+      o.frequency.value=notes[i%notes.length];
+      g.connect(bgmGain);o.connect(g);
+      o.start();o.stop(c.currentTime+dur);
+      i++;
+      bgmNode=setTimeout(playNote,dur*1000);
+    }
+    bgmOn=true;playNote();
+  }
+
+  // 轻快探索 BGM
+  function bgmExplore(){
+    stopBGM();
+    var c=getCtx();
+    bgmGain = c.createGain();
+    bgmGain.gain.value = volume * 0.2;
+    bgmGain.connect(c.destination);
+
+    var notes=[330,392,440,392, 330,294,262,294, 330,392,523,440, 392,330,294,262];
+    var dur=0.3;
+    var i=0;
+    function playNote(){
+      if(!bgmOn)return;
+      var o=c.createOscillator();o.type='triangle';
+      var g=c.createGain();g.gain.setValueAtTime(0.25,c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+dur*0.85);
+      o.frequency.value=notes[i%notes.length];
+      g.connect(bgmGain);o.connect(g);
+      o.start();o.stop(c.currentTime+dur);
+      i++;
+      bgmNode=setTimeout(playNote,dur*1000);
+    }
+    bgmOn=true;playNote();
+  }
+
+  // 紧张刺激 BGM
+  function bgmTense(){
+    stopBGM();
+    var c=getCtx();
+    bgmGain = c.createGain();
+    bgmGain.gain.value = volume * 0.3;
+    bgmGain.connect(c.destination);
+
+    var notes=[196,220,247,262, 247,220,196,220, 262,294,330,294, 262,247,220,196];
+    var dur=0.15;
+    var i=0;
+    function playNote(){
+      if(!bgmOn)return;
+      var o=c.createOscillator();o.type='sawtooth';
+      var g=c.createGain();g.gain.setValueAtTime(0.2,c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+dur*0.7);
+      o.frequency.value=notes[i%notes.length];
+      g.connect(bgmGain);o.connect(g);
+      o.start();o.stop(c.currentTime+dur);
+      i++;
+      bgmNode=setTimeout(playNote,dur*1000);
+    }
+    bgmOn=true;playNote();
+  }
+
+  // 太空科幻 BGM
+  function bgmSpace(){
+    stopBGM();
+    var c=getCtx();
+    bgmGain = c.createGain();
+    bgmGain.gain.value = volume * 0.2;
+    bgmGain.connect(c.destination);
+
+    var notes=[262,262,392,392,440,440,392, 349,349,330,330,294,294,262];
+    var dur=0.35;
+    var i=0;
+    function playNote(){
+      if(!bgmOn)return;
+      var o=c.createOscillator();o.type='sine';
+      var g=c.createGain();g.gain.setValueAtTime(0.3,c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01,c.currentTime+dur*0.9);
+      o.frequency.value=notes[i%notes.length];
+      var o2=c.createOscillator();o2.type='sine';
+      o2.frequency.value=notes[i%notes.length]*1.5;
+      var g2=c.createGain();g2.gain.setValueAtTime(0.1,c.currentTime);
+      g2.gain.exponentialRampToValueAtTime(0.01,c.currentTime+dur*0.9);
+      g.connect(bgmGain);o.connect(g);
+      g2.connect(bgmGain);o2.connect(g2);
+      o.start();o2.start();
+      o.stop(c.currentTime+dur);o2.stop(c.currentTime+dur);
+      i++;
+      bgmNode=setTimeout(playNote,dur*1000);
+    }
+    bgmOn=true;playNote();
+  }
+
+  function stopBGM(){
+    bgmOn=false;
+    if(bgmNode){clearTimeout(bgmNode);bgmNode=null}
+  }
+
+  // 切换背景音乐开关
+  function toggleBGM(){
+    if(bgmOn){stopBGM();return false}
+    return true;
+  }
+
+  // ===== 音效预设 =====
   function click(){ tone(800,0.05,'sine'); }
   function tap(){ tone(600,0.04,'sine'); }
-
-  // 收集/拾取
   function collect(){
     tone(880,0.08,'sine');
     setTimeout(function(){tone(1320,0.08,'sine')},60);
   }
-
-  // 射击
   function shoot(){
     var buf=noise(0.06);
     playBuf(buf,{vol:0.4});
     tone(200,0.1,'square',{vol:0.3});
   }
-
-  // 爆炸
   function boom(){
     var buf=noise(0.25);
     playBuf(buf,{vol:0.6});
     tone(60,0.3,'sawtooth',{vol:0.5,detune:-300});
   }
-
-  // 受伤
   function hurt(){
     tone(200,0.15,'sawtooth',{vol:0.4,detune:-200});
   }
-
-  // 得分
   function score(){
     tone(523,0.1,'sine');
     setTimeout(function(){tone(659,0.1,'sine')},80);
     setTimeout(function(){tone(784,0.15,'sine')},160);
   }
-
-  // 成功
   function success(){
     tone(523,0.1,'sine');
     setTimeout(function(){tone(659,0.1,'sine')},100);
     setTimeout(function(){tone(784,0.1,'sine')},200);
     setTimeout(function(){tone(1047,0.2,'sine')},300);
   }
-
-  // 失败/错误
   function fail(){
     tone(300,0.15,'sawtooth',{vol:0.3});
     setTimeout(function(){tone(200,0.2,'sawtooth',{vol:0.3})},120);
   }
-
-  // 跳跃
   function jump(){
     tone(400,0.06,'sine');
     setTimeout(function(){tone(600,0.06,'sine')},40);
   }
-
-  // 升级/强化
   function powerup(){
     tone(440,0.08,'sine');
     setTimeout(function(){tone(554,0.08,'sine')},70);
     setTimeout(function(){tone(659,0.08,'sine')},140);
     setTimeout(function(){tone(880,0.15,'sine')},210);
   }
-
-  // 倒计时 tick
   function tick(){ tone(1000,0.03,'sine'); }
-
-  // 消息提示
   function notify(){ tone(1200,0.06,'sine');tone(1600,0.06,'sine',{delay:0.04}); }
-
-  // 移动/滑动
   function whoosh(){
     var buf=noise(0.1);
     playBuf(buf,{vol:0.2,detune:800});
   }
-
-  // 闪现/瞬移
   function teleport(){
     tone(300,0.15,'sine',{detune:1200});
   }
 
-  // ===== 公共 API =====
   return {
     enabled: function(v){ if(v!==undefined) enabled=v; return enabled; },
     volume: function(v){ if(v!==undefined) volume=Math.max(0,Math.min(1,v)); return volume; },
     resume: function(){ var c=getCtx(); if(c.state==='suspended') c.resume(); },
-    // 预设
+    // 背景音乐
+    bgmAdventure: bgmAdventure, bgmExplore: bgmExplore,
+    bgmTense: bgmTense, bgmSpace: bgmSpace,
+    stopBGM: stopBGM, toggleBGM: toggleBGM,
+    // 音效预设
     click: click, tap: tap, collect: collect, shoot: shoot, boom: boom,
     hurt: hurt, score: score, success: success, fail: fail, jump: jump,
     powerup: powerup, tick: tick, notify: notify, whoosh: whoosh, teleport: teleport,
-    // 自定义音效
     tone: tone, noise: function(d){return playBuf(noise(d))}
   };
 })();
