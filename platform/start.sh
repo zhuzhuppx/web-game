@@ -1,7 +1,9 @@
 #!/bin/bash
 cd /home/ppx/.qwenpaw/workspaces/D2GPcF/www/platform
-# Set DEEPSEEK_API_KEY_GAME and ADMIN_PASSWORD before running
+# 请在启动前设置环境变量
 # export DEEPSEEK_API_KEY_GAME=sk-xxx
 # export ADMIN_PASSWORD=admin123
-node server.js >> /tmp/platform.log 2>&1 &
-echo "啟動於 PID: $!"
+fuser -k 8765/tcp 2>/dev/null
+sleep 1
+nohup node server.js > /tmp/platform.log 2>&1 &
+echo "平台启动于 PID: $! → http://localhost:8765/platform/"

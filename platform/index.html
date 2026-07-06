@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>AI 游戏工坊</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui;background:#0f0f0f;color:#e0e0e0;height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#1a1a1a;border:1px solid #222;border-radius:16px;padding:32px;width:400px;max-width:90vw;text-align:center}
+.card h1{color:#fff;margin-bottom:8px}.card p{color:#888;font-size:14px;line-height:1.8}
+.card input{margin-top:16px;padding:8px 14px;border-radius:8px;border:1px solid #333;background:#2a2a2a;color:#fff;font-size:14px;width:80%;text-align:center;outline:none}
+.card .btn{margin-top:12px;padding:10px 24px;border-radius:8px;border:none;background:#4a6cf7;color:#fff;cursor:pointer;font-size:14px;font-weight:600}
+.card .note{font-size:12px;color:#555;margin-top:12px}
+</style></head><body>
+<div class="card">
+  <h1>🤖 AI 游戏工坊</h1>
+  <p>这个平台需要先配置 frp 隧道<br>请输入分配的端口号：</p>
+  <input type="text" id="port" placeholder="例如 18765" onkeydown="if(event.key==='Enter')go()">
+  <br><button class="btn" onclick="go()">进入工坊</button>
+  <div class="note">端口号只需输入一次，下次自动进入</div>
+</div>
+<script>
+var saved=localStorage.getItem('platform_port');
+if(saved){document.getElementById('port').value=saved;setTimeout(go,300)}
+function go(){
+  var p=document.getElementById('port').value.trim();
+  if(!p)return;
+  localStorage.setItem('platform_port',p);
+  location.href='http://game.2u1.cn:'+p+'/platform/';
+}
+</script>
+</body></html>
