@@ -17,6 +17,11 @@ function readUsers(){return JSON.parse(fs.readFileSync(USERS_FILE,'utf8'))}
 function writeUsers(u){fs.writeFileSync(USERS_FILE,JSON.stringify(u,null,2))}
 function hash(pw){return crypto.createHash('sha256').update(pw+SALT).digest('hex')}
 
+// 用户 → 短码（用 SHA256 前 6 位，避免中文 URL）
+function userCode(name){return crypto.createHash('sha256').update('u_'+name).digest('hex').slice(0,6)}
+// 游戏 ID 生成（递增）
+function nextGameId(meta){var i=1;while(meta['g'+i])i++;return 'g'+i}
+
 var app=express();
 app.use(express.json({limit:'2mb'}));
 app.use(cookieParser());
@@ -27,8 +32,7 @@ app.use(function(req,res,next){
   next();
 });
 app.get('/', function(req,res){
-  var html=fs.readFileSync(path.resolve(__dirname,'workspace.html'),'utf8');
-  res.type('html').send(html);
+  res.type('html').send(fs.readFileSync(path.resolve(__dirname,'workspace.html'),'utf8'));
 });
 app.get('/login', function(req,res){
   res.type('html').send(fs.readFileSync(path.join(__dirname,'login.html'),'utf8'));
@@ -37,36 +41,40 @@ app.get('/admin', function(req,res){
   res.type('html').send(fs.readFileSync(path.join(__dirname,'admin.html'),'utf8'));
 });
 app.get('/api/config', function(req,res){
-  // 不使用服务端 Key，用户需自行设置
   res.json({apiKey:'',notice:'请点击右上角 ⚙️ 设置你的 DeepSeek API Key'});
 });
 app.use('/platform', express.static(__dirname, {index: false}));
 
-app.get('/p/:user/:slug',function(req,res){
-  var file=path.join(GAMES_DIR,req.params.user,req.params.slug+'.html');
-  if(!fs.existsSync(file))return res.status(404).send('not found');
-  res.sendFile(file);
-});
-
-// 独立游戏播放页（分享用）
-app.get('/play/:user/:slug',function(req,res){
-  var file=path.join(GAMES_DIR,req.params.user,req.params.slug+'.html');
+// 独立游戏播放页（分享用）— 纯英文短码 URL
+app.get('/play/:ucode/:gcode',function(req,res){
+  // 从 ucode 反查用户名
+  var users=readUsers(),userName=null;
+  Object.keys(users).forEach(function(n){if(users[n].code===req.params.ucode)userName=n});
+  if(!userName)return res.status(404).send('用户不存在');
+  var metaFile=path.join(GAMES_DIR,userName,'meta.json');
+  if(!fs.existsSync(metaFile))return res.status(404).send('游戏不存在');
+  var meta=JSON.parse(fs.readFileSync(metaFile,'utf8'));
+  var info=meta[req.params.gcode];
+  if(!info)return res.status(404).send('游戏不存在');
+  var file=path.join(GAMES_DIR,userName,req.params.gcode+'.html');
   if(!fs.existsSync(file))return res.status(404).send('游戏不存在');
   var html=fs.readFileSync(file,'utf8');
-  var metaFile=path.join(GAMES_DIR,req.params.user,'meta.json');
-  var meta=fs.existsSync(metaFile)?JSON.parse(fs.readFileSync(metaFile,'utf8')):{};
-  var info=meta[req.params.slug]||{};
-  var title=info.title||req.params.slug;
-  // 注入移动端适配 meta + 全屏样式
+  var title=info.title||'游戏';
   var wrapper='<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">'+
     '<title>'+title+' - AI 游戏工坊</title>'+
     '<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:100%;height:100%;overflow:hidden;background:#000}'+
     'canvas{display:block}</style></head><body>';
-  // 只注入包装，保留原游戏代码的 <html><body> 标签
   res.send(html.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'').replace(/<head>[\s\S]*?<\/head>/i,function(m){
     return wrapper+m.replace(/<\/head>/i,'');
   }));
+});
+
+// 兼容旧 URL
+app.get('/p/:user/:slug',function(req,res){
+  var file=path.join(GAMES_DIR,req.params.user,req.params.slug+'.html');
+  if(!fs.existsSync(file))return res.status(404).send('not found');
+  res.sendFile(file);
 });
 
 function requireAuth(req,res,next){
@@ -75,6 +83,7 @@ function requireAuth(req,res,next){
   var users=readUsers();
   if(!users[user]||!users[user].active)return res.status(403).json({error:'账号无效'});
   req.userName=user;
+  req.userCode=users[user].code;
   next();
 }
 
@@ -91,10 +100,10 @@ app.post('/api/register',function(req,res){
   if(p.length<3)return res.status(400).json({error:'密码至少3位'});
   var users=readUsers();
   if(users[u])return res.status(409).json({error:'用户名已存在'});
-  users[u]={pass:hash(p),active:true,created:new Date().toISOString().slice(0,10)};
+  users[u]={pass:hash(p),active:true,code:userCode(u),created:new Date().toISOString().slice(0,10)};
   writeUsers(users);
   res.cookie('auth_token',u,{maxAge:30*24*3600*1000,httpOnly:false,sameSite:'lax'});
-  res.json({ok:true,username:u});
+  res.json({ok:true,username:u,code:users[u].code});
 });
 
 app.post('/api/login',function(req,res){
@@ -103,7 +112,7 @@ app.post('/api/login',function(req,res){
   if(!users[u]||!users[u].active||users[u].pass!==hash(p))
     return res.status(401).json({error:'用户名或密码错误'});
   res.cookie('auth_token',u,{maxAge:30*24*3600*1000,httpOnly:false,sameSite:'lax'});
-  res.json({ok:true,username:u});
+  res.json({ok:true,username:u,code:users[u].code});
 });
 
 app.post('/api/logout',function(req,res){
@@ -116,81 +125,80 @@ app.get('/api/me',function(req,res){
   if(!user)return res.json({loggedIn:false});
   var users=readUsers();
   if(!users[user]||!users[user].active)return res.json({loggedIn:false});
-  res.json({loggedIn:true,username:user});
+  res.json({loggedIn:true,username:user,code:users[user].code});
 });
 
-app.get('/api/my-games',requireAuth,function(req,res){
-  listGames(req,res);
-});
-app.get('/api/games',requireAuth,function(req,res){
-  listGames(req,res);
-});
+// 旧用户迁移：没有 code 的补上
+function ensureUserCode(){
+  var users=readUsers(),changed=false;
+  Object.keys(users).forEach(function(n){
+    if(!users[n].code){users[n].code=userCode(n);changed=true}
+  });
+  if(changed)writeUsers(users);
+}
+ensureUserCode();
+
+app.get('/api/my-games',requireAuth,listGames);
+app.get('/api/games',requireAuth,listGames);
 function listGames(req,res){
   var dir=path.join(GAMES_DIR,req.userName);
   if(!fs.existsSync(dir))return res.json({games:[]});
   var metaFile=path.join(dir,'meta.json');
   var meta=fs.existsSync(metaFile)?JSON.parse(fs.readFileSync(metaFile,'utf8')):{};
   var games=Object.values(meta).sort(function(a,b){return b.updated-a.updated});
-  res.json({games:games});
+  res.json({games:games,userCode:req.userCode});
 }
 
-app.post('/api/save-game',requireAuth,function(req,res){
-  saveGame(req,res);
-});
-app.post('/api/save',requireAuth,function(req,res){
-  saveGame(req,res);
-});
+app.post('/api/save-game',requireAuth,saveGame);
+app.post('/api/save',requireAuth,saveGame);
 function saveGame(req,res){
   var title=req.body.title||'',html=req.body.html||'';
   if(!title||!html)return res.status(400).json({error:'缺少参数'});
-  var slug=title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g,'-').slice(0,40);
   var dir=path.join(GAMES_DIR,req.userName);
   if(!fs.existsSync(dir))fs.mkdirSync(dir,{recursive:true});
   var metaFile=path.join(dir,'meta.json');
   var meta=fs.existsSync(metaFile)?JSON.parse(fs.readFileSync(metaFile,'utf8')):{};
-  var existing=meta[slug],ver=existing?existing.ver+1:1;
-  meta[slug]={title:title,ver:ver,slug:slug,updated:Date.now()};
+  // 如果已有同名游戏 → 覆盖；否则新建
+  var existing=Object.values(meta).find(function(g){return g.title===title});
+  var gid,ver;
+  if(existing){gid=existing.id;ver=existing.ver+1}
+  else{gid=nextGameId(meta);ver=1}
+  meta[gid]={id:gid,title:title,ver:ver,updated:Date.now()};
   fs.writeFileSync(metaFile,JSON.stringify(meta,null,2));
-  fs.writeFileSync(path.join(dir,slug+'.html'),html);
-  res.json({ok:true,slug:slug,ver:ver});
+  fs.writeFileSync(path.join(dir,gid+'.html'),html);
+  res.json({ok:true,id:gid,ver:ver});
 }
 
-app.get('/api/load-game/:slug',requireAuth,function(req,res){
-  loadGame(req,res);
-});
-app.get('/api/game/:title',requireAuth,function(req,res){
-  loadGame(req,res);
-});
+app.get('/api/load-game/:id',requireAuth,function(req,res){loadGame(req,res)});
+app.get('/api/game/:id',requireAuth,function(req,res){loadGame(req,res)});
 function loadGame(req,res){
-  var id=req.params.slug||req.params.title;
-  var slug=id.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g,'-').slice(0,40);
-  var file=path.join(GAMES_DIR,req.userName,slug+'.html');
-  if(!fs.existsSync(file))return res.status(404).json({error:'游戏不存在'});
-  var metaFile=path.join(GAMES_DIR,req.userName,'meta.json');
+  var id=req.params.id;
+  var dir=path.join(GAMES_DIR,req.userName);
+  var metaFile=path.join(dir,'meta.json');
   var meta=fs.existsSync(metaFile)?JSON.parse(fs.readFileSync(metaFile,'utf8')):{};
-  var info=meta[slug]||{};
-  res.json({ok:true,html:fs.readFileSync(file,'utf8'),title:info.title||id,version:info.ver||1});
+  // 按 ID 查找，或按旧 slug 兼容
+  var info=meta[id];
+  if(!info){info=Object.values(meta).find(function(g){return g.title===id})}
+  if(!info)return res.status(404).json({error:'游戏不存在'});
+  var file=path.join(dir,info.id+'.html');
+  if(!fs.existsSync(file))return res.status(404).json({error:'文件丢失'});
+  res.json({ok:true,html:fs.readFileSync(file,'utf8'),title:info.title,id:info.id,version:info.ver||1});
 }
 
-app.post('/api/delete-game',requireAuth,function(req,res){
-  deleteGame(req,res);
-});
-app.post('/api/delete',requireAuth,function(req,res){
-  deleteGame(req,res);
-});
+app.post('/api/delete-game',requireAuth,deleteGame);
+app.post('/api/delete',requireAuth,deleteGame);
 function deleteGame(req,res){
-  var id=req.body.slug||req.body.title;
+  var id=req.body.id||req.body.slug||req.body.title;
   if(!id)return res.status(400).json({error:'缺少参数'});
-  var slug=id.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g,'-').slice(0,40);
   var dir=path.join(GAMES_DIR,req.userName);
-  var file=path.join(dir,slug+'.html');
-  if(fs.existsSync(file))fs.unlinkSync(file);
   var metaFile=path.join(dir,'meta.json');
-  if(fs.existsSync(metaFile)){
-    var meta=JSON.parse(fs.readFileSync(metaFile,'utf8'));
-    delete meta[slug];
-    fs.writeFileSync(metaFile,JSON.stringify(meta,null,2));
-  }
+  var meta=fs.existsSync(metaFile)?JSON.parse(fs.readFileSync(metaFile,'utf8')):{};
+  var info=meta[id]||Object.values(meta).find(function(g){return g.title===id||g.id===id});
+  if(!info)return res.status(404).json({error:'游戏不存在'});
+  var file=path.join(dir,info.id+'.html');
+  if(fs.existsSync(file))fs.unlinkSync(file);
+  delete meta[info.id];
+  fs.writeFileSync(metaFile,JSON.stringify(meta,null,2));
   res.json({ok:true});
 }
 
@@ -206,7 +214,7 @@ app.get('/api/admin/users',requireAdmin,function(req,res){
     var u=users[name];
     var dir=path.join(GAMES_DIR,name);
     var meta=fs.existsSync(path.join(dir,'meta.json'))?JSON.parse(fs.readFileSync(path.join(dir,'meta.json'),'utf8')):{};
-    result.push({username:name,active:u.active,created:u.created,gameCount:Object.keys(meta).length});
+    result.push({username:name,code:u.code,active:u.active,created:u.created,gameCount:Object.keys(meta).length});
   });
   res.json({users:result});
 });

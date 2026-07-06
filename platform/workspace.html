@@ -251,7 +251,7 @@ body{display:flex;flex-direction:column}
 </div>
 
 <script>
-var username='',gameCode='',gameTitle='我的游戏',version=0,gameStarted=false,gameSaved=false;
+var username='',userCode='',gameCode='',gameTitle='我的游戏',gameId='',version=0,gameStarted=false,gameSaved=false;
 var messages=[],turnCount=0,maxTurns=15,DS_KEY='';
 var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，帮小朋友把游戏想法变成现实。小朋友是游戏设计师，你只负责实现他的设计。\n\n"+
 "## 设计思维四步法\n"+
@@ -287,7 +287,7 @@ async function init(){
   try{
     var r=await fetch('/api/me');var d=await r.json();
     if(!d.loggedIn){location.href='/login';return}
-    username=d.username;
+    username=d.username;userCode=d.code;
     document.getElementById('usernameLabel').textContent='👤 '+username+' 的工作台';
 
     // 优先用 localStorage 的 key
@@ -585,9 +585,9 @@ async function doSave(){
   gameTitle=name;
   document.getElementById('gameName').textContent=gameTitle;
   try{
-    var r=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:gameTitle,html:gameCode,version:version})});
+    var r=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:gameTitle,html:gameCode,id:gameId,version:version})});
     var d=await r.json();
-    if(d.ok){closeSave();gameSaved=true;SFX.success();alert('保存成功！✌️')}else{SFX.fail();alert('保存失败：'+d.error)}
+    if(d.ok){closeSave();gameSaved=true;gameId=d.id;SFX.success();alert('保存成功！✌️')}else{SFX.fail();alert('保存失败：'+d.error)}
   }catch(e){SFX.fail();alert('保存失败')}
 }
 
@@ -601,20 +601,20 @@ async function loadGameList(){
     d.games.forEach(function(g){
       var div=document.createElement('div');
       div.className='game-item';
-      div.innerHTML='<span class="gtitle">'+g.title+'</span><span class="gver">v'+g.version+'</span><span class="gdel" title="删除">🗑️</span>';
-      div.querySelector('.gtitle').onclick=function(){loadGame(g.title)};
-      div.querySelector('.gdel').onclick=function(e){e.stopPropagation();deleteGame(g.title)};
+      div.innerHTML='<span class="gtitle">'+g.title+'</span><span class="gver">v'+g.ver+'</span><span class="gdel" title="删除">🗑️</span>';
+      div.querySelector('.gtitle').onclick=function(){loadGame(g.id,g.title)};
+      div.querySelector('.gdel').onclick=function(e){e.stopPropagation();deleteGame(g.id,g.title)};
       list.appendChild(div);
     });
   }catch(e){}
 }
 
-async function loadGame(title){
+async function loadGame(id,title){
   try{
-    var r=await fetch('/api/game/'+encodeURIComponent(title));
+    var r=await fetch('/api/game/'+encodeURIComponent(id));
     var d=await r.json();
     if(!d.ok){alert('加载失败');return}
-    gameCode=d.html;gameTitle=d.title;version=d.version;gameSaved=false;
+    gameCode=d.html;gameTitle=d.title;gameId=d.id;version=d.version;gameSaved=false;
     document.getElementById('gameName').textContent=gameTitle;
     document.getElementById('gameVer').textContent='🔄 第'+version+'次迭代';
     var frame=document.getElementById('previewFrame');
@@ -625,10 +625,10 @@ async function loadGame(title){
   }catch(e){alert('加载失败')}
 }
 
-async function deleteGame(title){
+async function deleteGame(id,title){
   if(!confirm('确定删除「'+title+'」？'))return;
   try{
-    var r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title})});
+    var r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
     var d=await r.json();
     if(d.ok){loadGameList()}else{alert('删除失败')}
   }catch(e){alert('删除失败')}
@@ -669,7 +669,7 @@ function enterWorkspace(){
   document.getElementById('input').focus();
   // 重置聊天
   if(!gameStarted){
-    gameSaved=false;
+    gameSaved=false;gameId='';gameCode='';gameTitle='我的游戏';version=0;
     messages=[];turnCount=0;
     // 清空聊天
     var msgs=document.getElementById('msgs');
@@ -695,7 +695,7 @@ function backToLobby(){
   closePreview();
   buildLobby();
   // 重置状态，下次新建游戏是干净的
-  gameStarted=false;gameCode='';gameSaved=false;version=0;
+  gameStarted=false;gameCode='';gameSaved=false;version=0;gameId='';
   gameTitle='我的游戏';
 }
 
@@ -720,20 +720,20 @@ function buildLobby(){
         '<div class="card-icon">'+icon+'</div>'+
         '<div class="card-title">'+g.title+'</div>'+
         '<div class="card-meta">🔄 迭代'+g.ver+'次</div>';
-      card.querySelector('.card-icon').onclick=function(){playGame(g.title,g.slug)};
-      card.querySelector('.card-title').onclick=function(){playGame(g.title,g.slug)};
-      card.querySelector('.card-del').onclick=function(e){e.stopPropagation();deleteFromLobby(g.title)};
+      card.querySelector('.card-icon').onclick=function(){playGame(g.id,g.title)};
+      card.querySelector('.card-title').onclick=function(){playGame(g.id,g.title)};
+      card.querySelector('.card-del').onclick=function(e){e.stopPropagation();deleteFromLobby(g.id,g.title)};
       grid.appendChild(card);
     });
   });
 }
 
-var _editingGame=null,_playingSlug='';
-function playGame(title,slug){
-  _playingSlug=slug||title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g,'-').slice(0,40);
-  fetch('/api/game/'+encodeURIComponent(title)).then(function(r){return r.json()}).then(function(d){
+var _editingGame=null,_playingId='',_playingTitle='';
+function playGame(id,title){
+  _playingId=id;_playingTitle=title;
+  fetch('/api/game/'+encodeURIComponent(id)).then(function(r){return r.json()}).then(function(d){
     if(!d.ok)return;
-    _editingGame=d;
+    _editingGame=d;gameId=id;
     document.getElementById('playTitle').textContent='🎮 '+title;
     document.getElementById('playFrame').srcdoc=d.html;
     document.getElementById('playOverlay').classList.add('show');
@@ -745,9 +745,8 @@ function closePlay(){
 }
 
 async function shareGame(){
-  if(!_editingGame||!_playingSlug)return;
-  // 先确保服务端有这个游戏的独立页面
-  var url='https://studio.2u1.cn/play/'+username+'/'+_playingSlug;
+  if(!_playingId||!userCode)return;
+  var url='https://studio.2u1.cn/play/'+userCode+'/'+_playingId;
   try{
     await navigator.clipboard.writeText(url);
     SFX.success();
@@ -767,6 +766,7 @@ function editCurrentGame(){
   // 先设置游戏状态，再切换视图，避免 enterWorkspace 重置
   gameCode=_editingGame.html;
   gameTitle=_editingGame.title;
+  gameId=_editingGame.id||'';
   version=_editingGame.version||1;
   gameStarted=true;
   gameSaved=false;
@@ -789,9 +789,9 @@ function editCurrentGame(){
   addMsg('了解了！你想给这个游戏做什么改进？',false);
 }
 
-function deleteFromLobby(title){
+function deleteFromLobby(id,title){
   if(!confirm('删除「'+title+'」？'))return;
-  fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title})})
+  fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
     .then(function(){buildLobby()});
 }
 </script>
