@@ -26,6 +26,10 @@ body{display:flex;flex-direction:column}
 .hint-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .hint-btns button{background:rgba(255,255,255,0.08);border:1px solid #555;color:#ddd;padding:6px 12px;border-radius:16px;font-size:12px;cursor:pointer;font-family:system-ui;transition:all 0.15s}
 .hint-btns button:hover{background:rgba(74,108,247,0.3);border-color:#4a6cf7;color:#fff}
+.hint-speak{display:flex;gap:6px;margin-top:12px}
+.hint-speak input{flex:1;padding:8px 12px;border-radius:16px;border:1px solid #444;background:#1a1a1a;color:#fff;font-size:13px;outline:none;font-family:system-ui}
+.hint-speak input::placeholder{color:#555}
+.hint-speak button{width:36px;height:36px;border-radius:50%;border:none;background:#4a6cf7;color:#fff;cursor:pointer;font-size:16px;flex-shrink:0}
 .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#333;gap:8px}
 .empty .big{font-size:56px}.empty p{font-size:14px}
 .chat-panel{width:340px;min-width:280px;display:flex;flex-direction:column;border-left:1px solid #222;background:#1a1a1a;flex-shrink:0}
@@ -93,6 +97,10 @@ body{display:flex;flex-direction:column}
       <button class="hint-close" onclick="closeHints()">✕</button>
       <div class="hint-label">🎮 玩得开心吗？要不要加点新功能？</div>
       <div class="hint-btns" id="hintBtns"></div>
+      <div class="hint-speak">
+        <input type="text" id="hintInput" placeholder="或者对我说你想加什么..." onkeydown="if(event.key==='Enter')hintSpeak()">
+        <button onclick="hintSpeak()">💬</button>
+      </div>
     </div>
   </div>
   <div class="chat-panel">
@@ -194,8 +202,16 @@ function addMsg(text,isUser){
 
 function closeHints(){document.getElementById('previewHints').style.display='none'}
 
+function hintSpeak(){
+  var v=document.getElementById('hintInput').value.trim();
+  if(!v)return;
+  closeHints();
+  quickSend(v);
+}
+
 function quickSend(text){
   document.getElementById('previewHints').style.display='none';
+  document.getElementById('hintInput').value='';
   document.getElementById('input').value=text;
   send();
 }
