@@ -1,0 +1,26 @@
+services:
+  web:
+    build: ./app
+    container_name: ai-game-studio
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./app:/app
+      - ./data:/data
+
+  speech:
+    build: ./speech
+    container_name: whisper-speech
+    restart: unless-stopped
+    ports:
+      - "8766:8766"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

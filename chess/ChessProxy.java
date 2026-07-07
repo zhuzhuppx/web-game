@@ -11,7 +11,7 @@ import java.util.regex.*;
 
 public class ChessProxy {
     static final int PORT = 8656;
-    static final String WWW_ROOT = "/home/ppx/.qwenpaw/workspaces/D2GPcF/www";
+    static final String WWW_ROOT = "/www";
     static final String DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
     static final String PIKAFISH_PATH = "/app/pikafish_data/pikafish";
     static final String PIKAFISH_NNUE = "/app/pikafish_data/pikafish.nnue";

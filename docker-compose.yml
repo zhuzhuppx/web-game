@@ -1,5 +1,4 @@
 services:
-  # === 游戏大厅 ===
   hub:
     build: ./chess
     image: game-services-game-hub
@@ -8,4 +7,4 @@ services:
     ports:
       - "8656:8656"
     volumes:
-      - .:/home/ppx/.qwenpaw/workspaces/D2GPcF/www
+      - .:/www

@@ -7,4 +7,4 @@ services:
     ports:
       - "8656:8656"
     volumes:
-      - /home/ppx/.qwenpaw/workspaces/D2GPcF/www:/home/ppx/.qwenpaw/workspaces/D2GPcF/www
+      - ..:/www
