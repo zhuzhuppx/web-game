@@ -1,0 +1,10 @@
+services:
+  hub:
+    build: .
+    image: game-services-game-hub
+    container_name: game-hub
+    restart: unless-stopped
+    ports:
+      - "8656:8656"
+    volumes:
+      - /home/ppx/.qwenpaw/workspaces/D2GPcF/www:/home/ppx/.qwenpaw/workspaces/D2GPcF/www

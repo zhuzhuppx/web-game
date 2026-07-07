@@ -13,8 +13,8 @@ public class ChessProxy {
     static final int PORT = 8656;
     static final String WWW_ROOT = "/home/ppx/.qwenpaw/workspaces/D2GPcF/www";
     static final String DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
-    static final String PIKAFISH_PATH = "/home/ppx/.qwenpaw/workspaces/D2GPcF/pikafish_data/pikafish";
-    static final String PIKAFISH_NNUE = "/home/ppx/.qwenpaw/workspaces/D2GPcF/pikafish_data/pikafish.nnue";
+    static final String PIKAFISH_PATH = "/app/pikafish_data/pikafish";
+    static final String PIKAFISH_NNUE = "/app/pikafish_data/pikafish.nnue";
 
     static PikafishClient pikafish;
 
@@ -48,7 +48,7 @@ public class ChessProxy {
 
         PikafishClient() throws IOException {
             ProcessBuilder pb = new ProcessBuilder(PIKAFISH_PATH);
-            pb.directory(new File("/home/ppx/.qwenpaw/workspaces/D2GPcF/pikafish_data"));
+            pb.directory(new File("/app/pikafish_data"));
             pb.redirectErrorStream(false);
             process = pb.start();
             reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
@@ -382,6 +382,8 @@ public class ChessProxy {
         public void handle(HttpExchange exc) throws IOException {
             String path = exc.getRequestURI().getPath();
             if (path.equals("/")) path = "/index.html";
+            // 去掉前导斜杠，避免 Paths.get 把 path 当作绝对路径
+            if (path.startsWith("/")) path = path.substring(1);
             Path file = Paths.get(WWW_ROOT, path).normalize();
             if (!file.startsWith(Paths.get(WWW_ROOT).normalize())) { send404(exc); return; }
             if (Files.isDirectory(file)) file = file.resolve("index.html");
