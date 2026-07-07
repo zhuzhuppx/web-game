@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
-"""Chess AI Proxy + Game Hub — Python version"""
+"""Chess AI Proxy + Game Hub"""
 
 import http.server
 import json
-import os
 import re
-import subprocess
+import socket
 import sys
-import threading
+import time
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
 PORT = 8656
 WWW_ROOT = '/www'
-PIKAFISH_PATH = '/app/pikafish_data/pikafish'
-PIKAFISH_NNUE = '/app/pikafish_data/pikafish.nnue'
+PIKAFISH_HOST = 'pikafish'
+PIKAFISH_PORT = 9000
 DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions'
 
 MIME = {
     '.html': 'text/html; charset=utf-8',
     '.css': 'text/css; charset=utf-8',
     '.js': 'application/javascript; charset=utf-8',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon',
+    '.png': 'image/png', '.jpg': 'image/jpeg',
+    '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
     '.json': 'application/json; charset=utf-8',
     '.txt': 'text/plain; charset=utf-8',
 }
@@ -36,77 +32,63 @@ OUR_TO_UCI = {
 }
 
 
-class PikafishClient:
-    """UCI engine client for Pikafish."""
+class PikafishTCP:
+    """Connect to pikafishd over TCP."""
 
-    def __init__(self):
-        self.proc = None
-        self.lock = threading.Lock()
-        self.ready = False
-        self._cond = threading.Condition()
-        self._output = []
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
 
-    def start(self):
-        self.proc = subprocess.Popen(
-            [PIKAFISH_PATH],
-            cwd='/app/pikafish_data',
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True, bufsize=1,
-        )
+    def _connect(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        sock.connect((self.host, self.port))
+        return sock
 
-        def reader():
-            for line in iter(self.proc.stdout.readline, ''):
-                with self._cond:
-                    self._output.append(line.rstrip())
-                    self._cond.notify_all()
-
-        threading.Thread(target=reader, daemon=True).start()
-
-        self._send('uci')
-        self._wait_for('uciok', 5000)
-        self._send(f'setoption name NNUEFile value {PIKAFISH_NNUE}')
-        self._send('isready')
-        self._wait_for('readyok', 5000)
-        self.ready = True
-
-    def _send(self, line):
-        self.proc.stdin.write(line + '\n')
-        self.proc.stdin.flush()
-
-    def _wait_for(self, prefix, timeout_ms):
-        deadline = threading.get_event()._time if False else __import__('time').monotonic() + timeout_ms / 1000
-        import time
-        deadline = time.monotonic() + timeout_ms / 1000
-        with self._cond:
-            while True:
-                for i, line in enumerate(self._output):
-                    if line.startswith(prefix):
-                        del self._output[:i + 1]
-                        return line
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError(f'Timeout waiting for {prefix}')
-                self._cond.wait(remaining)
+    def send(self, cmd):
+        """Send one UCI command, return all output lines until terminal line."""
+        for attempt in range(3):
+            try:
+                sock = self._connect()
+                with sock.makefile('rw', buffering=1) as f:
+                    f.write(cmd + '\n')
+                    f.flush()
+                    lines = []
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        lines.append(line)
+                        if line.startswith('bestmove') or line.startswith('uciok') or line.startswith('readyok') or line == 'pong':
+                            break
+                        if cmd == 'uci' and (line.startswith('option name') or line.startswith('id')):
+                            continue
+                    return lines
+            except Exception:
+                if attempt < 2:
+                    time.sleep(1)
+                    continue
+                raise
 
     def search(self, fen, depth=10):
-        self._send(f'position fen {fen}')
-        self._send(f'go depth {depth}')
-        line = self._wait_for('bestmove', 60000)
-        m = re.search(r'bestmove\s+(\w+)', line)
-        if not m or m.group(1) == '(none)':
-            raise RuntimeError('no move')
-        return m.group(1)
-
-    def restart(self):
-        self.proc.kill()
-        self.proc.wait()
-        import time
-        time.sleep(1.5)
-        self._output.clear()
-        self.ready = False
-        self.start()
+        try:
+            self.send(f'position fen {fen}')
+            lines = self.send(f'go depth {depth}')
+            bestmove = [l for l in lines if l.startswith('bestmove')]
+            if not bestmove:
+                raise RuntimeError('no bestmove')
+            m = re.search(r'bestmove\s+(\w+)', bestmove[0])
+            if not m or m.group(1) == '(none)':
+                raise RuntimeError('no move')
+            return m.group(1)
+        except Exception:
+            self.send('restart')
+            self.send(f'position fen {fen}')
+            lines = self.send(f'go depth {depth}')
+            m = re.search(r'bestmove\s+(\w+)', lines[-1])
+            if not m:
+                raise RuntimeError('no move after restart')
+            return m.group(1)
 
 
 def board_to_fen(board, color):
@@ -130,22 +112,15 @@ def board_to_fen(board, color):
     return f"{'/'.join(rows)} {side} - - 0 1"
 
 
-def uci_to_coords(uci):
-    fc = ord(uci[0]) - 97
-    fr = 9 - int(uci[1])
-    tc = ord(uci[2]) - 97
-    tr = 9 - int(uci[3])
-    return fr, fc, tr, tc
-
-
 class Handler(http.server.SimpleHTTPRequestHandler):
-    pikafish: PikafishClient = None
+
+    pikafish: PikafishTCP = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=WWW_ROOT, **kwargs)
 
     def log_message(self, fmt, *args):
-        pass  # quiet
+        pass
 
     def do_OPTIONS(self):
         self._cors()
@@ -157,7 +132,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
-    def _send_json(self, status, data):
+    def _json(self, status, data):
         body = json.dumps(data, ensure_ascii=False).encode()
         self.send_response(status)
         self._cors()
@@ -172,9 +147,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         body = json.loads(self.rfile.read(length)) if length > 0 else {}
 
         if path == '/api/chess-pikafish':
-            if not Handler.pikafish or not Handler.pikafish.ready:
-                return self._send_json(503, {'ok': False, 'error': 'Pikafish not started'})
-
             board = body.get('board', [])
             color = body.get('color', 'r')
             depth = body.get('depth', 10)
@@ -183,34 +155,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             try:
                 uci = Handler.pikafish.search(fen, depth)
             except Exception as e:
-                print(f'Pikafish error: {e}', file=sys.stderr)
-                Handler.pikafish.restart()
-                uci = Handler.pikafish.search(fen, depth)
+                print(f'Pikafish error: {e}', file=sys.stderr, flush=True)
+                return self._json(503, {'ok': False, 'error': str(e)})
 
-            fc, fr, tc, tr = uci_to_coords(uci)  # wait, i got confused - let me re-check
-            # Actually the uci_to_coords above is wrong, let me inline it correctly
-            fc_c = ord(uci[0]) - 97
-            fr_r = 9 - int(uci[1])
-            tc_c = ord(uci[2]) - 97
-            tr_r = 9 - int(uci[3])
-            return self._send_json(200, {
-                'ok': True,
-                'move': {'fr': fr_r, 'fc': fc_c, 'tr': tr_r, 'tc': tc_c},
-            })
+            fc = ord(uci[0]) - 97
+            fr = 9 - int(uci[1])
+            tc = ord(uci[2]) - 97
+            tr = 9 - int(uci[3])
+            return self._json(200, {'ok': True, 'move': {'fr': fr, 'fc': fc, 'tr': tr, 'tc': tc}})
 
         if path == '/api/chess-ai':
             auth = self.headers.get('Authorization', '')
             api_key = auth[7:] if auth.startswith('Bearer ') else ''
             if not api_key:
-                return self._send_json(400, {'error': 'Missing API key'})
+                return self._json(400, {'error': 'Missing API key'})
             try:
                 req = urllib.request.Request(
                     DEEPSEEK_URL,
                     data=json.dumps(body).encode(),
-                    headers={
-                        'Content-Type': 'application/json',
-                        'Authorization': f'Bearer {api_key}',
-                    },
+                    headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'},
                 )
                 with urllib.request.urlopen(req, timeout=60) as resp:
                     result = resp.read()
@@ -221,29 +184,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(result)
             except Exception as e:
-                return self._send_json(500, {'error': f'Proxy error: {e}'})
+                return self._json(500, {'error': f'Proxy error: {e}'})
             return
 
-        self._send_json(404, {'error': 'Not found'})
+        self._json(404, {'error': 'Not found'})
 
 
 def main():
-    print('Starting Pikafish...', flush=True)
-    pikafish = PikafishClient()
-    try:
-        pikafish.start()
-        print('Pikafish ready', flush=True)
-    except Exception as e:
-        print(f'Pikafish start failed: {e}', file=sys.stderr, flush=True)
-
-    Handler.pikafish = pikafish
+    print(f'Connecting to pikafish at {PIKAFISH_HOST}:{PIKAFISH_PORT}...', flush=True)
+    Handler.pikafish = PikafishTCP(PIKAFISH_HOST, PIKAFISH_PORT)
+    Handler.pikafish.send('ping')
+    print('Pikafish connected', flush=True)
 
     server = http.server.HTTPServer(('0.0.0.0', PORT), Handler)
     print(f'Chess AI Proxy + Game Hub running on port {PORT}', flush=True)
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+    server.serve_forever()
 
 
 if __name__ == '__main__':

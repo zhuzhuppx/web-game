@@ -1,6 +1,16 @@
 services:
+  pikafish:
+    build:
+      context: .
+      dockerfile: Dockerfile.pikafish
+    image: game-services-pikafish
+    container_name: pikafish
+    restart: unless-stopped
+
   hub:
-    build: ./chess
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: game-services-game-hub
     container_name: game-hub
     restart: unless-stopped
@@ -8,3 +18,5 @@ services:
       - "8656:8656"
     volumes:
       - .:/www
+    depends_on:
+      - pikafish
