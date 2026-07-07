@@ -59,22 +59,47 @@ class PikafishEngine:
                     raise TimeoutError(f'Timeout waiting for {prefix}')
                 self._cond.wait(remaining)
 
+    def _read_until(self, prefix, timeout_ms):
+        """Read lines until we see one starting with prefix, return all lines."""
+        lines = []
+        line = self._wait_for(prefix, timeout_ms)
+        lines.append(line)
+        # Also grab any lines that arrived in the meantime
+        with self._cond:
+            for l in self._lines:
+                lines.append(l)
+            self._lines.clear()
+        return lines
+
     def command(self, cmd):
         with self.lock:
-            # Drain stale lines
             with self._cond:
                 self._lines.clear()
             self._send(cmd)
-            lines = []
-            while True:
-                line = self._wait_for('', 60000)
-                lines.append(line)
-                if line.startswith('bestmove') or line.startswith('uciok') or line.startswith('readyok'):
-                    break
-                if line.startswith('option name') or line.startswith('id '):
-                    if cmd == 'uci':
-                        continue
-            return '\n'.join(lines)
+
+            # silent commands (no output from engine)
+            if cmd.startswith('position'):
+                return 'ok'
+            if cmd.startswith('setoption'):
+                return 'ok'
+            if cmd.startswith('ucinewgame'):
+                return 'ok'
+
+            # commands with terminal output
+            if cmd == 'uci':
+                lines = self._read_until('uciok', 5000)
+                return '\n'.join(lines)
+            if cmd == 'isready':
+                lines = self._read_until('readyok', 5000)
+                return '\n'.join(lines)
+            if cmd.startswith('go'):
+                lines = self._read_until('bestmove', 60000)
+                return '\n'.join(lines)
+            if cmd == 'stop':
+                lines = self._read_until('bestmove', 5000)
+                return '\n'.join(lines)
+
+            return 'ok'
 
 
 def handle_client(conn, engine):
@@ -92,16 +117,16 @@ def handle_client(conn, engine):
                         engine.ready = False
                         engine._lines.clear()
                         engine.start()
-                    conn.sendall(b'ok\n')
+                    conn.sendall(b'ok\nEND\n')
                     continue
                 if line == 'ping':
-                    conn.sendall(b'pong\n')
+                    conn.sendall(b'pong\nEND\n')
                     continue
                 try:
                     result = engine.command(line)
-                    conn.sendall((result + '\n').encode())
+                    conn.sendall((result + '\nEND\n').encode())
                 except Exception as e:
-                    conn.sendall(f'ERROR {e}\n'.encode())
+                    conn.sendall(f'ERROR {e}\nEND\n'.encode())
     finally:
         conn.close()
 

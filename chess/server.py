@@ -58,11 +58,11 @@ class PikafishTCP:
                         line = line.strip()
                         if not line:
                             continue
-                        lines.append(line)
-                        if line.startswith('bestmove') or line.startswith('uciok') or line.startswith('readyok') or line == 'pong':
+                        if line == 'END':
                             break
-                        if cmd == 'uci' and (line.startswith('option name') or line.startswith('id')):
-                            continue
+                        if line.startswith('ERROR'):
+                            raise RuntimeError(line)
+                        lines.append(line)
                     return lines
             except Exception:
                 if attempt < 2:
