@@ -86,7 +86,8 @@ body{display:flex;flex-direction:column}
 .slide-cancel.active{background:rgba(200,60,60,0.9);color:#fff;border-color:#ff4444;transform:scale(1.05)}
 .slide-send{background:rgba(74,108,247,0.7);color:#aac;border-color:#4a6cf7}
 .slide-send.active{background:rgba(74,108,247,0.95);color:#fff;border-color:#6a8cff;transform:scale(1.05)}
-.wizard-slide-row{display:none;justify-content:center;gap:12px;margin:16px auto 20px;padding:0}
+.wizard-voice-wrap{position:relative;display:flex;flex-direction:column;align-items:center;margin-top:28px}
+.wizard-slide-row{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);display:none;justify-content:center;gap:12px;white-space:nowrap;padding:0}
 .wizard-slide-row.show{display:flex}
 .wizard-slide-row .slide-zone{flex:1;max-width:140px;height:52px;font-size:13px}
 /* AI 思考动画 */
@@ -562,11 +563,13 @@ function renderWizard(){
       '<div class="wizard-desc">给你的游戏取一个名字吧！点下面的灵感标签'+(hasVoice?'，或按住按钮说话':'')+'</div>'+
       '<div class="wizard-name-wrap" id="wizardNameTags"></div>'+
       (hasVoice
-        ?'<div class="wizard-slide-row" id="wizardSlideRow">'+
-            '<div class="slide-zone slide-cancel" id="wizSc">✕ 取消</div>'+
-            '<div class="slide-zone slide-send" id="wizSs">✓ 转文字</div>'+
-          '</div>'+
-          '<div class="wizard-hold-record" id="wizardHoldRecord" style="margin-top:28px">🎤 按住说话</div>'
+        ?'<div class="wizard-voice-wrap">'+
+            '<div class="wizard-slide-row" id="wizardSlideRow">'+
+              '<div class="slide-zone slide-cancel" id="wizSc">✕ 取消</div>'+
+              '<div class="slide-zone slide-send" id="wizSs">✓ 转文字</div>'+
+            '</div>'+
+            '<div class="wizard-hold-record" id="wizardHoldRecord">🎤 按住说话</div>'+
+          '</div>'
         :'');
     // 渲染灵感标签
     var tags='';
@@ -1094,19 +1097,20 @@ function wizardPreviewGame(){
   try{setDnd(true)}catch(e){}
 }
 
-var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，把小朋友的游戏设计变成HTML代码。收到设计方案后直接写完整代码，不要提问。\n\n"+
-"## 硬性规则\n"+
-"❌ 不要说「好了」「完成了」，给出代码后追问：「试试你的游戏！想加什么新功能？」并给 2-3 个建议\n"+
-"❌ 小朋友没说结束就不结束。没想法时主动给 3 个建议：加敌人、加道具、加特效\n"+
-"✅ 代码放回复最后面，前面简要说明改了什么\n\n"+
-"## 代码要求\n"+
-"1. 单文件HTML，Canvas自适应屏幕，必须完整可运行，用 ```html ... ``` 包裹\n"+
-"2. 必须有：得分、生命值、胜负条件、操控提示\n"+
-"3. 🎮 同时支持PC（WASD/方向键+A/B键）和手机（左摇杆+右AB键）\n"+
-"4. 🎵 代码开头加 <script src=\"https://studio.2u1.cn/platform/sfx.js\"><"+"/script>，BGM首次点击启动，🔊/🔇 切换（不要播放器），音效：SFX.score() hurt() success()\n"+
-"5. ⏸️ 加暂停：window.addEventListener('message',function(e){if(e.data==='pause'){paused=true;SFX.stopBGM()}if(e.data==='resume'){paused=false}})，循环里 if(paused)return\n\n"+
+var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，把小朋友的游戏设计变成HTML代码。\n\n"+
+"## 核心规则\n"+
+"1. 收到方案直接写完整HTML，不要提问分析\n"+
+"2. ❌ 绝不说「好了」「完成了」。给代码后必须追问：「试试你的游戏！想加什么新功能？」并给2-3个建议\n"+
+"3. ❌ 小朋友不说结束就不结束。没想法时主动给3建议：加敌人/加道具/加特效\n"+
+"4. ✅ 代码放回复最后，前面简要说明改了什么\n\n"+
+"## 代码规范\n"+
+"• 单文件HTML，Canvas自适应，完整可运行，```html包裹\n"+
+"• 必须有：得分、生命值、胜负条件、操控提示\n"+
+"• 🎮 PC:WASD/方向键+A/B键 手机:左摇杆+右AB键\n"+
+"• 🎵 开头加<script src=\"https://studio.2u1.cn/platform/sfx.js\"><"+"/script>，BGM首次点击启动，🔊/🔇切换(不要播放器)。音效:SFX.score() hurt() success()\n"+
+"• ⏸️ 暂停:window.addEventListener('message',function(e){if(e.data==='pause'){paused=true;SFX.stopBGM()}if(e.data==='resume'){paused=false}})，循环里if(paused)return\n\n"+
 "## 迭代\n"+
-"先问想升级哪方面（主角/目标/挑战/操作/音乐），再改代码。简单功能直接改。已有BGM就换风格别加第二个。\n";
+"先问想升级哪方面(主角/目标/挑战/操作/音乐)，再改代码。简单功能直接改。已有BGM就换风格别加第二个。\n";
 
 function showGuide(){
   document.getElementById('viewLobby').classList.add('show');
