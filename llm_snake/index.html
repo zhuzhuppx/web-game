@@ -188,8 +188,9 @@ function gameStep(){
     spawnParticles(food.x,food.y,'#0ff');
     spawnParticles(food.x,food.y,'#f0f');
     spawnFood();
-    if(speed>60){speed-=2;gameTimeout=setTimeout(gameStep,speed);}
+    if(speed>60)speed-=2;
   }else{snake.pop();}
+  gameTimeout=setTimeout(gameStep,speed);
 }
 
 function render(){
@@ -203,6 +204,9 @@ function render(){
   
   trail.forEach(t=>{t.alpha-=0.08;if(t.alpha>0){ctx.fillStyle='rgba(0,255,255,'+t.alpha*0.15+')';ctx.shadowColor='#0ff';ctx.shadowBlur=5;ctx.fillRect(t.x*GRID+1,t.y*GRID+1,GRID-2,GRID-2);ctx.shadowBlur=0;}});
   trail=trail.filter(t=>t.alpha>0);
+  
+  // 关键修复：即使 food 未初始化也不中断渲染循环
+  if(!food){requestAnimationFrame(render);return;}
   
   foodPulse+=0.05;
   const pulse=Math.sin(foodPulse)*0.3+0.7;
