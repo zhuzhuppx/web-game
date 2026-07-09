@@ -190,11 +190,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self._json(404, {'error': 'Not found'})
 
 
+def _connect_pikafish():
+    """Connect to pikafish in background; retry until success."""
+    import threading
+    def _background():
+        delay = 1
+        while True:
+            try:
+                Handler.pikafish = PikafishTCP(PIKAFISH_HOST, PIKAFISH_PORT)
+                Handler.pikafish.send('ping')
+                print('Pikafish connected', flush=True)
+                return
+            except Exception as e:
+                print(f'Pikafish connection failed ({e}), retrying in {delay}s...', flush=True)
+                time.sleep(delay)
+                delay = min(delay * 2, 30)
+    threading.Thread(target=_background, daemon=True).start()
+
+
 def main():
-    print(f'Connecting to pikafish at {PIKAFISH_HOST}:{PIKAFISH_PORT}...', flush=True)
-    Handler.pikafish = PikafishTCP(PIKAFISH_HOST, PIKAFISH_PORT)
-    Handler.pikafish.send('ping')
-    print('Pikafish connected', flush=True)
+    print(f'Game Hub starting on port {PORT}...', flush=True)
+    print(f'Will connect to pikafish at {PIKAFISH_HOST}:{PIKAFISH_PORT} in background', flush=True)
+    _connect_pikafish()
 
     server = http.server.HTTPServer(('0.0.0.0', PORT), Handler)
     print(f'Chess AI Proxy + Game Hub running on port {PORT}', flush=True)
