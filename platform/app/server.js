@@ -14,7 +14,7 @@ const LLM_LOCAL = process.env.LLM_LOCAL === 'true' || process.env.LLM_LOCAL === 
 const LLM_HOST = LLM_LOCAL ? 'llm-local' : 'api.deepseek.com';
 const LLM_PORT = LLM_LOCAL ? 8000 : 443;
 const LLM_HTTPS = !LLM_LOCAL;
-const LLM_MODEL = LLM_LOCAL ? 'Qwen3.6-35B-A3B-UD-Q3_K_M.gguf' : (process.env.LLM_MODEL || 'deepseek-v4-flash');
+const LLM_MODEL = LLM_LOCAL ? 'Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf' : (process.env.LLM_MODEL || 'deepseek-v4-flash');
 
 if(!require('fs').existsSync(DATA_DIR)) require('fs').mkdirSync(DATA_DIR,{recursive:true});
 
@@ -187,7 +187,7 @@ app.post('/api/polish-name', requireAuth, function(req,res){
   var transport = LLM_HTTPS ? require('https') : require('http');
   var opts = {
     hostname: LLM_HOST, port: LLM_PORT, path: '/v1/chat/completions',
-    method: 'POST', timeout: 5000,
+    method: 'POST', timeout: 120000,
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(payload)
@@ -274,7 +274,7 @@ app.get('/play/:ucode/:gcode', function(req,res){
     'canvas{display:block}</style></head><body>'+credit;
   res.send(row.html.replace(/<!DOCTYPE[^>]*>/i,'').replace(/<html[^>]*>/i,'').replace(/<\/html>/i,'').replace(/<head>[\s\S]*?<\/head>/i,function(m){
     return wrapper+m.replace(/<\/head>/i,'');
-  }));
+  }).replace(/platform\/sfx\.js/g, 'sfx.js'));
 });
 
 // ==================== Pikafish Chess Engine ====================
@@ -563,9 +563,24 @@ app.post('/api/delete',requireAuth,function(req,res){
 });
 
 // ==================== AI Chat (支持流式和非流式) ====================
-// 队列状态查询
+// 队列状态查询：直接问 llama-server 是否空闲
 app.get('/api/queue', requireAuth, function(req,res){
-  res.json({active: activeRequests, maxConcurrent: MAX_CONCURRENT});
+  if (LLM_LOCAL) {
+    var hreq = require('http').get('http://'+LLM_HOST+':'+LLM_PORT+'/slots', function(hres){
+      var data='';
+      hres.on('data',function(c){data+=c});
+      hres.on('end',function(){
+        try{
+          var slots = JSON.parse(data);
+          // idle slot 数量：0 表示忙，>=1 表示空闲
+          var busy = !slots.some(function(s){return s.state===0;});
+          res.json({busy: busy, active: activeRequests, maxConcurrent: MAX_CONCURRENT});
+        }catch(e){res.json({active: activeRequests, maxConcurrent: MAX_CONCURRENT});}
+      });
+    }).on('error',function(){res.json({active: activeRequests, maxConcurrent: MAX_CONCURRENT});});
+  } else {
+    res.json({active: activeRequests, maxConcurrent: MAX_CONCURRENT});
+  }
 });
 
 app.post('/api/chat', requireAuth, checkLimit, function(req,res){
@@ -585,12 +600,14 @@ app.post('/api/chat', requireAuth, checkLimit, function(req,res){
   var payloadObj = {
     model: modelName,
     messages: messages,
-    max_tokens: 32768,
+    max_tokens: 16384,
     temperature: 0.7,
     stream: useStream
   };
-  // 本地推理模型可能支持reasoning，DeepSeek不支持
-  if (!LLM_LOCAL) payloadObj.thinking = {type: 'disabled'};
+  // 本地14B纯文本模型不支持thinking参数，只在非本地时关闭reasoning
+  if (!LLM_LOCAL) {
+    payloadObj.thinking = {type: 'disabled'};
+  }
   var payload = JSON.stringify(payloadObj);
 
   var transport = LLM_HTTPS ? require('https') : require('http');
@@ -616,14 +633,12 @@ app.post('/api/chat', requireAuth, checkLimit, function(req,res){
       res.setHeader('X-Accel-Buffering', 'no');
       var consumed = false;
       apiRes.on('data', function(c){
-        // 本地模型（Qwen3.6）流式输出只发 reasoning_content 不发 content，
-        // 前端 SSE 解析器只认 delta.content，故将 reasoning_content 替换为 content
+        // 本地 LLM（如 llama-server）把回复内容放在 reasoning_content 字段
+        // 映射到 content 字段让前端正常显示，不跳过
         if (LLM_LOCAL) {
           var s = c.toString();
-          if (s.indexOf('"reasoning_content"') >= 0) {
-            s = s.replace(/"reasoning_content"/g, '"content"');
-            res.write(s);
-            return;
+          if (s.indexOf('"reasoning_content"') >= 0 && s.indexOf('"content"') < 0) {
+            c = Buffer.from(s.replace(/"reasoning_content"/g, '"content"'));
           }
         }
         res.write(c);

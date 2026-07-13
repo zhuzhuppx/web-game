@@ -11,6 +11,7 @@ services:
     environment:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - LLM_LOCAL=${LLM_LOCAL:-false}
     networks:
       - default
       - d2gpcf
