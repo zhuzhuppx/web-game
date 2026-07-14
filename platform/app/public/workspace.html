@@ -20,7 +20,6 @@ body{display:flex;flex-direction:column}
 .plan-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px;vertical-align:middle}
 .plan-badge.free{background:rgba(150,150,150,0.15);color:#999}
 .plan-badge.creator{background:rgba(74,108,247,0.2);color:#88aaff}
-.plan-badge.family{background:rgba(200,80,255,0.2);color:#cc88ff}
 .plan-badge.credits{background:rgba(230,160,30,0.2);color:#ffb733}
 .limit-bar{background:rgba(255,180,60,0.1);border:1px solid rgba(255,180,60,0.2);border-radius:8px;padding:8px 12px;margin:8px 14px 0;font-size:12px;color:#eebb55;display:flex;align-items:center;justify-content:space-between}
 .limit-bar a{color:#ffbb33;text-decoration:underline;cursor:pointer}
@@ -294,6 +293,21 @@ body{display:flex;flex-direction:column}
 .wizard-output.has-code{border-color:#4a6cf7;color:#e0e0e0}
 .wizard-opts-disabled{pointer-events:none!important;opacity:0.6}
 
+/* 模式选择弹窗 */
+.mode-select-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:300;display:none;align-items:center;justify-content:center;padding:20px}
+.mode-select-overlay.show{display:flex}
+.mode-select-box{background:#1a1a1a;border:1px solid #333;border-radius:20px;width:90vw;max-width:400px;padding:28px 24px;animation:slideUp 0.3s ease}
+.mode-select-title{font-size:20px;font-weight:700;color:#fff;text-align:center;margin-bottom:20px}
+.mode-select-cards{display:flex;flex-direction:column;gap:12px}
+.mode-card{background:#222;border:2px solid #333;border-radius:14px;padding:18px;cursor:pointer;transition:all 0.2s;text-align:center;position:relative}
+.mode-card:hover{border-color:#4a6cf7;transform:translateY(-2px);box-shadow:0 4px 20px rgba(74,108,247,0.15)}
+.mode-card-icon{font-size:36px;margin-bottom:6px}
+.mode-card-title{font-size:16px;font-weight:600;color:#fff;margin-bottom:4px}
+.mode-card-desc{font-size:12px;color:#888;line-height:1.4}
+.mode-card-tag{position:absolute;top:-8px;right:12px;background:#4a6cf7;color:#fff;font-size:10px;font-weight:600;padding:2px 10px;border-radius:10px}
+.mode-cancel{display:block;width:100%;margin-top:14px;padding:10px;background:rgba(255,255,255,0.04);border:none;border-radius:10px;color:#666;font-size:13px;cursor:pointer;font-family:system-ui}
+.mode-cancel:hover{color:#aaa;background:rgba(255,255,255,0.08)}
+
 </style>
 
 <div class="loading" id="loading">加载中...</div>
@@ -301,7 +315,7 @@ body{display:flex;flex-direction:column}
 <div id="app" style="display:none;flex-direction:column;height:100%;overflow:hidden">
 <div class="topbar">
   <div class="user" id="usernameLabel">👤 工作台</div>
-  <div class="plan-badge free" id="planBadge" style="display:none;cursor:pointer" onclick="showUpgrade()" title="点击查看会员详情">免费版</div>
+  <div class="plan-badge free" id="planBadge" style="display:none;cursor:pointer" onclick="showUpgrade()" title="点击查看会员详情">普通用户</div>
   <div class="btns">
     <button class="btn-back-lobby" id="btnBackLobby" onclick="backToLobby()" style="display:none">🏠 作品</button>
     <button class="btn-preview" id="topPreviewBtn" onclick="openPreview()" style="display:none">👁️ 预览</button>
@@ -446,6 +460,27 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
+<!-- 模式选择弹窗 -->
+<div class="mode-select-overlay" id="modeSelectOverlay" onclick="if(event.target===this)closeModeSelect()">
+  <div class="mode-select-box">
+    <div class="mode-select-title">🎮 选择创作模式</div>
+    <div class="mode-select-cards">
+      <div class="mode-card" onclick="startMode('wizard')">
+        <div class="mode-card-icon">🧭</div>
+        <div class="mode-card-title">向导模式</div>
+        <div class="mode-card-desc">一步一步跟着引导，轻松设计出你的第一款游戏！适合新手</div>
+        <div class="mode-card-tag">推荐</div>
+      </div>
+      <div class="mode-card" onclick="startMode('free')">
+        <div class="mode-card-icon">🎨</div>
+        <div class="mode-card-title">自由模式</div>
+        <div class="mode-card-desc">直接输入或说出你的想法，自由创作，AI 帮你实现</div>
+      </div>
+    </div>
+    <button class="mode-cancel" onclick="closeModeSelect()">取消</button>
+  </div>
+</div>
+
 <!-- 新手引导弹窗 -->
 <div class="wizard-overlay" id="wizardOverlay">
   <div class="wizard-box" id="wizardBox">
@@ -581,7 +616,7 @@ function startWizard(){
 }
 
 function renderWizard(){
-  var stepDisplay=wizardStep===0?'✏️ 命名':'🎯🏆⚡🔊'[wizardStep-1]+' 第 '+wizardStep+' 步 / '+(wizardTotal-1);
+  var stepDisplay=wizardStep===0?'✏️ 命名':wizardStep>=wizardTotal?'🎉 总结':'🎯🏆⚡🔊'[wizardStep-1]+' 第 '+wizardStep+' 步 / '+(wizardTotal-1);
   document.getElementById('wizardStepNum').textContent=stepDisplay;
   var pct=wizardStep===0?8:8+((wizardStep-1)*23);
   document.getElementById('wizardBar').style.width=Math.min(pct,100)+'%';
@@ -701,21 +736,26 @@ function renderWizard(){
       '<div class="wizard-title-big">🎉 '+wizardDesign.gameName+'</div>'+
       '<div class="wizard-sub">🏅 设计师称号：'+title+'</div>'+
       '<div class="wizard-summary">'+summary+'</div>'+
-      '<div class="wizard-desc">这就是你的游戏设计！让 AI 帮你变成现实吧 🚀</div>';
+      '<div class="wizard-desc">你的游戏设计完成啦！现在让它动起来吧 🚀</div>';
     
     document.getElementById('wizardBtns').style.display='';
-    nextBtn.textContent='🎮 生成游戏！';
-    nextBtn.disabled=false;
-    nextBtn.style.opacity='1';
+    // 隐藏生成按钮，自动生成
+    nextBtn.style.display='none';
+    nextBtn.disabled=true;
+    nextBtn.style.opacity='0.5';
     prevBtn.textContent='⬅ 修改设计';
     prevBtn.style.visibility='visible';
-    // 朗读总结页
+    // 朗读总结页，播完后自动生成游戏
     var d=window._userPlan;
     var hasVoice=d&&d.limits&&d.limits.voice;
     if(hasVoice){
       setTimeout(function(){
-        wizardSpeak(wizardDesign.gameName+'！'+title+'！'+'这就是你的游戏设计，让 AI 帮你变成现实吧');
+        wizardSpeak(wizardDesign.gameName+'！'+title+'！'+'你的游戏设计完成啦，现在让它动起来吧',function(){
+          setTimeout(function(){submitWizardGame()},500);
+        });
       },400);
+    }else{
+      setTimeout(function(){submitWizardGame()},1500);
     }
   }
 }
@@ -803,7 +843,7 @@ function wizardToggleInputMode(){
   if(!_wizardVoiceMode&&d&&d.limits&&!d.limits.voice){
     if(typeof SFX!=='undefined')SFX.tap();
     var upgradeBtn=document.getElementById('planBadge');
-    if(typeof addMsg==='function')addMsg('🔇 语音输入是会员专享功能\n\n💎 升级创作者/家庭版会员解锁语音输入、无限AI对话、源码下载等全部功能',false);
+    if(typeof addMsg==='function')addMsg('🔇 语音输入是会员专享功能\n\n💎 升级创作者会员解锁无限游戏、发布分享等全部功能',false);
     if(upgradeBtn){upgradeBtn.style.animation='pulse 1s 3';setTimeout(function(){upgradeBtn.style.animation='';},4000);}
     return;
   }
@@ -932,7 +972,7 @@ function wizardInitHold(e){
   if(_wizardSpeaking){console.log('TTS speaking, ignore');return;}
   var d=window._userPlan;
   if(d&&d.limits&&!d.limits.voice){
-    alert('🔇 语音输入是会员专享功能\n\n💎 升级创作者/家庭版会员解锁语音输入');
+    alert('🔇 语音输入是会员专享功能\n\n💎 升级创作者会员解锁语音输入');
     resetWizardRecord();
     return;
   }
@@ -1067,8 +1107,7 @@ function submitWizardGame(){
     '🏆 目标：'+wizardDesign.goal+'\n'+
     '⚡ 挑战：'+wizardDesign.challenge+'\n'+
     '🔊 音乐：'+wizardDesign.music+'\n\n'+
-    '重要：游戏必须同时支持PC和手机！PC用WASD/方向键移动+J/K键功能，手机用虚拟摇杆（左半屏）+AB按钮（右半屏下方）。\n\n'+
-    '这是小朋友花时间认真设计的完整方案。请先给一句游戏预览，再写出完整HTML代码！';
+    '这是小朋友花时间认真设计的完整方案，请严格按系统指令里的模板写代码，直接复制手机控制模板，不要自己重写。';
   
   // 关闭向导，显示loading
   document.getElementById('wizardOverlay').classList.remove('show');
@@ -1087,9 +1126,10 @@ function submitWizardGame(){
     document.getElementById('viewWorkspace').classList.add('show');
   }
   
-  // 显示 loading + 发送消息
+  // 显示 loading + 发送消息，禁用输入（包括按住说话）
+  setInputEnabled(false);
   var winHtml='<div class="wizard-loading"><div class="wl-icon" id="wlIcon">🚀</div>'+
-    '<div class="wl-text">AI 正在生成你的游戏...</div>'+
+    '<div class="wl-text">正在为你打造游戏世界...</div>'+
     '<div class="wl-dots"><span></span><span></span><span></span></div>'+
     '<div class="wizard-output" id="wizardOutput"></div></div>';
   document.getElementById('msgs').innerHTML='';
@@ -1106,7 +1146,7 @@ function submitWizardGame(){
 
 function doWizardApiCall(msg){
   var outputEl=document.getElementById('wizardOutput');
-  if(outputEl)outputEl.textContent='AI 正在思考...';
+  if(outputEl)outputEl.textContent='正在为你生成...';
   
   var msgs=window.messages&&window.messages.length?window.messages:[{role:'user',content:msg}];
   var controller=new AbortController();
@@ -1130,7 +1170,7 @@ function doWizardApiCall(msg){
             var htmlCode=codeMatch[0].replace(/^```html\s*/,'').replace(/```\s*$/,'');
             showGeneratedGame(htmlCode);
           }else{
-            showWizardRetry('AI 回复中没有找到完整代码，重新试试？');
+            showWizardRetry('没找到完整代码，再试一次？');
           }
           return;
         }
@@ -1175,20 +1215,21 @@ function showWizardRetry(msg){
 
 function showGeneratedGame(htmlCode){
   if(!htmlCode||htmlCode.length<50){
-    showWizardRetry('生成的代码太短了，重新试试？');
+    showWizardRetry('生成的代码太短了，再试一次？');
     return;
   }
   gameCode=htmlCode;
   
-  // 先保存，再显示结果
+  // 先保存，再显示结果，恢复输入
+  setInputEnabled(true);
   saveWizardGame(function(saved){
     if(saved)gameSaved=true;
     document.getElementById('msgs').innerHTML=
-      '<div class="msg ai">🎉 游戏已生成！</div>'+
+      '<div class="msg ai">🎉 你的游戏做好啦！太棒了！</div>'+
       '<div style="display:flex;gap:8px;padding:8px;justify-content:center">'+
       '<button onclick="wizardPreviewGame()" style="background:#4a6cf7;color:#fff;border:none;padding:10px 24px;border-radius:10px;cursor:pointer;font-size:14px">👁️ 预览游戏</button>'+
       '<button onclick="backToLobby()" style="background:#2a2a2a;color:#aaa;border:1px solid #444;padding:10px 24px;border-radius:10px;cursor:pointer;font-size:14px">🏠 返回大厅</button></div>'+
-      '<div class="msg ai" style="margin-top:8px">💡 在下面输入框打字，告诉 AI 想改什么功能。'+
+      '<div class="msg ai" style="margin-top:8px">💡 在下面输入框打字，告诉我想改什么！'+
       (window._userPlan&&window._userPlan.limits&&window._userPlan.limits.voice?'按住 🎤 说话也行！':'')+'</div>';
   });
 }
@@ -1237,8 +1278,103 @@ var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，帮小朋友把游戏想法
 "3. 必须有：得分显示、生命值、胜负条件、操控提示\n"+
 "4. 必须完全基于小朋友的设计方案\n"+
 "5. 代码放在回复的最后面，前面简要说明改了什么即可\n"+
-"6. 🎮 **必须同时支持PC和手机，这是硬性要求！** PC用WASD或方向键移动+J/K键功能（J跳跃/攻击,K特殊技能），手机用虚拟摇杆（左半屏）+AB按钮（右半屏下方，A键在左下，B键在右下）。不满足双端控制的代码视为无效，必须重写\n"+
-"7. 🎵 必须内置背景音乐！代码开头加：<script src=\"https://studio.2u1.cn/platform/sfx.js\"><"+"/script>。BGM 在第一次点击/按键时启动。加一个简单的 🔊/🔇 按钮切换音乐，**不要加播放器（不要进度条/快进/快退/暂停播放按钮）**。音效：得分 SFX.score()，碰撞 SFX.hurt()，胜利 SFX.success()\n"+
+"6. 🎮 **必须同时支持PC和手机，这是硬性要求！** 不允许只做PC端。手机端一律使用下方提供的虚拟摇杆+AB按钮模板，直接复制粘贴到你的HTML中。\n\n"+
+"PC控制：WASD或方向键移动 + J键(跳跃/攻击) + K键(特殊技能)\n\n"+
+"手机控制模板（直接复制到HTML的<body>末尾，</body>之前）：\n"+
+"```html\n"+
+"<!-- 手机虚拟摇杆 + AB按钮 -->\n"+
+"<style>\n"+
+"  .touch-controls{position:fixed;bottom:0;left:0;right:0;height:180px;z-index:9999;pointer-events:none;touch-action:none;-webkit-user-select:none;user-select:none}\n"+
+"  .touch-controls>*{pointer-events:auto}\n"+
+"  .joystick-area{position:absolute;left:20px;bottom:20px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.3)}\n"+
+"  .joystick-knob{position:absolute;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,0.5);top:50%;left:50%;transform:translate(-50%,-50%);transition:none}\n"+
+"  .ab-buttons{position:absolute;right:20px;bottom:20px;display:flex;gap:30px}\n"+
+"  .btn-a,.btn-b{width:60px;height:60px;border-radius:50%;border:2px solid rgba(255,255,255,0.4);font-size:20px;font-weight:bold;color:#fff;display:flex;align-items:center;justify-content:center;touch-action:none}\n"+
+"  .btn-a{background:rgba(76,175,80,0.5)}.btn-b{background:rgba(244,67,54,0.5)}\n"+
+"  .btn-a:active,.btn-b:active{transform:scale(0.9)}.btn-a.active{background:rgba(76,175,80,0.9)}.btn-b.active{background:rgba(244,67,54,0.9)}\n"+
+"  @media(min-width:769px){.touch-controls{display:none}}\n"+
+"</style>\n"+
+"<div class=\"touch-controls\" id=\"touchControls\">\n"+
+"  <div class=\"joystick-area\" id=\"joystickArea\"><div class=\"joystick-knob\" id=\"joystickKnob\"></div></div>\n"+
+"  <div class=\"ab-buttons\"><div class=\"btn-a\" id=\"btnA\">J</div><div class=\"btn-b\" id=\"btnB\">K</div></div>\n"+
+"</div>\n"+
+"<"+"script>\n"+
+"(function(){\n"+
+"  var jArea=document.getElementById('joystickArea');\n"+
+"  var jKnob=document.getElementById('joystickKnob');\n"+
+"  var jRect, jTouchId=null;\n"+
+"  function updateKeys(x,y){\n"+
+"    var dx=x-jRect.left-jRect.width/2, dy=y-jRect.top-jRect.height/2;\n"+
+"    var maxR=jRect.width/2, dist=Math.sqrt(dx*dx+dy*dy);\n"+
+"    if(dist>maxR){dx=dx/dist*maxR;dy=dy/dist*maxR}\n"+
+"    jKnob.style.left=(50+dx/jRect.width*100)+'%';jKnob.style.top=(50+dy/jRect.height*100)+'%';\n"+
+"    var threshold=20; keys['ArrowUp']=dy<-threshold; keys['ArrowDown']=dy>threshold; keys['ArrowLeft']=dx<-threshold; keys['ArrowRight']=dx>threshold;\n"+
+"    keys['w']=keys['ArrowUp'];keys['s']=keys['ArrowDown'];keys['a']=keys['ArrowLeft'];keys['d']=keys['ArrowRight'];\n"+
+"  }\n"+
+"  jArea.addEventListener('touchstart',function(e){e.preventDefault();var t=e.changedTouches[0];jRect=jArea.getBoundingClientRect();jTouchId=t.identifier;updateKeys(t.clientX,t.clientY)});\n"+
+"  jArea.addEventListener('touchmove',function(e){e.preventDefault();for(var i=0;i<e.changedTouches.length;i++){var t=e.changedTouches[i];if(t.identifier===jTouchId){updateKeys(t.clientX,t.clientY)}}});\n"+
+"  jArea.addEventListener('touchend',function(e){e.preventDefault();for(var i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===jTouchId){jTouchId=null;jKnob.style.left='50%';jKnob.style.top='50%';keys['ArrowUp']=keys['ArrowDown']=keys['ArrowLeft']=keys['ArrowRight']=keys['w']=keys['s']=keys['a']=keys['d']=false;break}}});\n"+
+"  jArea.addEventListener('touchcancel',function(e){jTouchId=null;jKnob.style.left='50%';jKnob.style.top='50%';keys['ArrowUp']=keys['ArrowDown']=keys['ArrowLeft']=keys['ArrowRight']=keys['w']=keys['s']=keys['a']=keys['d']=false});\n"+
+"  var btnA=document.getElementById('btnA'), btnB=document.getElementById('btnB');\n"+
+"  btnA.addEventListener('touchstart',function(e){e.preventDefault();keys['j']=true;btnA.classList.add('active')});\n"+
+"  btnA.addEventListener('touchend',function(e){e.preventDefault();keys['j']=false;btnA.classList.remove('active')});\n"+
+"  btnA.addEventListener('touchcancel',function(){keys['j']=false;btnA.classList.remove('active')});\n"+
+"  btnB.addEventListener('touchstart',function(e){e.preventDefault();keys['k']=true;btnB.classList.add('active')});\n"+
+"  btnB.addEventListener('touchend',function(e){e.preventDefault();keys['k']=false;btnB.classList.remove('active')});\n"+
+"  btnB.addEventListener('touchcancel',function(){keys['k']=false;btnB.classList.remove('active')});\n"+
+"  // 也支持鼠标点击AB按钮\n"+
+"  btnA.addEventListener('mousedown',function(e){keys['j']=true;btnA.classList.add('active')});\n"+
+"  btnA.addEventListener('mouseup',function(e){keys['j']=false;btnA.classList.remove('active')});\n"+
+"  btnA.addEventListener('mouseleave',function(){keys['j']=false;btnA.classList.remove('active')});\n"+
+"  btnB.addEventListener('mousedown',function(e){keys['k']=true;btnB.classList.add('active')});\n"+
+"  btnB.addEventListener('mouseup',function(e){keys['k']=false;btnB.classList.remove('active')});\n"+
+"  btnB.addEventListener('mouseleave',function(){keys['k']=false;btnB.classList.remove('active')});\n"+
+"})();\n"+
+"<"+"/script>\n"+
+"```\n"+
+"**重要：** 你的游戏代码必须使用全局 `keys` 对象来检测按键（`keys['w']`、`keys['j']`等），这样手机触摸控制才能和PC键盘共用同一套按键检测逻辑。\n\n"+
+"PC键盘处理模板（直接复制到你的<script>中）：\n"+
+"```javascript\n"+
+"var keys={};\n"+
+"document.addEventListener('keydown',function(e){keys[e.key]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault()});\n"+
+"document.addEventListener('keyup',function(e){keys[e.key]=false});\n"+
+"```\n"+
+"然后在游戏主循环中通过 `if(keys['w']||keys['ArrowUp'])` 检测移动，`if(keys['j'])` 检测跳跃/攻击，`if(keys['k'])` 检测特殊技能。\n"+
+"不满足此规则的代码视为无效，必须重写\n"+
+"7. 🎵 **必须内置背景音乐！这是硬性要求！** 不满足此规则的代码视为无效，必须重写。\n\n"+
+"请在HTML的<head>中（或其他<script>之前）加这行引入音效库：\n"+
+"<script src=\"/sfx.js\"><"+"/script>\n\n"+
+"BGM启动与切换按钮的完整模板（直接复制到你的<script>中，放到游戏变量声明区域。根据小朋友选的音乐风格选用对应的bgm函数：轻快探索→bgmAdventure、太空/科幻→bgmSpace、激烈/战斗→bgmFight、轻松休闲→bgmRelax、欢快→bgmHappy、冒险→bgmAdventure）：\n"+
+"```javascript\n"+
+"// ===== BGM 启动 =====\n"+
+"var bgmStarted=false, bgmMuted=false;\n"+
+"function startBGM(){\n"+
+"  if(bgmStarted) return;\n"+
+"  bgmStarted=true;\n"+
+"  try{ SFX.bgmAdventure(); }catch(e){} // ← 根据音乐风格替换为对应的bgm函数\n"+
+"}\n"+
+"// 第一次点击/按键/触摸时启动BGM\n"+
+"document.addEventListener('click',function(){startBGM()},{once:true});\n"+
+"document.addEventListener('keydown',function(){startBGM()},{once:true});\n"+
+"document.addEventListener('touchstart',function(){startBGM()},{once:true});\n"+
+"\n"+
+"// 音乐切换按钮（在HTML中创建）\n"+
+"var musicBtn=document.createElement('div');\n"+
+"musicBtn.id='musicToggle';\n"+
+"musicBtn.textContent='🔊';\n"+
+"musicBtn.style.cssText='position:fixed;top:10px;right:10px;z-index:10000;font-size:22px;cursor:pointer;background:rgba(0,0,0,0.4);color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;';\n"+
+"musicBtn.onclick=function(e){\n"+
+"  e.stopPropagation();\n"+
+"  bgmMuted=!bgmMuted;\n"+
+"  musicBtn.textContent=bgmMuted?'🔇':'🔊';\n"+
+"  try{\n"+
+"    if(bgmMuted) SFX.stopBGM();\n"+
+"    else SFX.bgmAdventure(); // ← 同样替换为对应的bgm函数\n"+
+"  }catch(e){}\n"+
+"};\n"+
+"document.body.appendChild(musicBtn);\n"+
+"```\n"+
+"音效：得分 SFX.score()，碰撞 SFX.hurt()，胜利 SFX.success()\n"+
 "8. ⏸️ **必须支持暂停！** 在游戏脚本开头声明 var paused=false; 添加 window.addEventListener('message',function(e){if(e.data==='pause'){paused=true;if(typeof SFX!=='undefined'&&SFX.stopBGM)SFX.stopBGM()}if(e.data==='resume'){paused=false}}); 在游戏主循环（requestAnimationFrame）开头加 if(paused)return; 否则预览关闭时页面会卡死。不满足此规则的代码视为无效\n\n"+
 "## 迭代升级建议格式\n"+
 "如果小朋友想升级，先问想升级哪个部分：\n"+
@@ -1310,6 +1446,7 @@ function updateLimitBar(d){
   } else {
     if (ai.max < 999) parts.push('今日AI对话: '+ai.used+'/'+ai.max);
     if (gm.max < 999) parts.push('游戏数量: '+gm.used+'/'+gm.max);
+    if (!d.limits.share) parts.push('发布分享: 会员专享');
   }
   if (!d.limits.voice) parts.push('语音输入: 会员专享');
   if (parts.length > 0) {
@@ -1323,13 +1460,13 @@ function updateLimitBar(d){
 function showUpgrade(){
   var d = window._userPlan;
   if (!d) return;
-  if (d.plan === 'creator') { alert('你已是创作者会员 🎉\n\n✅ 无限 AI 对话\n✅ 无限游戏\n✅ 语音输入\n✅ 下载源码'); return; }
-  if (d.plan === 'family') { alert('你已是家庭版会员 🎉\n\n✅ 无限 AI 对话\n✅ 无限游戏\n✅ 语音输入\n✅ 下载源码\n👨‍👩‍👧 支持 3 个子账号'); return; }
+  if (d.plan === 'creator') { alert('你已是创作者会员 🎉\n\n✅ 无限 AI 对话\n✅ 无限游戏\n✅ 发布到广场\n✅ 语音输入'); return; }
+  if (d.plan === 'family') { alert('你已是创作者会员 🎉\n\n✅ 无限 AI 对话\n✅ 无限游戏\n✅ 发布到广场\n✅ 语音输入'); return; }
   if (d.plan === 'credits') { 
-    alert('你当前是按次付费用户 🎫\n剩余次数: '+d.credits+' 次\n\n📱 联系管理员充值次数\n💰 10次=¥1 | 100次=¥9 | 500次=¥39\n\n或升级为会员解锁无限次数：\n创作者 ¥29/月 | 家庭版 ¥49/月');
+    alert('你当前是按次付费用户 🎫\n剩余次数: '+d.credits+' 次\n\n📱 联系管理员充值次数\n💰 10次=¥1 | 100次=¥9 | 500次=¥39\n\n或升级会员解锁：\n💎 创作者 ¥19.9/月（无限游戏+发布分享）');
     return;
   }
-  alert('🚀 升级解锁全部功能：\n\n🎫 按次付费: ¥1=10次 AI 对话\n💎 创作者 ¥29/月: 无限 AI+语音+下载\n🏠 家庭版 ¥49/月: 3个子账号+全部功能\n\n📱 联系管理员开通');
+  alert('💎 创作者会员 ¥19.9/月\n\n✅ 无限生成游戏\n✅ 发布到广场分享给所有人\n✅ 语音输入\n✅ 无限 AI 对话\n\n普通用户最多生成 10 个游戏，不支持发布分享');
 }
 
 async function checkCanSend(){
@@ -1418,7 +1555,7 @@ function toggleInputMode(){
   if (!_voiceMode && d && d.limits && !d.limits.voice) {
     SFX.tap();
     var upgradeBtn = document.getElementById('planBadge');
-    addMsg('🔇 语音输入是会员专享功能\n\n💎 升级创作者/家庭版会员解锁语音输入、无限AI对话、源码下载等全部功能', false);
+    addMsg('🔇 语音输入是会员专享功能\n\n💎 升级创作者会员解锁语音输入、无限AI对话、源码下载等全部功能', false);
     // 高亮会员入口提醒
     if (upgradeBtn) upgradeBtn.style.animation = 'pulse 1s 3';
     setTimeout(function(){ if(upgradeBtn) upgradeBtn.style.animation = ''; }, 4000);
@@ -1789,6 +1926,10 @@ async function send(){
   addMsg(text,true);
   input.value='';
 
+  // 确保 system prompt 始终存在（自由模式也需要 BGM/音效/手机控制指令）
+  if(messages.length===0||messages[0].role!=='system'){
+    messages=[{role:'system',content:SYSTEM_PROMPT}].concat(messages);
+  }
   messages.push({role:'user',content:text});
   doChat();
 }
@@ -2187,19 +2328,71 @@ function logout(){
 }
 
 // === 大厅逻辑 ===
-function enterWorkspace(){
+function enterWorkspace(skipMode){
+  // 清空状态
+  if(!gameStarted){
+    gameSaved=false;gameId='';gameCode='';gameTitle='我的游戏';version=0;
+    messages=[];turnCount=0;
+  }
+  if(skipMode){
+    // 直接进入工作区（编辑已有游戏时）
+    document.getElementById('viewLobby').classList.remove('show');
+    document.getElementById('viewWorkspace').classList.add('show');
+    document.getElementById('btnNewGameTop').style.display='none';
+    document.getElementById('btnBackLobby').style.display='inline-block';
+    document.getElementById('btnLogoutTop').style.display='none';
+    document.getElementById('input').focus();
+  }else{
+    // 显示模式选择弹窗
+    document.getElementById('modeSelectOverlay').classList.add('show');
+  }
+}
+
+function closeModeSelect(){
+  document.getElementById('modeSelectOverlay').classList.remove('show');
+}
+
+function startMode(mode){
+  closeModeSelect();
   document.getElementById('viewLobby').classList.remove('show');
   document.getElementById('viewWorkspace').classList.add('show');
   document.getElementById('btnNewGameTop').style.display='none';
   document.getElementById('btnBackLobby').style.display='inline-block';
-    document.getElementById('btnLogoutTop').style.display='none';
+  document.getElementById('btnLogoutTop').style.display='none';
   document.getElementById('input').focus();
-  // 重置聊天
-  if(!gameStarted){
-    gameSaved=false;gameId='';gameCode='';gameTitle='我的游戏';version=0;
-    messages=[];turnCount=0;
-    // 打开设计向导
+  
+  if(mode==='wizard'){
+    // 向导模式
     startWizard();
+  }else{
+    // 自由模式 — 直接进入聊天，默认语音模式
+    if(!gameStarted){
+      gameStarted=true;
+      // 默认开启语音模式
+      var d = window._userPlan;
+      if(d && d.limits && d.limits.voice){
+        _voiceMode = true;
+        var c = document.getElementById('chatInput');
+        var m = document.getElementById('modeBtn');
+        c.classList.add('voice-mode');
+        m.classList.add('voice');
+        m.textContent='⌨';
+        m.title='切换到文字输入';
+        var hr = document.getElementById('holdRecord');
+        if(hr) hr.style.display = '';
+      }
+      // 重置聊天消息
+      document.getElementById('msgs').innerHTML=
+        '<div class="msg ai">嘿，小游戏设计师！🎮<br>这里是你的游戏工坊，你说想法，我帮你实现。<br><br>今天你想做一个什么样的游戏？</div>'+
+        '<div class="suggestions" id="suggestions">'+
+        '<button onclick="quickSend(\'我想做太空飞船打陨石的游戏\')">🚀 太空飞船</button>'+
+        '<button onclick="quickSend(\'我想做一个躲避怪兽的游戏\')">👾 躲避怪兽</button>'+
+        '<button onclick="quickSend(\'我想做跑酷跳跃的游戏\')">🏃 跑酷跳跃</button>'+
+        '<button onclick="quickSend(\'我想做贪吃蛇\')">🐍 贪吃蛇</button>'+
+        '<button onclick="quickSend(\'我想做一个收集宝石的游戏\')">💎 收集宝石</button>'+
+        '<button onclick="quickSend(\'我想做推箱子游戏\')">📦 推箱子</button>'+
+        '</div>';
+    }
   }
 }
 
@@ -2302,11 +2495,12 @@ function editCurrentGame(){
   document.getElementById('gameVer').textContent='🔄 第'+version+'次迭代';
   document.getElementById('topPreviewBtn').style.display='inline-block';
 
-  enterWorkspace();
+  enterWorkspace(true);
 
   // 清旧消息，设新上下文（把当前代码发给 AI）
   document.getElementById('msgs').innerHTML='';
   messages=[
+    {role:'system',content:SYSTEM_PROMPT},
     {role:'user',content:'这是「'+gameTitle+'」的当前代码：\n```html\n'+gameCode+'\n```'},
     {role:'assistant',content:'了解了！你想给「'+gameTitle+'」做什么改进？'}
   ];
@@ -2366,6 +2560,12 @@ async function publishFromDetail(){
   var g=window._gameCache[_gdId];
   if(!g)return;
   if(!g.public){
+    // 检查发布权限
+    var d = window._userPlan;
+    if (d && d.plan === 'free' && (!d.limits || !d.limits.share)) {
+      showToast('💎 普通用户暂不支持发布到广场，升级创作者会员即可分享');
+      return;
+    }
     // 弹出协议确认
     _pendingPublish=true;
     document.getElementById('publishIcon').textContent='📜';

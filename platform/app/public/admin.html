@@ -63,16 +63,15 @@ th{color:#888;font-weight:500;white-space:nowrap}
   </div>
 </div>
 
-<!-- 会员赠送 -->
+<!-- 会员等级管理 -->
 <div class="card">
-  <h2>💎 会员赠送</h2>
+  <h2>💎 会员等级管理</h2>
   <div class="plan-row">
     <label>会员等级</label>
     <select id="grantPlan">
       <option value="credits">按次付费</option>
-      <option value="creator">创作者 (¥29/月)</option>
-      <option value="family">家庭版 (¥49/月)</option>
-      <option value="free">免费版 (取消)</option>
+      <option value="creator">创作者 (¥19.9/月)</option>
+      <option value="free">普通用户</option>
     </select>
   </div>
   <div class="plan-row">
@@ -86,10 +85,10 @@ th{color:#888;font-weight:500;white-space:nowrap}
     </select>
   </div>
   <div class="row" style="margin-top:10px;gap:8px">
-    <button class="btn-green" onclick="batchGrant()">🎁 批量赠送选中用户</button>
+    <button class="btn-green" onclick="batchGrant()">✅ 批量应用等级</button>
     <button class="btn-blue btn-sm" onclick="selectAll()">全选</button>
     <button class="btn-blue btn-sm" onclick="selectNone()">取消全选</button>
-    <button class="btn-blue btn-sm" onclick="selectFree()">仅选免费用户</button>
+    <button class="btn-blue btn-sm" onclick="selectFree()">仅选普通用户</button>
   </div>
 </div>
 
@@ -145,11 +144,10 @@ function toast(m){var t=document.createElement('div');t.className='toast';t.text
 function getPlanBadge(plan,expires){
   var now=new Date().toISOString().slice(0,10);
   var expired=expires&&expires<now;
-  if(plan==='free'||expired)return'<span class="badge badge-free">免费</span>';
+  if(plan==='free'||expired)return'<span class="badge badge-free">普通用户</span>';
   if(plan==='credits')return'<span class="badge badge-credits">按次'+(expires?' ⏳'+expires:'')+'</span>';
   if(plan==='creator')return'<span class="badge badge-creator">创作者'+(expires?' ⏳'+expires:'')+'</span>';
-  if(plan==='family')return'<span class="badge badge-family">家庭版'+(expires?' ⏳'+expires:'')+'</span>';
-  return'<span class="badge badge-free">免费</span>';
+  return'<span class="badge badge-free">普通用户</span>';
 }
 
 function loadData(){
@@ -178,7 +176,7 @@ function loadData(){
         '<td>'+(u.active?'<span class="badge badge-active">正常</span>':'<span class="badge badge-inactive">禁用</span>')+'</td>'+
         '<td>'+
           '<button class="btn-red btn-sm" onclick="toggleUser(\''+u.username+'\')">'+(u.active?'禁用':'启用')+'</button> '+
-          '<button class="btn-blue btn-sm" onclick="grantOne(\''+u.username+'\')">送会员</button>'+
+          '<button class="btn-blue btn-sm" onclick="grantOne(\''+u.username+'\')">应用</button>'+
         '</td></tr>';
     });
     document.getElementById('userTable').innerHTML=html;
@@ -204,8 +202,10 @@ function batchGrant(){
 function doGrant(usernames){
   var plan=document.getElementById('grantPlan').value;
   var days=parseInt(document.getElementById('grantDays').value);
+  var planNames={credits:'按次付费',creator:'创作者',free:'普通用户'};
   api('/api/admin/grant-plan','POST',{usernames:usernames,plan:plan,days:days}).then(function(d){
-    toast('已为 '+d.updated.length+' 人设置「'+d.plan+'」'+(d.expires?' 至 '+d.expires:''));
+    var name=planNames[d.plan]||d.plan;
+    toast('已为 '+d.updated.length+' 人设置为「'+name+'」'+(d.expires?' 至 '+d.expires:''));
     loadData();
   });
 }

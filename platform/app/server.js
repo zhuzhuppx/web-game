@@ -79,17 +79,20 @@ db.exec(`
 
 // ==================== Plan Config ====================
 const PLANS = {
-  free:    {dailyAi:5,  maxGames:2,  voice:true,  download:false, name:'免费版'},
-  credits: {dailyAi:Infinity, maxGames:10, voice:true,  download:true,  name:'按次',  costPerCall:1},
-  creator: {dailyAi:Infinity, maxGames:Infinity, voice:true,  download:true,  name:'创作者'},
-  family:  {dailyAi:Infinity, maxGames:Infinity, voice:true,  download:true,  name:'家庭版'},
+  free:    {dailyAi:5,  maxGames:10, voice:true,  download:false, share:false, name:'普通用户'},
+  credits: {dailyAi:Infinity, maxGames:10, voice:true,  download:true,  share:true,  name:'按次',  costPerCall:1},
+  creator: {dailyAi:Infinity, maxGames:Infinity, voice:true,  download:true,  share:true,  name:'创作者'},
+  // family 已移除（用户要求）
 };
-const VALID_PLANS = Object.keys(PLANS);
+// 兼容旧数据：family 用户降级为 creator
+const VALID_PLANS = ['free', 'credits', 'creator'];
 
 function getUserPlan(user) {
   var now = new Date().toISOString().slice(0,10);
   var plan = user.plan || 'free';
   if (user.plan_expires && user.plan_expires < now) plan = 'free';
+  // 废弃的 plan 值（如 family）自动降级为 creator
+  if (!PLANS[plan]) { plan = 'creator'; }
   if (user.daily_ai_date !== now) {
     db.prepare('UPDATE users SET daily_ai_usage=0, daily_ai_date=? WHERE username=?').run(now, user.username);
     user.daily_ai_usage = 0;
@@ -457,7 +460,8 @@ app.get('/api/me',function(req,res){
       dailyAi:{used:info.dailyUsed, max:info.cfg.dailyAi===Infinity?999:info.cfg.dailyAi},
       games:{used:gameCount, max:info.cfg.maxGames===Infinity?999:info.cfg.maxGames},
       voice:info.cfg.voice,
-      download:info.cfg.download
+      download:info.cfg.download,
+      share:info.cfg.share||false
     }
   });
 });
@@ -806,6 +810,14 @@ app.get('/api/plaza',function(req,res){
 app.post('/api/publish-game',requireAuth,function(req,res){
   var id=req.body.id, pub=req.body.public?1:0;
   if(!id)return res.status(400).json({error:'缺少参数'});
+  // 检查发布权限
+  if(pub){
+    var user = db.prepare('SELECT * FROM users WHERE username=? AND active=1').get(req.userName);
+    var info = getUserPlan(user);
+    if (!info.cfg.share) {
+      return res.status(403).json({error:'普通用户暂不支持发布到广场，升级会员即可分享', code:'SHARE_LIMIT'});
+    }
+  }
   db.prepare('UPDATE games SET public=? WHERE id=? AND username=?').run(pub,id,req.userName);
   res.json({ok:true,public:!!pub});
 });
