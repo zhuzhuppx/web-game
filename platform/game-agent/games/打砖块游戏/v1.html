@@ -1,0 +1,440 @@
+我来帮您生成一个完整的打砖块游戏HTML代码，这是v1版本，实现了核心玩法、键盘/触控操作和自适应屏幕。
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>打砖块 Breakout</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #0a0f1e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', 'PingFang SC', Roboto, system-ui, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 820px;
+            padding: 8px;
+            gap: 6px;
+        }
+
+        /* 顶部信息栏 */
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #f0f4ff;
+            font-size: clamp(14px, 3.5vw, 20px);
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
+        }
+
+        #header .title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #ffd866;
+        }
+
+        #header .title .emoji {
+            font-size: 1.2em;
+        }
+
+        #header .stats {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        #header .stats span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.07);
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        #header .stats .score-val {
+            color: #7ae0ff;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        #header .stats .lives-val {
+            color: #ff6b7c;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        /* 画布容器 */
+        #canvas-container {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            position: relative;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #121829;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            flex-shrink: 0;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #121829;
+            touch-action: none;
+            cursor: none;
+        }
+
+        /* 覆盖层 (游戏结束 / 胜利) */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.72);
+            backdrop-filter: blur(6px);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 14px;
+            color: #fff;
+            z-index: 10;
+            padding: 20px;
+            animation: fadeIn 0.35s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.94);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        #overlay.show {
+            display: flex;
+        }
+
+        #overlay .overlay-title {
+            font-size: clamp(32px, 8vw, 52px);
+            font-weight: 800;
+            margin-bottom: 6px;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #overlay .overlay-title.win {
+            color: #ffd866;
+        }
+        #overlay .overlay-title.lose {
+            color: #ff6b7c;
+        }
+
+        #overlay .overlay-score {
+            font-size: clamp(18px, 4vw, 26px);
+            color: #b0c4ff;
+            margin-bottom: 18px;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 6px 24px;
+            border-radius: 30px;
+        }
+
+        #overlay .btn-restart {
+            padding: 12px 44px;
+            font-size: clamp(18px, 4vw, 24px);
+            font-weight: 700;
+            border: none;
+            border-radius: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 6px 24px rgba(102, 126, 234, 0.4);
+            touch-action: manipulation;
+        }
+
+        #overlay .btn-restart:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        /* 底部虚拟按钮 */
+        #controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: clamp(20px, 8vw, 60px);
+            width: 100%;
+            padding: 6px 0 2px 0;
+            flex-shrink: 0;
+        }
+
+        #controls .ctrl-btn {
+            width: clamp(72px, 18vw, 120px);
+            height: clamp(52px, 12vw, 76px);
+            border: none;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #f0f4ff;
+            font-size: clamp(24px, 6vw, 40px);
+            font-weight: 300;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+            transition: background 0.15s, transform 0.1s;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #controls .ctrl-btn:active,
+        #controls .ctrl-btn.active {
+            background: rgba(255, 255, 255, 0.20);
+            transform: scale(0.93);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        #controls .ctrl-btn .label {
+            font-size: 0.5em;
+            font-weight: 600;
+            letter-spacing: 1px;
+            opacity: 0.6;
+            margin-left: 2px;
+        }
+
+        /* 响应式微调 */
+        @media (max-width: 520px) {
+            #game-wrapper {
+                padding: 4px;
+                gap: 4px;
+            }
+            #header {
+                padding: 6px 12px;
+                border-radius: 10px;
+            }
+            #header .stats {
+                gap: 8px;
+            }
+            #header .stats span {
+                padding: 2px 10px;
+            }
+            #canvas-container {
+                border-radius: 10px;
+            }
+            #controls .ctrl-btn {
+                border-radius: 14px;
+                height: 48px;
+            }
+        }
+
+        @media (max-height: 600px) {
+            #header {
+                padding: 4px 12px;
+            }
+            #header .stats span {
+                padding: 2px 8px;
+                font-size: 0.8em;
+            }
+            #controls .ctrl-btn {
+                height: 40px;
+                width: 60px;
+                font-size: 20px;
+            }
+        }
+
+        /* 横屏提示 (仅对手机) */
+        @media (orientation: landscape) and (max-height: 500px) {
+            #game-wrapper {
+                flex-direction: row;
+                flex-wrap: wrap;
+                max-width: 100%;
+                padding: 4px;
+                gap: 4px;
+            }
+            #header {
+                width: 100%;
+                order: 0;
+            }
+            #canvas-container {
+                width: 76%;
+                aspect-ratio: 4 / 3;
+                order: 1;
+            }
+            #controls {
+                width: 20%;
+                flex-direction: column;
+                order: 2;
+                padding: 0;
+                gap: 8px;
+            }
+            #controls .ctrl-btn {
+                width: 80%;
+                height: 56px;
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <!-- 顶部信息栏 -->
+        <div id="header">
+            <div class="title">
+                <span class="emoji">🧱</span>
+                <span>打砖块</span>
+            </div>
+            <div class="stats">
+                <span>🏆 <span class="score-val" id="scoreDisplay">0</span></span>
+                <span>❤️ <span class="lives-val" id="livesDisplay">3</span></span>
+            </div>
+        </div>
+
+        <!-- 画布 -->
+        <div id="canvas-container">
+            <canvas id="gameCanvas"></canvas>
+            <!-- 覆盖层 -->
+            <div id="overlay">
+                <div class="overlay-title" id="overlayTitle">🎉 胜利！</div>
+                <div class="overlay-score" id="overlayScore">得分: 0</div>
+                <button class="btn-restart" id="restartBtn">🔄 重新开始</button>
+            </div>
+        </div>
+
+        <!-- 底部虚拟按钮 -->
+        <div id="controls">
+            <button class="ctrl-btn" id="btnLeft">◀ <span class="label">左</span></button>
+            <button class="ctrl-btn" id="btnRight"><span class="label">右</span> ▶</button>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  打砖块 Breakout  —  完整游戏逻辑
+        // ============================================================
+
+        // ---------- DOM 引用 ----------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const livesDisplay = document.getElementById('livesDisplay');
+        const overlay = document.getElementById('overlay');
+        const overlayTitle = document.getElementById('overlayTitle');
+        const overlayScore = document.getElementById('overlayScore');
+        const restartBtn = document.getElementById('restartBtn');
+        const btnLeft = document.getElementById('btnLeft');
+        const btnRight = document.getElementById('btnRight');
+
+        // ---------- 逻辑尺寸 (设计基准) ----------
+        const LOGIC_W = 800;
+        const LOGIC_H = 600;
+
+        // ---------- 游戏状态 ----------
+        let game = {
+            score: 0,
+            lives: 3,
+            state: 'playing', // 'playing' | 'gameover' | 'win' | 'paused'
+            combo: 0,
+        };
+
+        // ---------- 挡板 ----------
+        const paddle = {
+            x: 0,
+            y: 0,
+            w: 110,
+            h: 14,
+            speed: 7,
+            dx: 0, // -1 left, 1 right, 0 idle
+            targetX: null, // 用于触控跟随
+        };
+
+        // ---------- 球 ----------
+        const ball = {
+            x: 0,
+            y: 0,
+            r: 8,
+            dx: 0,
+            dy: 0,
+            speed: 5.2,
+            stuck: true, // 是否粘在挡板上
+        };
+
+        // ---------- 砖块 ----------
+        let bricks = [];
+        const BRICK_ROWS = 6;
+        const BRICK_COLS = 10;
+        const BRICK_W = 70;
+        const BRICK_H = 22;
+        const BRICK_PAD = 6;
+        const BRICK_TOP_OFFSET = 50;
+
+        const BRICK_COLORS = [
+            '#FF6B6B', // 红
+            '#FF9F43', // 橙
+            '#FECA57', // 黄
+            '#48DBFB', // 天蓝
+            '#0ABDE3', // 蓝
+            '#A29BFE', // 紫
+        ];
+
+        // 每行砖块获得不同的分数
+        const BRICK_SCORES = [7, 5, 4, 3, 2, 1];
+
+        // ---------- 按键状态 ----------
+        const keys = {
+            left: false,
+            right: false,
+        };
+
+        // ---------- 尺寸适配 ----------
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            const containerW = rect.width;
+            const containerH = rect.height;
+
+            // 计算缩放，保持 4:3 比例，居中显示
+           

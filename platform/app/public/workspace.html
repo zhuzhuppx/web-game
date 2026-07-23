@@ -68,8 +68,8 @@ body{display:flex;flex-direction:column}
 .rec-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(2px)}
 .rec-overlay.show{display:flex}
 /* 选项栏 - 两个独立按钮 */
-.rec-overlay .rec-opt-cancel{position:fixed;bottom:84px;left:calc(50% - 170px);padding:14px 38px;border-radius:24px;font-size:15px;color:#e0e0e0;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.12);z-index:1000;transition:all 0.1s;cursor:default}
-.rec-overlay .rec-opt-confirm{position:fixed;bottom:84px;right:calc(50% - 170px);padding:14px 38px;border-radius:24px;font-size:15px;color:#4a6cf7;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.12);z-index:1000;transition:all 0.1s;cursor:default}
+.rec-overlay .rec-opt-cancel{position:fixed;bottom:94px;left:calc(50% - 170px);padding:14px 38px;border-radius:24px;font-size:15px;color:#e0e0e0;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.12);z-index:1000;transition:all 0.1s;cursor:default}
+.rec-overlay .rec-opt-confirm{position:fixed;bottom:94px;right:calc(50% - 170px);padding:14px 38px;border-radius:24px;font-size:15px;color:#4a6cf7;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.12);z-index:1000;transition:all 0.1s;cursor:default}
 .rec-overlay .rec-opt-cancel.hover{background:rgba(255,50,50,0.25);border-color:#ff6666}
 .rec-overlay .rec-opt-confirm.hover{background:rgba(74,108,247,0.2);border-color:#4a6cf7}
 /* 大圆盘 */
@@ -90,8 +90,8 @@ body{display:flex;flex-direction:column}
 /* Wizard 录音 overlay — 与聊天区一致（大圆环+波浪+取消/转文字） */
 .wizard-record-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(2px)}
 .wizard-record-overlay.show{display:flex}
-.wizard-record-overlay .wiz-opt-cancel{position:fixed;bottom:84px;left:calc(50% - 170px);padding:14px 38px;border-radius:24px;font-size:15px;color:#e0e0e0;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.12);z-index:1000;transition:all 0.1s;cursor:default}
-.wizard-record-overlay .wiz-opt-confirm{position:fixed;bottom:84px;right:calc(50% - 170px);padding:14px 38px;border-radius:24px;font-size:15px;color:#4a6cf7;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.12);z-index:1000;transition:all 0.1s;cursor:default}
+.wizard-record-overlay .wiz-opt-cancel{position:fixed;bottom:94px;left:calc(50% - 170px);padding:14px 38px;border-radius:24px;font-size:15px;color:#e0e0e0;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.12);z-index:1000;transition:all 0.1s;cursor:default}
+.wizard-record-overlay .wiz-opt-confirm{position:fixed;bottom:94px;right:calc(50% - 170px);padding:14px 38px;border-radius:24px;font-size:15px;color:#4a6cf7;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.12);z-index:1000;transition:all 0.1s;cursor:default}
 .wizard-record-overlay .wiz-opt-cancel.hover{background:rgba(255,50,50,0.25);border-color:#ff6666}
 .wizard-record-overlay .wiz-opt-confirm.hover{background:rgba(74,108,247,0.2);border-color:#4a6cf7}
 .wizard-record-overlay .wiz-big-ring{position:relative;width:160px;height:160px;border-radius:50%;border:4px solid #ff4444;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85)}
@@ -212,6 +212,20 @@ body{display:flex;flex-direction:column}
 .lobby-empty{text-align:center;padding:60px 20px;color:#555}
 .lobby-empty .big{font-size:60px;margin-bottom:12px}
 .lobby-empty p{font-size:14px;line-height:1.8}
+.agent-import-section{border-top:1px solid #222;margin-top:24px;padding-top:20px;max-width:600px;margin-left:auto;margin-right:auto}
+.agent-import-section h3{font-size:14px;color:#888;margin-bottom:12px;text-align:center}
+.agent-import-list{display:flex;flex-direction:column;gap:8px}
+.agent-import-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;transition:all 0.2s}
+.agent-import-item:hover{border-color:#3a3a6a}
+.agent-import-item .ai-name{font-size:13px;color:#ccc;font-weight:500}
+.agent-import-item .ai-ver{font-size:11px;color:#555;margin-left:8px}
+.agent-import-item button{padding:5px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-family:system-ui;transition:all 0.2s}
+.agent-import-item .btn-import{background:rgba(74,108,247,0.2);color:#88aaff}
+.agent-import-item .btn-import:hover{background:rgba(74,108,247,0.35)}
+.agent-import-item .btn-imported{background:rgba(100,200,100,0.12);color:#6c6;cursor:default}
+.agent-import-empty{text-align:center;color:#444;font-size:12px;padding:16px}
+.agent-import-refresh{display:block;margin:10px auto 0;padding:5px 14px;border-radius:8px;border:1px solid #333;background:transparent;color:#666;cursor:pointer;font-size:12px;font-family:system-ui}
+.agent-import-refresh:hover{color:#aaa;border-color:#555}
 .btn-new-game{background:#4a6cf7;color:#fff;padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-family:system-ui;font-weight:600;transition:all 0.2s}
 .btn-new-game:hover{background:#5b7df8;transform:scale(1.02)}
 /* 工作区用 wrapper 控制显示 */
@@ -287,6 +301,12 @@ body{display:flex;flex-direction:column}
 .wizard-loading .wl-dots span:nth-child(2){animation-delay:0.2s}
 .wizard-loading .wl-dots span:nth-child(3){animation-delay:0.4s}
 @keyframes wlDot{0%,80%,100%{opacity:0.2}40%{opacity:1}}
+/* 游戏生成进度条 */
+.wizard-progress-bar{width:100%;height:6px;background:#222;border-radius:3px;overflow:hidden;margin:12px 0 6px}
+.wizard-progress-bar .fill{height:100%;background:linear-gradient(90deg,#4a6cf7,#6c5ce7);border-radius:3px;transition:width 0.5s ease;width:0%}
+.wizard-progress-phase{font-size:12px;color:#888;margin-bottom:4px;text-align:center}
+.wizard-progress-detail{font-size:11px;color:#555;text-align:center}
+.wizard-loading .wl-icon{font-size:64px;animation:wizardBounce 1s ease-in-out infinite}
 .wizard-output{background:#0a0a0a;border:1px solid #333;border-radius:10px;padding:14px;margin-top:12px;max-height:160px;overflow-y:auto;font-size:13px;color:#ccc;line-height:1.6;text-align:left;white-space:pre-wrap;word-break:break-word;font-family:'SF Mono','Fira Code','Courier New',monospace}
 .wizard-output .cursor{display:inline-block;width:2px;height:15px;background:#4a6cf7;margin-left:2px;animation:blinkCursor 0.8s step-end infinite;vertical-align:text-bottom}
 @keyframes blinkCursor{0%,100%{opacity:1}50%{opacity:0}}
@@ -335,6 +355,12 @@ body{display:flex;flex-direction:column}
   <div class="lobby-empty" id="lobbyEmpty">
     <div class="big">🎨</div>
     <p>还没有游戏，点击右上角「➕ 新建游戏」开始吧！</p>
+  </div>
+  <!-- Agent 游戏导入区 -->
+  <div class="agent-import-section" id="agentImportSection" style="display:none">
+    <h3>🤖 游戏开发 Agent 作品</h3>
+    <div class="agent-import-list" id="agentImportList"></div>
+    <button class="agent-import-refresh" onclick="refreshAgentGames()">🔄 刷新</button>
   </div>
 </div>
 
@@ -938,7 +964,7 @@ function doTTS(text,onDone){
 }
 
 // 向导语音
-var _wizardStream=null,_wizardRecorder=null,_wizardChunks=[];
+var _wizardStream=null,_wizardRecorder=null,_wizardRecMime=null,_wizardChunks=[];
 var _wizardSpeaking=false,_wizardAudio=null;
 
 // TTS 朗读期间禁用卡片/标签/录音按钮/导航按钮点击，防语音重叠
@@ -1002,7 +1028,8 @@ function wizardInitHold(e){
 
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
     _wizardStream=stream;
-    _wizardRecorder=new MediaRecorder(stream,{mimeType:'audio/webm'});
+    _wizardRecMime=_getRecorderMime();
+    _wizardRecorder=_wizardRecMime?new MediaRecorder(stream,{mimeType:_wizardRecMime}):new MediaRecorder(stream);
     _wizardChunks=[];
     _wizardRecorder.ondataavailable=function(e){if(e.data.size>0)_wizardChunks.push(e.data)};
     _wizardRecorder.onstop=function(){
@@ -1011,7 +1038,8 @@ function wizardInitHold(e){
         // 录音太短（<500ms）直接忽略，避免 Whisper 幻觉乱出字
         var dur=Date.now()-_wizRecStartTime;
         if(dur<500){resetWizardRecord();return}
-        var blob=new Blob(_wizardChunks,{type:'audio/webm'});
+        var blobType=_wizardRecMime||'audio/webm';
+        var blob=new Blob(_wizardChunks,{type:blobType});
         if(blob.size>0)wizardSendAudio(blob);
       }
     };
@@ -1076,6 +1104,8 @@ async function wizardSendAudio(blob){
     var d=await r.json();
     var text=(d.text||'').trim();
     if(!text){resetWizardRecord();return}
+    // 字幕志愿者等无意义识别结果直接忽略，当作未识别到声音
+    if(text.indexOf('字幕志愿者')>=0){resetWizardRecord();return}
     // 本地同音纠错
     var fixed=text;
     for(var k in _STT_FIXES){
@@ -1146,11 +1176,128 @@ function submitWizardGame(){
 
 function doWizardApiCall(msg){
   var outputEl=document.getElementById('wizardOutput');
-  if(outputEl)outputEl.textContent='正在为你生成...';
+  if(outputEl)outputEl.textContent='正在启动游戏生成流水线...';
+
+  // 把向导设计转成游戏描述
+  var title=wizardDesign.gameName||'我的游戏';
+  var userMsg=msg;
+  
+  // 显示进度条
+  var loadingDiv=document.querySelector('.wizard-loading');
+  if(loadingDiv){
+    var progressHtml='<div class="wizard-progress-phase" id="wizProgressPhase">🚀 启动中...</div>'+
+      '<div class="wizard-progress-bar"><div class="fill" id="wizProgressFill" style="width:0%"></div></div>'+
+      '<div class="wizard-progress-detail" id="wizProgressDetail"></div>';
+    // 插入到 wl-text 后面
+    var wlText=loadingDiv.querySelector('.wl-text');
+    if(wlText)wlText.insertAdjacentHTML('afterend',progressHtml);
+  }
+
+  // 1. 调 game-agent 异步创建
+  fetch('/api/game-agent/async-chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:userMsg})
+  }).then(function(r){return r.json()}).then(function(data){
+    if(!data.ok||!data.project){
+      showWizardRetry('启动失败: '+(data.error||'未知错误'));
+      return;
+    }
+    var projectName=data.project;
+    // 2. 轮询进度
+    pollProgress(projectName);
+  }).catch(function(e){
+    // 如果 game-agent 不可用，降级到原来的 /api/chat
+    fallbackWizardChat(msg);
+  });
+}
+
+// 进度轮询
+var _progressPollTimer=null;
+function pollProgress(projectName){
+  var phaseEl=document.getElementById('wizProgressPhase');
+  var fillEl=document.getElementById('wizProgressFill');
+  var detailEl=document.getElementById('wizProgressDetail');
+
+  function poll(){
+    fetch('/api/game-agent/games/'+encodeURIComponent(projectName)+'/progress')
+      .then(function(r){return r.json()})
+      .then(function(d){
+        var taskStatus=d.task_status||'idle';
+        var p=d.progress||{};
+        var phase=p.phase||'';
+        var detail=p.detail||'';
+        var pct=p.pct||0;
+
+        // 更新进度条
+        if(phaseEl){
+          var phaseLabels={'design':'📝 设计游戏','coding':'💻 编写代码','review':'🔍 审查代码',
+            'fixing':'🔧 修复问题','testing':'🧪 测试游戏','done':'✅ 完成','error':'❌ 出错了'};
+          phaseEl.textContent=phaseLabels[phase]||'🚀 '+phase;
+        }
+        if(fillEl)fillEl.style.width=Math.min(pct,100)+'%';
+        if(detailEl)detailEl.textContent=detail||'';
+        if(outputEl)outputEl.textContent=detail||'正在生成...';
+
+        if(taskStatus==='done'){
+          // 生成完成
+          if(_progressPollTimer){clearInterval(_progressPollTimer);_progressPollTimer=null}
+          var result=d.result;
+          if(result&&result.ok){
+            // 从数据库加载游戏
+            finishWizardGame(projectName);
+          }else{
+            var errMsg=(result&&result.errors&&result.errors.join(', '))||'生成失败';
+            showWizardRetry(errMsg);
+          }
+          return;
+        }
+        if(taskStatus==='error'){
+          if(_progressPollTimer){clearInterval(_progressPollTimer);_progressPollTimer=null}
+          showWizardRetry(d.error||'生成出错');
+          return;
+        }
+        // 继续轮询
+      })
+      .catch(function(){
+        // 网络错误，继续尝试
+      });
+  }
+
+  // 每 2 秒轮询
+  poll();
+  _progressPollTimer=setInterval(poll,2000);
+}
+
+function finishWizardGame(projectName){
+  // 从 game-agent 获取游戏数据
+  fetch('/api/game-agent/games/'+encodeURIComponent(projectName)+'/download')
+    .then(function(r){return r.text()})
+    .then(function(html){
+      if(html&&html.length>100){
+        showGeneratedGame(html);
+      }else{
+        showWizardRetry('游戏数据为空');
+      }
+    })
+    .catch(function(){
+      showWizardRetry('下载游戏失败');
+    });
+}
+
+function fallbackWizardChat(msg){
+  // game-agent 不可用时的降级方案 — 走原来的 /api/chat 流式
+  var outputEl=document.getElementById('wizardOutput');
+  if(outputEl)outputEl.textContent='正在为你生成（简洁模式）...';
+
+  var phaseEl=document.getElementById('wizProgressPhase');
+  if(phaseEl)phaseEl.textContent='💻 直接生成中...';
   
   var msgs=window.messages&&window.messages.length?window.messages:[{role:'user',content:msg}];
   var controller=new AbortController();
   var timeout=setTimeout(function(){controller.abort()},300000);
+  
+  window._wizardChatStopped=false;
   
   fetch('/api/chat',{
     method:'POST',signal:controller.signal,
@@ -1164,6 +1311,7 @@ function doWizardApiCall(msg){
       return reader.read().then(function(result){
         if(result.done){
           clearTimeout(timeout);
+          window._wizardChatStopped=true;
           var codeMatch=full.match(/```html[\s\S]*?```/);
           if(!codeMatch)codeMatch=full.match(/<!DOCTYPE html[\s\S]*?<\/html>/i);
           if(codeMatch){
@@ -1201,7 +1349,8 @@ function doWizardApiCall(msg){
     return readChunk();
   }).catch(function(e){
     clearTimeout(timeout);
-    var errMsg='网络出错了'+(e.name==='AbortError'?'（超时了，AI 思考太久）':': '+e.message);
+    window._wizardChatStopped=true;
+    var errMsg='网络出错了'+(e.name==='AbortError'?'（超时了）':': '+e.message);
     showWizardRetry(errMsg);
   });
 }
@@ -1254,6 +1403,176 @@ function saveChatGame(){
   }).then(function(r){return r.json()}).then(function(d){
     if(d.ok){gameId=d.id;gameSaved=true;version=d.ver||version}
   }).catch(function(){});
+}
+
+// === 自由模式 game-agent 流水线（与向导模式共用同一套后端） ===
+var _freePollTimer=null;
+
+function startFreeGameAgent(text){
+  // 显示"正在生成"的状态消息
+  addMsg('🚀 正在启动游戏生成流水线（设计→编码→审查→测试→入库）...',false);
+  var typing=document.getElementById('typing');
+  if(typing)typing.remove();
+
+  // 1. 调 game-agent 异步创建
+  fetch('/api/game-agent/async-chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:text})
+  }).then(function(r){return r.json()}).then(function(data){
+    if(!data.ok||!data.project){
+      addMsg('😣 启动失败: '+(data.error||'未知错误')+'，切换到直接生成模式...',false);
+      fallbackFreeChat(text);
+      return;
+    }
+    var projectName=data.project;
+    addMsg('⏳ 正在为你设计游戏 <strong>「'+projectName+'」</strong>，请稍候...',false);
+    // 2. 轮询进度
+    freePollProgress(projectName);
+  }).catch(function(e){
+    // game-agent 不可用时降级到原来的 /api/chat
+    addMsg('😣 游戏引擎暂时不可用，切换到直接生成模式...',false);
+    fallbackFreeChat(text);
+  });
+}
+
+function freePollProgress(projectName){
+  var phaseLabels={'design':'📝 设计游戏','coding':'💻 编写代码','review':'🔍 审查代码',
+    'fixing':'🔧 修复问题','testing':'🧪 测试游戏','done':'✅ 完成','error':'❌ 出错了'};
+
+  function poll(){
+    fetch('/api/game-agent/games/'+encodeURIComponent(projectName)+'/progress')
+      .then(function(r){return r.json()})
+      .then(function(d){
+        var taskStatus=d.task_status||'idle';
+        var p=d.progress||{};
+        var phase=p.phase||'';
+        var detail=p.detail||'';
+        var pct=p.pct||0;
+
+        // 更新进度消息
+        var phaseLabel=phaseLabels[phase]||'🚀 '+phase;
+        var progressText=phaseLabel+(detail?' — '+detail:'');
+        if(pct>0)progressText+=' ('+pct+'%)';
+        updateLastMsg('⏳ '+progressText);
+
+        if(taskStatus==='done'){
+          if(_freePollTimer){clearInterval(_freePollTimer);_freePollTimer=null}
+          var result=d.result;
+          if(result&&result.ok){
+            showFreeGameResult(projectName);
+          }else{
+            var errMsg=(result&&result.errors&&result.errors.join(', '))||'生成失败';
+            updateLastMsg('❌ 生成失败: '+errMsg+'，切换到直接生成模式');
+            // 降级：用用户原始消息调 LLM
+            fallbackFreeChat(text);
+          }
+          return;
+        }
+        if(taskStatus==='error'){
+          if(_freePollTimer){clearInterval(_freePollTimer);_freePollTimer=null}
+          updateLastMsg('❌ 生成出错: '+(d.error||'未知错误')+'，切换到直接生成模式');
+          fallbackFreeChat(text);
+          return;
+        }
+      })
+      .catch(function(){
+        // 网络错误，继续尝试
+      });
+  }
+
+  // 保存 text 用于降级
+  var text = '';
+  // 从消息列表获取最后一条用户消息
+  for(var _i=messages.length-1;_i>=0;_i--){
+    if(messages[_i].role==='user'){text=messages[_i].content;break;}
+  }
+
+  poll();
+  _freePollTimer=setInterval(poll,2000);
+}
+
+function showFreeGameResult(projectName){
+  // 从消息列表获取最后一条用户消息（用于降级）
+  var _fallbackText='';
+  for(var _i=messages.length-1;_i>=0;_i--){
+    if(messages[_i].role==='user'){_fallbackText=messages[_i].content;break;}
+  }
+  // 从 game-agent 下载游戏
+  fetch('/api/game-agent/games/'+encodeURIComponent(projectName)+'/download')
+    .then(function(r){return r.text()})
+    .then(function(html){
+      if(html&&html.length>100){
+        gameCode=html;
+        gameTitle=projectName;
+        version=1;
+        document.getElementById('gameName').textContent='🎮 '+projectName;
+        document.getElementById('gameVer').textContent='🔄 第1次迭代';
+        gameStarted=true;
+        // 保存到本地数据库
+        saveChatGame();
+        // 替换最后一条消息为完成状态
+        updateLastMsg('🎉 游戏 <strong>「'+projectName+'」</strong> 已生成完毕！');
+        // 显示预览和操作按钮
+        var msgEl=addMsg('👁️ 点下面预览你的游戏，也可以继续输入文字告诉我怎么改！',false);
+        (function(mEl){
+          var btn=document.createElement('button');
+          btn.className='preview-btn';
+          btn.textContent='👁️ 预览游戏';
+          btn.onclick=function(){
+            var frame=document.getElementById('previewFrame');
+            frame.srcdoc='';setTimeout(function(){frame.srcdoc=gameCode},50);
+            openPreview();
+          };
+          mEl.appendChild(btn);
+        })(msgEl);
+        // 建议快捷操作
+        var sugg=document.createElement('div');
+        sugg.className='suggestions';sugg.id='suggestions';
+        sugg.innerHTML='<button onclick="quickSend(\'好的，继续升级！\')">🚀 继续升级</button>'+
+          '<button onclick="quickSend(\'加个Boss吧\')">👾 加Boss</button>'+
+          '<button onclick="quickSend(\'让难度慢慢增加\')">📈 难度递增</button>'+
+          '<button onclick="quickSend(\'加个排行榜\')">🏆 加排行榜</button>';
+        document.getElementById('msgs').appendChild(sugg);
+        document.getElementById('msgs').scrollTop=document.getElementById('msgs').scrollHeight;
+        setInputEnabled(true);
+        SFX.powerup();
+      }else{
+        updateLastMsg('❌ 游戏数据为空，切换到直接生成模式');
+        fallbackFreeChat(_fallbackText);
+      }
+    })
+    .catch(function(){
+      updateLastMsg('❌ 下载游戏失败，切换到直接生成模式');
+      fallbackFreeChat(_fallbackText);
+    });
+}
+
+function fallbackFreeChat(text){
+  // 降级：直接调 /api/chat 流式
+  setInputEnabled(false);
+  var typing=document.createElement('div');
+  typing.className='msg ai';typing.id='typing';
+  typing.innerHTML='<span class="think-dots"><i>.</i><i>.</i><i>.</i></span>';
+  document.getElementById('msgs').appendChild(typing);
+  document.getElementById('msgs').scrollTop=document.getElementById('msgs').scrollHeight;
+
+  // 确保 system prompt 存在
+  if(messages.length===0||messages[0].role!=='system'){
+    messages=[{role:'system',content:SYSTEM_PROMPT}].concat(messages);
+  }
+  messages.push({role:'user',content:text});
+  doChat();
+}
+
+// 更新最后一条 AI 消息的内容
+function updateLastMsg(content){
+  var msgs=document.getElementById('msgs');
+  var children=msgs.querySelectorAll('.msg.ai');
+  if(children.length>0){
+    children[children.length-1].innerHTML=content;
+  }
+  msgs.scrollTop=msgs.scrollHeight;
 }
 
 function wizardPreviewGame(){
@@ -1376,6 +1695,22 @@ var SYSTEM_PROMPT="你是'游戏工坊'的AI助手，帮小朋友把游戏想法
 "```\n"+
 "音效：得分 SFX.score()，碰撞 SFX.hurt()，胜利 SFX.success()\n"+
 "8. ⏸️ **必须支持暂停！** 在游戏脚本开头声明 var paused=false; 添加 window.addEventListener('message',function(e){if(e.data==='pause'){paused=true;if(typeof SFX!=='undefined'&&SFX.stopBGM)SFX.stopBGM()}if(e.data==='resume'){paused=false}}); 在游戏主循环（requestAnimationFrame）开头加 if(paused)return; 否则预览关闭时页面会卡死。不满足此规则的代码视为无效\n\n"+
+"## 手术刀式修改规则（重要！）\n"+
+"当小朋友说**修改/修复/改一下**某个具体问题（比如改分数、修Bug、加个判断、调数值），而不是加一个新功能时：\n"+
+"1. **不要输出完整的HTML代码！** 只输出需要修改的部分，使用下面的 PATCH 格式\n"+
+"2. PATCH 格式：用 ```patch ... ``` 包裹，每块包含 SEARCH 和 REPLACE\n"+
+"3. SEARCH 是当前代码中要替换的**原片段**，REPLACE 是**新片段**，两者必须语义匹配\n"+
+"4. 可以同时输出多个 PATCH 块，按顺序应用\n"+
+"5. 如果修改涉及多个不连续的地方，每个地方写一个独立的 PATCH 块\n\n"+
+"PATCH 模板（直接复制使用）：\n"+
+"```patch\n"+
+"SEARCH:\n"+
+"<当前代码中要替换的精确片段>\n"+
+"---\n"+
+"REPLACE:\n"+
+"<替换后的新片段>\n"+
+"```\n\n"+
+"**例外：** 如果修改涉及全局性改动（比如加BGM、加手机控制、重构整个游戏逻辑），或者修改量超过代码总量的30%，则仍然输出完整HTML代码。\n\n"+
 "## 迭代升级建议格式\n"+
 "如果小朋友想升级，先问想升级哪个部分：\n"+
 "🎯 主角：换角色/改大小/加特效\n"+
@@ -1489,6 +1824,97 @@ async function checkCanSend(){
     return true;
   } catch(e) { return true; }
 }
+
+// ── 游戏开发 Agent 导入 ──
+var _agentImportedCache={};
+
+function refreshAgentGames(){
+  fetch('/api/game-agent/games').then(function(r){return r.json()}).then(function(d){
+    var list=document.getElementById('agentImportList');
+    var section=document.getElementById('agentImportSection');
+    if(!d.projects||!d.projects.length){
+      section.style.display='none';
+      return;
+    }
+    section.style.display='block';
+    list.innerHTML='';
+    // 同步已导入的游戏列表
+    fetch('/api/games').then(function(r2){return r2.json()}).then(function(d2){
+      var imported={};
+      if(d2.games) d2.games.forEach(function(g){imported[g.title]=g.id});
+      for(var i=0;i<d.projects.length;i++){
+        var p=d.projects[i];
+        if(p.status==='created'&&!p.files.length) continue; // 只显示有HTML的
+        var isImported=!!imported[p.name];
+        var item=document.createElement('div');
+        item.className='agent-import-item';
+        item.innerHTML=
+          '<div><span class="ai-name">'+_escapeHtml(p.name)+'</span><span class="ai-ver">v'+p.version+'</span></div>'+
+          (isImported
+            ? '<button class="btn-imported" disabled>✅ 已导入</button>'
+            : '<button class="btn-import" onclick="importAgentGame(\''+_escapeHtml(p.name)+'\',this)">📥 导入到主站</button>');
+        list.appendChild(item);
+      }
+    }).catch(function(){section.style.display='none'});
+  }).catch(function(){
+    document.getElementById('agentImportSection').style.display='none';
+  });
+}
+
+function importAgentGame(name,btn){
+  btn.disabled=true;
+  btn.textContent='⏳ 导入中...';
+  fetch('/api/import-agent-game',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({projectName:name})
+  }).then(function(r){return r.json()}).then(function(d){
+    if(d.ok){
+      btn.textContent='✅ 已导入';
+      btn.className='btn-imported';
+      btn.disabled=true;
+      // 刷新主站列表
+      buildLobby();
+      showImportToast('🎉 游戏「'+name+'」已导入到主站！');
+    }else{
+      btn.textContent='❌ 导入失败';
+      btn.disabled=false;
+      btn.className='btn-import';
+      setTimeout(function(){btn.textContent='📥 导入到主站'},2000);
+    }
+  }).catch(function(){
+    btn.textContent='❌ 网络错误';
+    btn.disabled=false;
+    btn.className='btn-import';
+    setTimeout(function(){btn.textContent='📥 导入到主站'},2000);
+  });
+}
+
+function showImportToast(msg){
+  var el=document.getElementById('importToast');
+  if(!el){
+    el=document.createElement('div');
+    el.id='importToast';
+    el.className='agent-import-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent=msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){el.classList.remove('show')},3000);
+}
+
+function _escapeHtml(s){
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 修改 buildLobby 加载完后也刷新 Agent 游戏列表
+var _origBuildLobby=buildLobby;
+buildLobby=function(){
+  _origBuildLobby();
+  refreshAgentGames();
+};
+
 init();
 
 function addMsg(text,isUser){
@@ -1656,7 +2082,8 @@ async function startHoldRecord(e){
 
   try{
     _stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    _mediaRecorder=new MediaRecorder(_stream,{mimeType:'audio/webm'});
+    var recMime=_getRecorderMime();
+    _mediaRecorder=recMime?new MediaRecorder(_stream,{mimeType:recMime}):new MediaRecorder(_stream);
     _audioChunks=[];
     _mediaRecorder.ondataavailable=function(e){if(e.data.size>0)_audioChunks.push(e.data)};
     _mediaRecorder.onstop=function(){
@@ -1664,7 +2091,8 @@ async function startHoldRecord(e){
       // 录音太短（<500ms）直接忽略，避免 Whisper 幻觉乱出字
       var dur=Date.now()-_recStartTime;
       if(dur<500){_audioChunks=[];return}
-      var blob=new Blob(_audioChunks,{type:'audio/webm'});
+      var blobType=recMime||'audio/webm';
+      var blob=new Blob(_audioChunks,{type:blobType});
       if(blob.size>0)sendAudio(blob);
     };
     _mediaRecorder.start();
@@ -1726,6 +2154,13 @@ async function sendAudio(blob){
     var r=await fetch('/api/speech',{method:'POST',body:wav,headers:{'Content-Type':'audio/wav'}});
     var d=await r.json();
     if(d.text){
+      // 字幕志愿者等无意义识别结果直接忽略，当作未识别到声音
+      if(d.text.indexOf('字幕志愿者')>=0){
+        btn.textContent='没听清，再试一次';
+        btn.style.background='#ff6644';
+        setTimeout(function(){btn.textContent='按住说话';btn.style.background=''},1500);
+        return;
+      }
       btn.textContent='按住说话';
       // ★语音转文字后逐字打出，不突然蹦出来
       if (!(await checkCanSend())) { setInputEnabled(true);return; }
@@ -1761,6 +2196,16 @@ async function sendAudio(blob){
     btn.style.background='#ff6644';
     setTimeout(function(){btn.textContent='按住说话';btn.style.background=''},1500);
   }
+}
+
+// 检测当前浏览器支持的 MediaRecorder mimeType（iOS 不支持 audio/webm，只支持 audio/mp4）
+function _getRecorderMime(){
+  if(typeof MediaRecorder==='undefined')return null;
+  var types=['audio/webm','audio/webm;codecs=opus','audio/mp4','audio/mp4;codecs=mp4a'];
+  for(var i=0;i<types.length;i++){
+    if(MediaRecorder.isTypeSupported(types[i]))return types[i];
+  }
+  return null;
 }
 
 // 重采样到 16kHz 单声道并输出 WAV
@@ -1915,6 +2360,7 @@ async function send(){
   if (!(await checkCanSend())) { return; }
 
   window._cancelled=false;
+  window._partialCode=null; // 重置截断续写缓存
   setInputEnabled(false);
   
   var input=document.getElementById('input');
@@ -1925,6 +2371,21 @@ async function send(){
   
   addMsg(text,true);
   input.value='';
+
+  // ★ 新游戏请求检测 — 走 game-agent 异步流水线
+  // 没有已有游戏代码，且消息含"做个/写个/开发/做一/生成"等关键词时，走 game-agent 流水线
+  if(!gameCode){
+    var _newGameKws=["做个","写个","开发","做一","生成","create","make","build","new game"];
+    var _isNewGame=false;
+    for(var _i=0;_i<_newGameKws.length;_i++){
+      if(text.indexOf(_newGameKws[_i])!==-1){_isNewGame=true;break;}
+    }
+    if(_isNewGame){
+      // 走 game-agent 异步流水线（设计→编码→审查→测试→入库）
+      startFreeGameAgent(text);
+      return;
+    }
+  }
 
   // 确保 system prompt 始终存在（自由模式也需要 BGM/音效/手机控制指令）
   if(messages.length===0||messages[0].role!=='system'){
@@ -2039,9 +2500,6 @@ async function doChat(){
     if(!codeMatch){codeMatch=reply.match(/```\n?([\s\S]*?)```/)}
     // 检测是否被截断（有 ```html 但没闭合 ```）
     var truncated=!/```\s*$/.test(reply) && /```html/.test(reply) && !/```[\s\S]*```/.test(reply.replace(/```html/,''));
-    if(truncated && !codeMatch){
-      addMsg('⚠️ 代码太长被截断了，试试说「精简一下」或分步生成',false);
-    }
     // 最后兜底：如果回复里直接包含完整的 <!DOCTYPE html> 或 <html>
     if(!codeMatch){
       var m=reply.match(/(<!DOCTYPE html[\s\S]*<\/html>)/i);
@@ -2057,24 +2515,97 @@ async function doChat(){
     if(codeMatch && codeMatch[1].trim()){
       if(codeMatch[1].trim().length<50){codeMatch=null}
     }
+    // ===== 手术刀式 PATCH 模式 =====
+    // 只有没提取到完整HTML代码时，才尝试 PATCH 模式
     if(!codeMatch){
-      console.warn('⚠️ 未提取到代码！AI回复前200字符:',reply.slice(0,200));
-      // 自动继续：最多重试3次
-      window._retryCount=(window._retryCount||0)+1;
-      if(window._retryCount<=3){
-        addMsg('🤖 代码好像没写完整，让我继续...',false);
-        // 追加消息并继续
-        messages.push({role:'user',content:'请继续输出完整的HTML代码（用```html包裹），不要省略，不要只说"完成了"但没有代码'});
-        doChat(); // 继续调用 API
-        return;
-      }else{
-        addMsg('⚠️ 重试了多次还是没拿到代码，请手动说「继续写」试试',false);
-        window._retryCount=0;
-        setInputEnabled(true);
+    var patchBlocks=[];
+
+    // 提取所有 ```patch ... ``` 块
+    var patchRe=/```patch\s*\n([\s\S]*?)```/g;
+    var patchMatch;
+    while((patchMatch=patchRe.exec(reply))!==null){
+      var block=patchMatch[1].trim();
+      // 解析 SEARCH / --- / REPLACE
+      var sepIdx=block.indexOf('\n---\n');
+      if(sepIdx===-1)sepIdx=block.indexOf('\n---\r\n');
+      if(sepIdx===-1)continue;
+      var searchPart=block.substring(0,sepIdx).trim();
+      var replacePart=block.substring(sepIdx+5).trim();
+      // 去掉 SEARCH: 和 REPLACE: 前缀
+      searchPart=searchPart.replace(/^SEARCH:\s*\n?/i,'');
+      replacePart=replacePart.replace(/^REPLACE:\s*\n?/i,'');
+      if(searchPart.length>10 && replacePart.length>0){
+        patchBlocks.push({search:searchPart,replace:replacePart});
       }
-    }else{
-      window._retryCount=0; // 成功了，重置计数
     }
+
+    // 有 PATCH 块时，对当前 gameCode 做精确替换
+    if(patchBlocks.length>0 && gameCode && gameCode.length>100){
+      // 备份旧代码
+      __prevCode=gameCode;
+      window.__prevVer=version-1;
+      var patchedCode=gameCode;
+      var patchApplied=0;
+      for(var pi=0;pi<patchBlocks.length;pi++){
+        var p=patchBlocks[pi];
+        if(patchedCode.indexOf(p.search)!==-1){
+          patchedCode=patchedCode.replace(p.search,p.replace);
+          patchApplied++;
+        }else{
+          // 尝试去掉首尾空白再搜
+          var sTrim=p.search.trim();
+          if(patchedCode.indexOf(sTrim)!==-1){
+            patchedCode=patchedCode.replace(sTrim,p.replace);
+            patchApplied++;
+          }else{
+            console.warn('⚠️ PATCH 未找到匹配片段:',p.search.slice(0,80));
+          }
+        }
+      }
+      if(patchApplied>0){
+        console.log('✅ 应用了 '+patchApplied+'/'+patchBlocks.length+' 个PATCH');
+        // 用 patchedCode 替换 codeMatch，走后续流程
+        codeMatch=[patchedCode,patchedCode];
+        // 跳过续写逻辑
+        window._partialCode=null;
+        window._retryCount=0;
+        truncated=false; // 标记截断已处理，不走续写
+      }else{
+        console.warn('⚠️ PATCH 全部未匹配，不修改');
+        // 不回退到完整代码模式，继续正常流程
+      }
+    }
+    } // end if(!codeMatch) - PATCH 模式结束
+
+    // ===== 截断续写机制 =====
+    // 如果能提取到代码但被截断了，或者没提取到但有代码开头 → 累计续写
+    if(truncated && codeMatch && codeMatch[1].length>50){
+      // 截断了但代码主体已提取到，累积起来让AI继续
+      window._partialCode=(window._partialCode||'')+codeMatch[1];
+      addMsg('✂️ 代码太长没写完，正在继续写...',false);
+      messages.push({role:'user',content:'这是你刚才写的代码。请不要重写，也不要精简，直接**继续接着写**后面的部分（从上次被截断的地方继续）。只输出截图未写完的代码（用```html包裹），前面已经写过的部分不要再重复。\n\n已写部分（接着这里往下写，不要重复这段）：\n```html\n'+window._partialCode+'\n```'});
+      doChat();
+      return;
+    }
+    if(!codeMatch && /```html/.test(reply)){
+      // 有 ```html 开头但没闭合，也没提取到 → 说明截断在代码中间
+      var partial=reply.match(/```html[ \t]*\r?\n([\s\S]*)/);
+      if(partial && partial[1].length>50){
+        window._partialCode=(window._partialCode||'')+partial[1];
+        addMsg('✂️ 代码太长没写完，正在继续写...',false);
+        messages.push({role:'user',content:'这是你刚才写的代码。请不要重写，也不要精简，直接**继续接着写**后面的部分（从上次被截断的地方继续）。只输出截图未写完的代码（用```html包裹），前面已经写过的部分不要再重复。\n\n已写部分（接着这里往下写，不要重复这段）：\n```html\n'+window._partialCode+'\n```'});
+        doChat();
+        return;
+      }
+    }
+    // 没有截断但有累积的 partialCode → 合并后作为最终代码
+    if(window._partialCode && codeMatch){
+      var finalCode=window._partialCode+codeMatch[1];
+      // 用合并后的代码替换
+      codeMatch=[finalCode,finalCode];
+      window._partialCode=null;
+    }
+    window._retryCount=0; // 重置计数
     if(codeMatch){
       // ★备份旧代码，用于撤回
       __prevCode=gameCode;
@@ -2392,6 +2923,10 @@ function startMode(mode){
         '<button onclick="quickSend(\'我想做一个收集宝石的游戏\')">💎 收集宝石</button>'+
         '<button onclick="quickSend(\'我想做推箱子游戏\')">📦 推箱子</button>'+
         '</div>';
+      // TTS 朗读欢迎语（仅语音权限用户）
+      if(d && d.limits && d.limits.voice){
+        setTimeout(function(){wizardSpeak('嘿，小游戏设计师！这里是你的游戏工坊，你说想法，我帮你实现。今天你想做一个什么样的游戏？');},500);
+      }
     }
   }
 }
@@ -2502,7 +3037,7 @@ function editCurrentGame(){
   messages=[
     {role:'system',content:SYSTEM_PROMPT},
     {role:'user',content:'这是「'+gameTitle+'」的当前代码：\n```html\n'+gameCode+'\n```'},
-    {role:'assistant',content:'了解了！你想给「'+gameTitle+'」做什么改进？'}
+    {role:'assistant',content:'了解了！我看到了「'+gameTitle+'」的完整代码。你想改哪个部分？如果是小修改（调数值、修Bug、改样式），我会用 PATCH 格式只改需要改的地方，其他部分保持不变。'}
   ];
   turnCount=0;
   var hp=window._userPlan&&window._userPlan.limits&&window._userPlan.limits.voice;
@@ -2660,8 +3195,5 @@ function confirmDelete(){
 
 function goPlaza(){window.open('/plaza','_blank')}
 
-// 旧的辅助函数改为空（保留兼容）
-function deleteFromLobby(){}
-function togglePublish(){}
 </script>
 </body></html>

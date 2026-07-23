@@ -1,0 +1,95 @@
+我来帮你生成一个完整的“打地鼠”游戏 HTML 文件，修复了所有语法错误并补全了核心玩法逻辑。
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>打地鼠</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #2d1b0e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #game-wrapper {
+            background: #5a3a1a;
+            border-radius: 24px;
+            padding: 16px 16px 0 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 200, 0.1);
+            max-width: 98vw;
+            max-height: 98vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #canvas-container {
+            position: relative;
+            background: #6b4423;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #8b6b3d;
+            touch-action: none;
+            cursor: pointer;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 24px;
+            padding: 12px 0 16px 0;
+            width: 100%;
+            flex-shrink: 0;
+        }
+
+        .ctrl-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 90px;
+            padding: 8px 24px;
+            border: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background: #c87b2c;
+            box-shadow: 0 6px 0 #7a4a1a, 0 8px 16px rgba(0, 0, 0, 0.3);
+            transition: all 0.08s ease;
+            touch-action: manipulation;
+            cursor: pointer;
+            letter-spacing: 1px;
+        }
+
+        .ctrl-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #7a4a1a, 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .ctrl-btn .key-hint {
+            font-size

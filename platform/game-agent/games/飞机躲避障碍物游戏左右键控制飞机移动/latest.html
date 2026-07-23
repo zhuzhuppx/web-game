@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>飞机躲避障碍物</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #game-container {
+            width: 480px;
+            height: 750px;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+        .key-hint {
+            position: absolute;
+            bottom: 8px;
+            color: rgba(255, 255, 255, 0.25);
+            font-size: 12px;
+            font-family: 'Arial', sans-serif;
+            pointer-events: none;
+            z-index: 10;
+            letter-spacing: 1px;
+        }
+        .key-hint.left {
+            left: 20px;
+        }
+        .key-hint.right {
+            right: 20px;
+        }
+        @media (hover: none) and (pointer: coarse) {
+            .key-hint {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="key-hint left">← J</div>
+        <div class="key-hint right">K →</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js">
+    </script>
+    <script>
+        // ============================================================
+        // 全局状态钩子（必须暴露）
+        // ============================================================
+        window.__gameState = {
+            running: true,
+            score: 0,
+            lives: 3,
+            gameOver: false,
+            canRestart: false,
+            objects: {
+                player: true,
+                enemies: 0,
+                projectiles: 0
+            }
+        };
+
+        // ============================================================
+        // 音效系统（Web Audio API）
+        // ============================================================
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                try {
+                    audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.warn('Web Audio API 不支持');
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playBeep(freq, duration, type, volume) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type || 'square';
+                osc.frequency.value = freq;
+                const vol = volume || 0.25;
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) { /* 静默 */ }
+        }
+
+        function sfxHit() {
+            playBeep(150, 0.3, 'sawtooth', 0.3);
+            setTimeout(() => playBeep(100, 0.2, 'sawtooth', 0.2), 100);
+        }
+
+        function sfxScore() {
+            playBeep(600, 0.08, 'square', 0.2);
+            setTimeout(() => playBeep(900, 0.08, 'square', 0.2), 80);
+            setTimeout(() => playBeep(1200, 0.1, 'square', 0.15), 160);
+        }
+
+        function sfxJump() {
+            playBeep(400, 0.06, 'square', 0.15);
+            setTimeout(() => playBeep(600, 0.06, 'square', 0.15), 50);
+            setTimeout(() => playBeep(800, 0.08, 'square', 0.12), 100);
+        }
+
+        function sfxGameOver() {
+            playBeep(400, 0.15, 'sawtooth', 0.25);
+            setTimeout(() => playBeep(300, 0.15, 'sawtooth', 0.25), 150);
+            setTimeout(() => playBeep(200, 0.2, 'sawtooth', 0.25), 300);
+            setTimeout(() => playBeep(120, 0.35, 'sawtooth', 0.2), 500);
+        }
+
+        // ============================================================
+        // 主游戏场景
+        // ============================================================
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super('GameScene');
+                // 数值参数
+                this.PLANE_SPEED = 350;
+                this.BG_SPEED = 200;
+                this.OBSTACLE_SPEED = 250;
+                this.SPAWN_INTERVAL = 1500;
+                this.PLANE_Y = 620;
+                this.INITIAL_LIVES = 3;
+                this.SCORE_PER_OBSTACLE = 10;
+                this.MAX_OBSTACLES = 4;
+                // 难度递增
+                this.DIFFICULTY_INTERVAL = 30000;
+                this.SPEED_INCREASE = 20;
+                this.INTERVAL_DECREASE = 100;
+                this.MIN_INTERVAL = 500;
+                this.MAX_SPEED = 500;
+                // 状态
+                this.score = 0;
+                this.lives = this.INITIAL_LIVES;
+                this.gameOver = false;
+                this.elapsedTime = 0;
+                this.obstacleSpeed = this.OBSTACLE_SPEED;
+                this.spawnInterval = this.SPAWN_INTERVAL;
+                this.difficultyLevel = 0;
+                // 控制
+                this.leftPressed = false;
+                this.rightPressed = false;
+                this.restartKey = null;
+                this.cursors = null;
+                this.keysWASD = null;
+                this.keysJK = null;
+                // 对象引用
+                this.plane = null;
+                this.obstacles = null;
+                this.scoreText = null;
+                this.livesText = null;
+                this.gameOverText = null;
+                this.restartText = null;
+                this.bg = null;
+                this.obstacleTimer = null;
+                this.difficultyTimer = null;
+                // 虚拟按钮
+                this.btnLeft = null;
+                this.btnRight = null;
+                this.btnLeftText = null;
+                this.btnRightText = null;
+                // 触控状态
+                this.touchLeft = false;
+                this.touchRight = false;
+            }
+
+            // -------- 创建纹理资源 --------
+            createTextures() {
+                // ---- 飞机纹理 ----
+                const pg = this.add.graphics();
+                // 机身（主体三角形）
+                pg.fillStyle(0x3399ff);
+                pg.beginPath();
+                pg.moveTo(30, 0);
+                pg.lineTo(8, 40);
+                pg.lineTo(52, 40);
+                pg.closePath();
+                pg.fillPath();
+                // 机翼
+                pg.fillStyle(0x2277cc);
+                pg.fillRect(4, 24, 52, 10);
+                // 翼尖小翼
+                pg.fillStyle(0x55bbff);
+                pg.fillRect(2, 26, 4, 6);
+                pg.fillRect(54, 26, 4, 6);
+                // 尾翼
+                pg.fillStyle(0x1a66aa);
+                pg.fillRect(20, 36, 20, 8);
+                // 驾驶舱
+                pg.fillStyle(0x88ddff);
+                pg.fillCircle(30, 14, 6);
+                pg.generateTexture('plane', 60, 46);
+                pg.destroy();
+
+                // ---- 障碍物纹理 ----
+                const og = this.add.graphics();
+                og.fillStyle(0xff4444);
+                og.fillRect(0, 0, 48, 28);
+                // 条纹装饰
+                og.fillStyle(0xcc2222);
+                og.fillRect(4, 6, 40, 4);
+                og.fillRect(4, 18, 40, 4);
+                // 发光的边缘
+                og.lineStyle(2, 0xff8888, 0.6);
+                og.strokeRect(1, 1, 46, 26);
+                og.generateTexture('obstacle', 48, 28);
+                og.destroy();
+
+                // ---- 背景纹理（用于 tileSprite） ----
+                const bg = this.add.graphics();
+                // 渐变背景
+                const steps = 80;
+                for (let i = 0; i < steps; i++) {
+                    const t = i / steps;
+                    const r = Math.floor(5 + t * 10);
+                    const g = Math.floor(10 + t * 20);
+                    const b = Math.floor(40 + t * 30);
+                    const color = (r << 16) | (g << 8) | b;
+                    bg.fillStyle(color, 1);
+                    bg.fillRect(0, i * 10, 480, 10);
+                }
+                // 星星
+                bg.fillStyle(0xffffff, 0.8);
+                const starPositions = [
+                    [40, 30],
+                    [120, 80],
+                    [220, 20],
+                    [340, 60],
+                    [420, 40],
+                    [80, 140],
+                    [200, 110],
+                    [310, 150],
+                    [440, 120],
+                    [50, 210],
+                    [170, 190],
+                    [280, 220],
+                    [400, 200],
+                    [100, 280],
+                    [240, 260],
+                    [360, 290],
+                    [460, 270],
+                    [30, 350],
+                    [150, 330],
+                    [300, 360],
+                    [420, 340],
+                    [70, 420],
+                    [190, 400],
+                    [350, 430],
+                    [450, 410],
+                    [40, 500],
+                    [160, 480],
+                    [280, 510],
+                    [400, 490],
+                    [90, 570],
+                    [220, 550],
+                    [340, 580],
+                    [460, 560]
+                ];
+                starPositions.forEach(([x, y]) => {
+                    const size = 1 + Math.random() * 2;
+                    bg.fillRect(x, y, size, size);
+                });
+                // 少量闪烁大星
+                bg.fillStyle(0xffffff, 1);
+                [
+                    [180, 160],
+                    [380, 250],
+                    [60, 460],
+                    [300, 530]
+                ].forEach(([x, y]) => {
+                    bg.fillRect(x, y, 3, 3);
+                    bg.fillRect(x - 1, y + 1, 5, 1);
+                    bg.fillRect(x + 1, y - 1, 1, 5);
+                });
+                bg.generateTexture('bg', 480, 600);
+                bg.destroy();
+
+                // ---- 粒子/小星星纹理 ----
+                const sg = this.add.graphics();
+                sg.fillStyle(0xffffff, 1);
+                sg.fillCircle(4, 4, 4);
+                sg.generateTexture('star', 8, 8);
+                sg.destroy();
+            }
+
+            // -------- 创建游戏 --------
+            create() {
+                // 初始化音效（在用户交互时会被唤醒）
+                initAudio();
+
+                // 重置状态
+                this.score = 0;
+                this.lives = this.INITIAL_LIVES;
+                this.gameOver = false;
+                this.elapsedTime = 0;
+                this.obstacleSpeed = this.OBSTACLE_SPEED;
+                this.spawnInterval = this.SPAWN_INTERVAL;
+                this.difficultyLevel = 0;
+                this.leftPressed = false;
+                this.rightPressed = false;
+                this.touchLeft = false;
+                this.touchRight = false;
+
+                // 更新全局状态
+                window.__gameState.running = true;
+                window.__gameState.score = 0;
+                window.__gameState.lives = this.INITIAL_LIVES;
+                window.__gameState.gameOver = false;
+                window.__gameState.canRestart = false;
+                window.__gameState.objects.enemies = 0;
+
+                // ---- 背景 ----
+                this.bg = this.add.tileSprite(240, 375, 480, 750, 'bg');
+                this.bg.setDepth(-10);
+
+                // ---- 玩家飞机 ----
+                this.plane = this.physics.add.sprite(240, this.PLANE_Y, 'plane');
+                this.plane.setCollideWorldBounds(true);
+                this.plane.setDepth(10);
+                this.plane.body.setSize(50, 36);
+                this.plane.body.setOffset(5, 5);
+
+                // ---- 障碍物组 ----
+                this.obstacles = this.physics.add.group({
+                    allowGravity: false,
+                    collideWorldBounds: false
+                });
+
+                // ---- 碰撞检测 ----
+                this.physics.add.overlap(this.plane, this.obstacles, this.hitObstacle, null, this);
+
+                // ---- UI ----
+                const uiStyle = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '22px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                };
+                this.scoreText = this.add.text(20, 16, '分数: 0', uiStyle).setDepth(20);
+                this.livesText = this.add.text(360, 16, this.getLivesDisplay(), uiStyle).setDepth(20);
+
+                // 游戏结束文字（隐藏）
+                const endStyle = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '42px',
+                    color: '#ff4444',
+                    stroke: '#000000',
+                    strokeThickness: 5,
+                    align: 'center'
+                };
+                this.gameOverText = this.add.text(240, 280, '游戏结束', endStyle).setOrigin(0.5).setDepth(20).setVisible(false);
+
+                const restartStyle = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '24px',
+                    color: '#ffcc00',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                    align: 'center'
+                };
+                this.restartText = this.add.text(240, 350, '点击或按空格键重新开始', restartStyle).setOrigin(0.5).setDepth(20)
+                    .setVisible(false);
+
+                // ---- 输入：键盘 ----
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keysWASD = this.input.keyboard.addKeys({
+                    left: Phaser.Input.Keyboard.KeyCodes.A,
+                    right: Phaser.Input.Keyboard.KeyCodes.D
+                });
+                this.keysJK = this.input.keyboard.addKeys({
+                    left: Phaser.Input.Keyboard.KeyCodes.J,
+                    right: Phaser.Input.Keyboard.KeyCodes.K
+                });
+                this.restartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+                // ---- 输入：触摸虚拟按钮 ----
+                this.createTouchButtons();
+
+                // ---- 计时器：障碍物生成 ----
+                this.obstacleTimer = this.time.addEvent({
+                    delay: this.spawnInterval,
+                    callback: this.spawnObstacle,
+                    callbackScope: this,
+                    loop: true
+                });
+
+                // ---- 计时器：难度递增 ----
+                this.difficultyTimer = this.time.addEvent({
+                    delay: this.DIFFICULTY_INTERVAL,
+                    callback: this.increaseDifficulty,
+                    callbackScope: this,
+                    loop: true
+                });
+
+                // ---- 一个小动画：星星闪烁 ----
+                this.time.addEvent({
+                    delay: 800,
+                    callback: () => {
+                        if (this.bg && this.bg.scene) {
+                            // 轻微闪烁效果（通过改变tilePosition偏移制造扰动）
+                        }
+                    },
+                    callbackScope: this,
+                    loop: true
+                });
+            }
+
+            // -------- 创建触摸按钮 --------
+            createTouchButtons() {
+                const btnAlpha = 0.25;
+                const btnHoverAlpha = 0.45;
+                const btnY = 700;
+                const btnW = 160;
+                const btnH = 70;
+
+                // 左按钮
+                this.btnLeft = this.add.rectangle(100, btnY, btnW, btnH, 0xffffff, btnAlpha)
+                    .setInteractive()
+                    .setDepth(30)
+                    .setStrokeStyle(2, 0xffffff, 0.3);
+
+                this.btnLeft.on('pointerdown', () => {
+                    this.touchLeft = true;
+                    this.btnLeft.setAlpha(btnHoverAlpha);
+                    initAudio();
+                });
+                this.btnLeft.on('pointerup', () => {
+                    this.touchLeft = false;
+                    this.btnLeft.setAlpha(btnAlpha);
+                });
+                this.btnLeft.on('pointerout', () => {
+                    this.touchLeft = false;
+                    this.btnLeft.setAlpha(btnAlpha);
+                });
+
+                this.btnLeftText = this.add.text(100, btnY, '←  A', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '26px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(31).setAlpha(0.7);
+
+                // 右按钮
+                this.btnRight = this.add.rectangle(380, btnY, btnW, btnH, 0xffffff, btnAlpha)
+                    .setInteractive()
+                    .setDepth(30)
+                    .setStrokeStyle(2, 0xffffff, 0.3);
+
+                this.btnRight.on('pointerdown', () => {
+                    this.touchRight = true;
+                    this.btnRight.setAlpha(btnHoverAlpha);
+                    initAudio();
+                });
+                this.btnRight.on('pointerup', () => {
+                    this.touchRight = false;
+                    this.btnRight.setAlpha(btnAlpha);
+                });
+                this.btnRight.on('pointerout', () => {
+                    this.touchRight = false;
+                    this.btnRight.setAlpha(btnAlpha);
+                });
+
+                this.btnRightText = this.add.text(380, btnY, 'B  →', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '26px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(31).setAlpha(0.7);
+
+                // 整个场景点击也可唤醒音频
+                this.input.on('pointerdown', () => {
+                    initAudio();
+                    if (this.gameOver) {
+                        this.restartGame();
+                    }
+                });
+            }
+
+            // -------- 生成障碍物 --------
+            spawnObstacle() {
+                if (this.gameOver) return;
+                if (this.obstacles.countActive() >= this.MAX_OBSTACLES) return;
+
+                const x = Phaser.Math.Between(40, 440);
+                const obs = this.obstacles.create(x, -30, 'obstacle');
+                obs.setVelocityY(this.obstacleSpeed);
+                obs.setDepth(5);
+                obs.body.setSize(44, 24);
+                obs.body.setOffset(2, 2);
+                obs.setData('scored', false);
+
+                // 记录障碍物数量
+                window.__gameState.objects.enemies = this.obstacles.countActive();
+            }
+
+            // -------- 碰撞处理 --------
+            hitObstacle(plane, obstacle) {
+                if (this.gameOver) return;
+                if (obstacle.getData('hit')) return;
+                obstacle.setData('hit', true);
+
+                // 扣命
+                this.loseLife();
+
+                // 移除障碍物
+                obstacle.destroy();
+                window.__gameState.objects.enemies = this.obstacles.countActive();
+
+                // 音效
+                sfxHit();
+
+                // 屏幕震动效果
+                this.cameras.main.shake(150, 0.008);
+            }
+
+            // -------- 失去生命 --------
+            loseLife() {
+                this.lives--;
+                if (this.lives < 0) this.lives = 0;
+                this.livesText.setText(this.getLivesDisplay());
+                window.__gameState.lives = this.lives;
+
+                if (this.lives <= 0) {
+                    this.endGame();
+                }
+            }
+
+            // -------- 加分 --------
+            addScore(points) {
+                if (this.gameOver) return;
+                this.score += points;
+                this.scoreText.setText('分数: ' + this.score);
+                window.__gameState.score = this.score;
+                sfxScore();
+
+                // 弹出得分动画
+                const pop = this.add.text(this.plane.x, this.plane.y - 40, '+' + points, {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '20px',
+                    color: '#ffdd44',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                }).setOrigin(0.5).setDepth(25);
+                this.tweens.add({
+                    targets: pop,
+                    y: pop.y - 60,
+                    alpha: 0,
+                    duration: 600,
+                    ease: 'Power2',
+                    onComplete: () => pop.destroy()
+                });
+            }
+
+            // -------- 生命值显示 --------
+            getLivesDisplay() {
+                let str = '生命: ';
+                for (let i = 0; i < this.lives; i++) {
+                    str += '❤';
+                }
+                if (this.lives === 0) str += '💀';
+                return str;
+            }
+
+            // -------- 难度递增 --------
+            increaseDifficulty() {
+                if (this.gameOver) return;
+                this.difficultyLevel++;
+
+                // 提高障碍物速度
+                this.obstacleSpeed = Math.min(
+                    this.obstacleSpeed + this.SPEED_INCREASE,
+                    this.MAX_SPEED
+                );
+                // 更新已有障碍物的速度
+                this.obstacles.getChildren().forEach(obs => {
+                    obs.setVelocityY(this.obstacleSpeed);
+                });
+
+                // 缩短生成间隔
+                this.spawnInterval = Math.max(
+                    this.spawnInterval - this.INTERVAL_DECREASE,
+                    this.MIN_INTERVAL
+                );
+                if (this.obstacleTimer) {
+                    this.obstacleTimer.destroy();
+                }
+                this.obstacleTimer = this.time.addEvent({
+                    delay: this.spawnInterval,
+                    callback: this.spawnObstacle,
+                    callbackScope: this,
+                    loop: true
+                });
+
+                // 显示难度提升提示
+                const hint = this.add.text(240, 300, '⚡ 难度提升!', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '28px',
+                    color: '#ff8844',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setOrigin(0.5).setDepth(25);
+                this.tweens.add({
+                    targets: hint,
+                    alpha: 0,
+                    y: 270,
+                    duration: 1200,
+                    ease: 'Power2',
+                    onComplete: () => hint.destroy()
+                });
+            }
+
+            // -------- 游戏结束 --------
+            endGame() {
+                this.gameOver = true;
+                window.__gameState.gameOver = true;
+                window.__gameState.running = false;
+                window.__gameState.canRestart = true;
+
+                // 停止生成障碍物
+                if (this.obstacleTimer) this.obstacleTimer.paused = true;
+                if (this.difficultyTimer) this.difficultyTimer.paused = true;
+
+                // 停止所有障碍物
+                this.obstacles.getChildren().forEach(obs => {
+                    obs.setVelocityY(0);
+                });
+
+                // 显示结束文字
+                this.gameOverText.setVisible(true);
+                this.restartText.setVisible(true);
+
+                // 音效
+                sfxGameOver();
+
+                // 飞机闪烁
+                this.tweens.add({
+                    targets: this.plane,
+                    alpha: 0.3,
+                    duration: 300,
+                    yoyo: true,
+                    repeat: 3,
+                    onComplete: () => {
+                        this.plane.setAlpha(0.5);
+                    }
+                });
+            }
+
+            // -------- 重新开始 --------
+            restartGame() {
+                if (!this.gameOver) return;
+
+                // 重置场景
+                this.scene.restart();
+            }
+
+            // -------- 更新循环 --------
+            update(time, delta) {
+                // 背景滚动
+                if (this.bg) {
+                    this.bg.tilePositionY += this.BG_SPEED * (delta / 1000);
+                }
+
+                // ---- 控制输入 ----
+                const leftKey = this.cursors.left.isDown || this.keysWASD.left.isDown || this.keysJK.left.isDown;
+                const rightKey = this.cursors.right.isDown || this.keysWASD.right.isDown || this.keysJK.right.isDown;
+
+                const moveLeft = leftKey || this.touchLeft;
+                const moveRight = rightKey || this.touchRight;
+
+                if (!this.gameOver && this.plane) {
+                    if (moveLeft) {
+                        this.plane.setVelocityX(-this.PLANE_SPEED);
+                    } else if (moveRight) {
+                        this.plane.setVelocityX(this.PLANE_SPEED);
+                    } else {
+                        this.plane.setVelocityX(0);
+                    }
+                } else if (this.gameOver) {
+                    if (this.plane) this.plane.setVelocityX(0);
+                }
+
+                // ---- 检查障碍物通过（得分） ----
+                if (!this.gameOver) {
+                    const children = this.obstacles.getChildren();
+                    for (let i = children.length - 1; i >= 0; i--) {
+                        const obs = children[i];
+                        if (obs.y > 760) {
+                            const scored = obs.getData('scored');
+                            if (!scored) {
+                                obs.setData('scored', true);
+                                this.addScore(this.SCORE_PER_OBSTACLE);
+                            }
+                            obs.destroy();
+                            window.__gameState.objects.enemies = this.obstacles.countActive();
+                        }
+                    }
+                }
+
+                // ---- 游戏结束重新开始 ----
+                if (this.gameOver) {
+                    if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
+                        this.restartGame();
+                    }
+                }
+
+                // ---- 更新全局状态 ----
+                if (!this.gameOver) {
+                    window.__gameState.running = true;
+                    window.__gameState.objects.enemies = this.obstacles.countActive();
+                    window.__gameState.objects.player = this.plane ? this.plane.active : false;
+                }
+
+                // ---- 飞机边界保护（额外安全） ----
+                if (this.plane) {
+                    if (this.plane.x < 30) this.plane.x = 30;
+                    if (this.plane.x > 450) this.plane.x = 450;
+                }
+
+                // ---- 生命周期计时（用于难度） ----
+                if (!this.gameOver) {
+                    this.elapsedTime += delta;
+                }
+            }
+        }
+
+        // ============================================================
+        // Phaser 游戏实例化
+        // ============================================================
+        const config = {
+            type: Phaser.AUTO,
+            width: 480,
+            height: 750,
+            parent: 'game-container',
+            backgroundColor: '#0a0a2a',
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            },
+            scene: GameScene,
+            input: {
+                activePointers: 3,
+                touch: true
+            },
+            render: {
+                pixelArt: false,
+                antialias: true
+            }
+        };
+
+        const game = new Phaser.Game(config);
+
+        // 窗口大小变化时，确保画布适配
+        window.addEventListener('resize', () => {
+            game.scale.refresh();
+        });
+
+        // 防止触摸滚动
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+
+        console.log('飞机躲避障碍物游戏已启动！');
+        console.log('控制方式: 方向键/WASD/JK 或 触摸A/B按钮');
+    </script>
+</body>
+</html>

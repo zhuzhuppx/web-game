@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>打飞碟</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 800 / 600;
+        }
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: auto !important;
+        }
+        /* 加载提示 */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 24px;
+            background: #1a1a2e;
+            z-index: 999;
+            transition: opacity 0.5s;
+        }
+        #loading.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">🚀 加载中…</div>
+    <div id="game-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js">
+    </script>
+    <script>
+        // ============================================================
+        //  打飞碟 — 完整修复版 v2
+        //  功能：飞碟生成/移动/点击击中 / 计分(含连击) / 60秒倒计时
+        //        / 速度递增 / 生成间隔自适应 / 游戏结束重新开始
+        // ============================================================
+
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 600;
+        const UFO_RADIUS = 25;
+        const GAME_DURATION = 60;
+        const BASE_SCORE = 10;
+
+        // ---- 飞碟速度参数 ----
+        const SPEED_INIT_MIN = 150;
+        const SPEED_INIT_MAX = 250;
+        const SPEED_MAX = 450;
+        const SPEED_INTERVAL = 15;
+        const SPEED_MULTIPLIER = 1.3;
+
+        // ---- 生成间隔参数 ----
+        const SPAWN_INTERVAL_INIT_MIN = 800;
+        const SPAWN_INTERVAL_INIT_MAX = 1500;
+        const SPAWN_INTERVAL_FINAL_MIN = 400;
+        const SPAWN_INTERVAL_FINAL_MAX = 1000;
+        const SPAWN_INTERVAL_STEP = 20;
+
+        // ---- 连击参数 ----
+        const COMBO_WINDOW = 2000;
+        const COMBO_BONUS_CAP = 50;
+
+        // ---- 飞碟生成方向 ----
+        const DIRECTIONS = ['left', 'right', 'top', 'bottom'];
+
+        // ============================================================
+        //  GameScene
+        // ============================================================
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'GameScene' });
+            }
+
+            preload() {
+                this.generateTextures();
+            }
+
+            // ---------- 生成纹理 ----------
+            generateTextures() {
+                const g = this.make.graphics({ x: 0, y: 0 });
+
+                // ---- 飞碟纹理 (50x50) ----
+                g.clear();
+                g.fillStyle(0x8899aa);
+                g.fillCircle(25, 25, 22);
+                g.fillStyle(0xaabbcc, 0.5);
+                g.fillCircle(25, 21, 16);
+                g.lineStyle(2, 0x667788);
+                g.strokeCircle(25, 25, 22);
+                g.fillStyle(0x66ddff, 0.7);
+                g.fillCircle(25, 14, 10);
+                g.fillStyle(0xaaeeff, 0.4);
+                g.fillCircle(23, 11, 5);
+                g.fillStyle(0xffaa33);
+                g.fillCircle(16, 37, 3);
+                g.fillCircle(25, 39, 3);
+                g.fillCircle(34, 37, 3);
+                g.generateTexture('ufo', 50, 50);
+
+                // ---- 击中特效纹理 (30x30) ----
+                g.clear();
+                g.fillStyle(0xffee44, 1);
+                g.fillCircle(15, 15, 12);
+                g.fillStyle(0xffffff, 0.6);
+                g.fillCircle(15, 12, 6);
+                g.fillCircle(12, 18, 4);
+                g.fillCircle(18, 18, 4);
+                g.generateTexture('hit_effect', 30, 30);
+
+                // ---- 背景星空纹理 ----
+                g.clear();
+                g.fillStyle(0x1a1a2e);
+                g.fillRect(0, 0, 800, 600);
+                for (let i = 0; i < 120; i++) {
+                    const sx = Math.random() * 800;
+                    const sy = Math.random() * 600;
+                    const sr = Math.random() * 1.8 + 0.5;
+                    const brightness = Math.random() * 0.6 + 0.4;
+                    g.fillStyle(0xffffff, brightness);
+                    g.fillCircle(sx, sy, sr);
+                }
+                g.generateTexture('bg_stars', 800, 600);
+
+                // ---- 爆炸纹理 (40x40) ----
+                g.clear();
+                g.fillStyle(0xff6633, 1);
+                g.fillCircle(20, 20, 16);
+                g.fillStyle(0xffaa44, 0.8);
+                g.fillCircle(20, 20, 10);
+                g.fillStyle(0xffdd66, 0.6);
+                g.fillCircle(20, 20, 6);
+                g.generateTexture('explosion', 40, 40);
+
+                g.destroy();
+            }
+
+            // ---------- 创建 ----------
+            create() {
+                // ---- 背景 ----
+                this.add.image(400, 300, 'bg_stars').setDepth(0);
+
+                // ---- 游戏状态 ----
+                this.isPlaying = true;
+                this.score = 0;
+                this.timeLeft = GAME_DURATION;
+                this.comboCount = 0;
+                this.lastHitTime = 0;
+                this.elapsedSeconds = 0;
+                this.gameOverShown = false;
+                this.spawnTimer = null;
+                this.difficultyLevel = 0;
+
+                // ---- 物理世界 ----
+                this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+                // ---- 飞碟分组 ----
+                this.ufos = this.physics.add.group({
+                    runChildUpdate: true,
+                    allowGravity: false,
+                    collideWorldBounds: false
+                });
+
+                // ---- UI ----
+                this.createUI();
+
+                // ---- 点击事件 ----
+                this.input.on('pointerdown', (pointer) => {
+                    this.onPointerDown(pointer);
+                });
+
+                // ---- 键盘支持 (空格/R 重新开始) ----
+                this.input.keyboard.on('keydown-SPACE', () => {
+                    if (!this.isPlaying) this.restartGame();
+                });
+                this.input.keyboard.on('keydown-R', () => {
+                    if (!this.isPlaying) this.restartGame();
+                });
+
+                // ---- 倒计时 ----
+                this.timerEvent = this.time.addEvent({
+                    delay: 1000,
+                    callback: this.onTimerTick,
+                    callbackScope: this,
+                    loop: true
+                });
+
+                // ---- 开始生成飞碟 ----
+                this.scheduleNextSpawn();
+
+                // ---- 隐藏加载提示 ----
+                const loading = document.getElementById('loading');
+                if (loading) loading.classList.add('hidden');
+            }
+
+            // ---------- 创建 UI ----------
+            createUI() {
+                const textStyle = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '20px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                    shadow: {
+                        offsetX: 1,
+                        offsetY: 1,
+                        color: '#000',
+                        blur: 2,
+                        fill: true
+                    }
+                };
+
+                // 分数
+                this.scoreText = this.add.text(20, 16, '分数: 0', textStyle).setDepth(10);
+
+                // 时间
+                this.timeText = this.add.text(GAME_WIDTH - 20, 16, '时间: 60', textStyle)
+                    .setOrigin(1, 0)
+                    .setDepth(10);
+
+                // 连击
+                this.comboText = this.add.text(GAME_WIDTH / 2, 16, '', textStyle)
+                    .setOrigin(0.5, 0)
+                    .setDepth(10);
+
+                // 游戏结束文字 (初始隐藏)
+                const endStyle = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '48px',
+                    color: '#ffdd44',
+                    stroke: '#000000',
+                    strokeThickness: 6,
+                    shadow: {
+                        offsetX: 2,
+                        offsetY: 2,
+                        color: '#000',
+                        blur: 4,
+                        fill: true
+                    }
+                };
+                this.gameOverText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, '', endStyle)
+                    .setOrigin(0.5, 0.5)
+                    .setDepth(20)
+                    .setVisible(false);
+
+                const restartStyle = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '24px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                };
+                this.restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30, '', restartStyle)
+                    .setOrigin(0.5, 0.5)
+                    .setDepth(20)
+                    .setVisible(false);
+
+                // ---- 移动端触摸提示 ----
+                const hintStyle = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '14px',
+                    color: '#aaaaaa',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                };
+                this.hintText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 20, '点击飞碟射击 | 空格/R 重新开始', hintStyle)
+                    .setOrigin(0.5, 0.5)
+                    .setDepth(10);
+            }
+
+            // ---------- 安排下一次生成 ----------
+            scheduleNextSpawn() {
+                if (!this.isPlaying) return;
+
+                // 根据难度调整生成间隔
+                const progress = Math.min(this.elapsedSeconds / GAME_DURATION, 1);
+                const minInterval = SPAWN_INTERVAL_INIT_MIN - (SPAWN_INTERVAL_INIT_MIN - SPAWN_INTERVAL_FINAL_MIN) * progress;
+                const maxInterval = SPAWN_INTERVAL_INIT_MAX - (SPAWN_INTERVAL_INIT_MAX - SPAWN_INTERVAL_FINAL_MAX) * progress;
+                const delay = Phaser.Math.Between(minInterval, maxInterval);
+
+                this.spawnTimer = this.time.delayedCall(delay, () => {
+                    this.spawnUFO();
+                    this.scheduleNextSpawn();
+                }, null, this);
+            }
+
+            // ---------- 生成飞碟 ----------
+            spawnUFO() {
+                if (!this.isPlaying) return;
+
+                const direction = Phaser.Utils.Array.GetRandom(DIRECTIONS);
+                let x, y, vx, vy;
+                const padding = 50;
+
+                // 根据难度调整速度
+                const progress = Math.min(this.elapsedSeconds / GAME_DURATION, 1);
+                const speedMin = SPEED_INIT_MIN + (SPEED_MAX - SPEED_INIT_MIN) * progress;
+                const speedMax = SPEED_INIT_MAX + (SPEED_MAX - SPEED_INIT_MAX) * progress;
+                const speed = Phaser.Math.Between(speedMin, speedMax);
+
+                switch (direction) {
+                    case 'left':
+                        x = -padding;
+                        y = Phaser.Math.Between(60, GAME_HEIGHT - 60);
+                        vx = speed;
+                        vy = Phaser.Math.Between(-80, 80);
+                        break;
+                    case 'right':
+                        x = GAME_WIDTH + padding;
+                        y = Phaser.Math.Between(60, GAME_HEIGHT - 60);
+                        vx = -speed;
+                        vy = Phaser.Math.Between(-80, 80);
+                        break;
+                    case 'top':
+                        x = Phaser.Math.Between(60, GAME_WIDTH - 60);
+                        y = -padding;
+                        vy = speed;
+                        vx = Phaser.Math.Between(-80, 80);
+                        break;
+                    case 'bottom':
+                        x = Phaser.Math.Between(60, GAME_WIDTH - 60);
+                        y = GAME_HEIGHT + padding;
+                        vy = -speed;
+                        vx = Phaser.Math.Between(-80, 80);
+                        break;
+                }
+
+                // 创建飞碟
+                const ufo = this.physics.add.sprite(x, y, 'ufo');
+                ufo.setDepth(5);
+                ufo.setCircle(22, 3, 3);
+                ufo.body.setCollideWorldBounds(false);
+                ufo.body.setAllowGravity(false);
+                ufo.body.setVelocity(vx, vy);
+                ufo.body.setDrag(0);
+                ufo.setData('hit', false);
+
+                // 随机旋转
+                ufo.setAngularVelocity(Phaser.Math.Between(-60, 60));
+
+                this.ufos.add(ufo);
+
+                // 自动移除飞出边界的飞碟
+                this.time.delayedCall(8000, () => {
+                    if (ufo.active) {
+                        // 飞出边界则移除
+                        if (ufo.x < -80 || ufo.x > GAME_WIDTH + 80 ||
+                            ufo.y < -80 || ufo.y > GAME_HEIGHT + 80) {
+                            ufo.destroy();
+                        }
+                    }
+                }, null, this);
+            }
+
+            // ---------- 点击处理 ----------
+            onPointerDown(pointer) {
+                if (!this.isPlaying) return;
+
+                const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+
+                // 检测是否点击到飞碟
+                let hit = false;
+                const ufos = this.ufos.getChildren();
+                for (let i = ufos.length - 1; i >= 0; i--) {
+                    const ufo = ufos[i];
+                    if (!ufo.active) continue;
+
+                    const dist = Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, ufo.x, ufo.y);
+                    if (dist < UFO_RADIUS + 5) {
+                        // 击中！
+                        ufo.setData('hit', true);
+                        hit = true;
+
+                        // 计算连击
+                        const now = this.time.now;
+                        if (now - this.lastHitTime < COMBO_WINDOW) {
+                            this.comboCount++;
+                        } else {
+                            this.comboCount = 1;
+                        }
+                        this.lastHitTime = now;
+
+                        // 计算分数
+                        let bonus = Math.min(this.comboCount * 2, COMBO_BONUS_CAP);
+                        let points = BASE_SCORE + bonus;
+                        this.score += points;
+
+                        // 更新UI
+                        this.updateScoreDisplay();
+                        this.updateComboDisplay();
+
+                        // 击中特效
+                        this.showHitEffect(ufo.x, ufo.y, points);
+
+                        // 销毁飞碟
+                        ufo.destroy();
+                        break;
+                    }
+                }
+
+                if (!hit) {
+                    // 点击miss — 重置连击
+                    if (this.comboCount > 0) {
+                        this.comboCount = 0;
+                        this.updateComboDisplay();
+                    }
+                }
+            }
+
+            // ---------- 击中特效 ----------
+            showHitEffect(x, y, points) {
+                // 爆炸粒子效果
+                const explosion = this.add.image(x, y, 'explosion').setDepth(15).setScale(0.5);
+                this.tweens.add({
+                    targets: explosion,
+                    scaleX: 1.8,
+                    scaleY: 1.8,
+                    alpha: 0,
+                    duration: 350,
+                    ease: 'Power2',
+                    onComplete: () => explosion.destroy()
+                });
+
+                // 分数浮动文字
+                const color = points > BASE_SCORE ? '#ffdd44' : '#ffffff';
+                const ptsText = this.add.text(x, y - 10, '+' + points, {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '22px',
+                    color: color,
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                    fontStyle: 'bold'
+                }).setOrigin(0.5, 0.5).setDepth(20);
+
+                this.tweens.add({
+                    targets: ptsText,
+                    y: y - 80,
+                    alpha: 0,
+                    duration: 700,
+                    ease: 'Power2',
+                    onComplete: () => ptsText.destroy()
+                });
+
+                // 屏幕微震
+                this.cameras.main.shake(80, 0.005);
+            }
+
+            // ---------- 更新分数显示 ----------
+            updateScoreDisplay() {
+                this.scoreText.setText('分数: ' + this.score);
+            }
+
+            // ---------- 更新连击显示 ----------
+            updateComboDisplay() {
+                if (this.comboCount > 1) {
+                    this.comboText.setText('🔥 连击 x' + this.comboCount);
+                    this.comboText.setColor('#ffaa33');
+                } else {
+                    this.comboText.setText('');
+                }
+            }
+
+            // ---------- 更新时间显示 ----------
+            updateTimeDisplay() {
+                this.timeText.setText('时间: ' + this.timeLeft);
+                if (this.timeLeft <= 10) {
+                    this.timeText.setColor('#ff4444');
+                } else {
+                    this.timeText.setColor('#ffffff');
+                }
+            }
+
+            // ---------- 每秒回调 ----------
+            onTimerTick() {
+                if (!this.isPlaying) return;
+
+                this.timeLeft--;
+                this.elapsedSeconds++;
+                this.updateTimeDisplay();
+
+                if (this.timeLeft <= 0) {
+                    this.gameOver();
+                }
+            }
+
+            // ---------- 游戏结束 ----------
+            gameOver() {
+                this.isPlaying = false;
+                this.gameOverShown = true;
+
+                // 停止生成
+                if (this.spawnTimer) {
+                    this.spawnTimer.remove();
+                    this.spawnTimer = null;
+                }
+                if (this.timerEvent) {
+                    this.timerEvent.remove();
+                    this.timerEvent = null;
+                }
+
+                // 停止所有飞碟
+                const ufos = this.ufos.getChildren();
+                for (let i = 0; i < ufos.length; i++) {
+                    if (ufos[i].active) {
+                        ufos[i].body.setVelocity(0, 0);
+                        ufos[i].setAngularVelocity(0);
+                    }
+                }
+
+                // 显示结束信息
+                this.gameOverText.setText('🎯 游戏结束！');
+                this.gameOverText.setVisible(true);
+
+                this.restartText.setText('按 空格键 或 R 重新开始');
+                this.restartText.setVisible(true);
+
+                // 闪烁效果
+                this.tweens.add({
+                    targets: this.restartText,
+                    alpha: 0.4,
+                    duration: 600,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+
+                // 隐藏提示
+                if (this.hintText) this.hintText.setVisible(false);
+            }
+
+            // ---------- 重新开始 ----------
+            restartGame() {
+                // 清理所有飞碟
+                this.ufos.clear(true, true);
+
+                // 重置状态
+                this.isPlaying = true;
+                this.score = 0;
+                this.timeLeft = GAME_DURATION;
+                this.comboCount = 0;
+                this.lastHitTime = 0;
+                this.elapsedSeconds = 0;
+                this.gameOverShown = false;
+
+                // 重置UI
+                this.updateScoreDisplay();
+                this.updateTimeDisplay();
+                this.updateComboDisplay();
+                this.timeText.setColor('#ffffff');
+
+                this.gameOverText.setVisible(false);
+                this.restartText.setVisible(false);
+                this.restartText.setAlpha(1);
+                if (this.hintText) this.hintText.setVisible(true);
+
+                // 重启倒计时
+                if (this.timerEvent) {
+                    this.timerEvent.remove();
+                }
+                this.timerEvent = this.time.addEvent({
+                    delay: 1000,
+                    callback: this.onTimerTick,
+                    callbackScope: this,
+                    loop: true
+                });
+
+                // 开始生成
+                this.scheduleNextSpawn();
+            }
+
+            // ---------- 更新循环 ----------
+            update() {
+                if (!this.isPlaying) return;
+
+                // 检查飞碟是否超出边界，超出则销毁
+                const ufos = this.ufos.getChildren();
+                for (let i = ufos.length - 1; i >= 0; i--) {
+                    const ufo = ufos[i];
+                    if (!ufo.active) continue;
+                    if (ufo.x < -80 || ufo.x > GAME_WIDTH + 80 ||
+                        ufo.y < -80 || ufo.y > GAME_HEIGHT + 80) {
+                        ufo.destroy();
+                    }
+                }
+            }
+        }
+
+        // ============================================================
+        //  Phaser 配置
+        // ============================================================
+        const config = {
+            type: Phaser.AUTO,
+            width: GAME_WIDTH,
+            height: GAME_HEIGHT,
+            parent: 'game-container',
+            backgroundColor: '#1a1a2e',
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            },
+            scene: [GameScene],
+            input: {
+                activePointers: 3
+            },
+            render: {
+                pixelArt: false,
+                antialias: true
+            }
+        };
+
+        // ============================================================
+        //  启动游戏
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            const game = new Phaser.Game(config);
+
+            // 如果5秒后加载提示还在，强制隐藏
+            setTimeout(() => {
+                const loading = document.getElementById('loading');
+                if (loading) loading.classList.add('hidden');
+            }, 5000);
+        });
+
+        // 备用：如果 DOM 已加载完毕，直接启动
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            const loading = document.getElementById('loading');
+            if (loading) loading.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

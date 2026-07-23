@@ -2,6 +2,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const path = require('path');
+const http = require('http');
 const Database = require('better-sqlite3');
 
 const PORT = 8765;
@@ -158,6 +159,31 @@ app.use(function(req,res,next){
 
 // 静态文件
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── 游戏开发 Agent 代理（内部 Python 服务，game-agent:8764）──
+const GAME_AGENT = 'http://game-agent:8764';
+app.use(function(req, res, next) {
+  if (!req.url.startsWith('/api/game-agent')) return next();
+  var targetPath = req.url.replace('/api/game-agent', '');
+  var body = req.method === 'GET' || req.method === 'HEAD' ? null : JSON.stringify(req.body);
+  var bodyLen = body ? Buffer.byteLength(body) : 0;
+  var opts = {
+    hostname: 'game-agent',
+    port: 8764,
+    path: targetPath,
+    method: req.method,
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  };
+  if (bodyLen > 0) opts.headers['Content-Length'] = bodyLen;
+  var pref = http.request(opts, function(prefRes) {
+    res.status(prefRes.statusCode);
+    prefRes.pipe(res);
+  });
+  pref.on('error', function() { res.status(502).json({error:'游戏开发 Agent 不可用'}); });
+  if (body) pref.end(body); else pref.end();
+});
 
 app.get('/', function(req,res){
   res.type('html').send(require('fs').readFileSync(path.resolve(__dirname,'public','plaza.html'),'utf8'));
@@ -566,6 +592,30 @@ app.post('/api/delete',requireAuth,function(req,res){
   res.json({ok:true});
 });
 
+// ── 从游戏开发 Agent 导入游戏到主站数据库 ──
+app.post('/api/import-agent-game', requireAuth, function(req, res) {
+  var projectName = (req.body.projectName || '').trim();
+  if (!projectName) return res.status(400).json({error:'缺少 projectName'});
+
+  var agentDir = path.join(__dirname, 'game-agent', 'games', projectName);
+  var htmlPath = path.join(agentDir, 'latest.html');
+
+  if (!require('fs').existsSync(htmlPath)) {
+    return res.status(404).json({error:'Agent 项目不存在或尚未生成游戏', projectName: projectName});
+  }
+
+  var html = require('fs').readFileSync(htmlPath, 'utf8');
+  var title = projectName;
+
+  // 检查是否已导入过（同名游戏视为同一个）
+  var existing = db.prepare("SELECT id,ver FROM games WHERE username=? AND title=? ORDER BY updated DESC LIMIT 1").get(req.userName, title);
+  var existingId = existing ? existing.id : '';
+
+  // 复用 saveGame 逻辑
+  req.body = { id: existingId, title: title, html: html };
+  saveGame(req, res);
+});
+
 // ==================== AI Chat (支持流式和非流式) ====================
 // 队列状态查询：直接问 llama-server 是否空闲
 app.get('/api/queue', requireAuth, function(req,res){
@@ -585,6 +635,62 @@ app.get('/api/queue', requireAuth, function(req,res){
   } else {
     res.json({active: activeRequests, maxConcurrent: MAX_CONCURRENT});
   }
+});
+
+// ==================== 等候闲聊（生成游戏时，每隔几秒调一次，不扣额度） ====================
+app.post('/api/wizard-chat', requireAuth, function(req,res){
+  var game = req.body.game||{};
+  var char = game.character||'主角';
+  var goal = game.goal||'闯关';
+  var music = game.music||'好听的音乐';
+  var name = game.gameName||'';
+  var msgs = [
+    {role:'system', content:'你是儿童游戏的AI设计师助手，正在帮小朋友生成游戏。生成过程中需要跟小朋友聊天，让等待变得有趣。\n\n规则：\n1. 每次只说一句话（10-25个字），口语化，像在跟6-10岁小朋友说话\n2. 内容要结合他选的游戏设定（主角、目标、音乐、名字），不要泛泛而谈\n3. 语气要亲切、鼓励、有想象力，可以夸他设计得好，可以想象游戏画面，可以聊后续还能加什么\n4. 每次说的话要不同，不要重复类似的内容\n5. 不要用"小朋友"这个词，用"你"直接称呼\n6. 生成的内容要适合TTS朗读，去掉emoji和特殊符号\n7. 只说一句话，不要问句，不要解释，不要分段'},
+    {role:'user', content:'我选了'+(name?'「'+name+'」这个游戏名，':'')+'主角是'+char+'，目标是'+goal+'，配'+music+'。你跟我说句话吧'}
+  ];
+  var payload = JSON.stringify({
+    model: LLM_MODEL,
+    messages: msgs,
+    max_tokens: 128,
+    temperature: 0.9,
+    stream: false
+  });
+  if (!LLM_LOCAL) {
+    var p = JSON.parse(payload);
+    p.thinking = {type: 'disabled'};
+    payload = JSON.stringify(p);
+  }
+  var transport = LLM_HTTPS ? require('https') : require('http');
+  var opts = {
+    hostname: LLM_HOST,
+    port: LLM_PORT,
+    path: '/v1/chat/completions',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(payload)
+    },
+    timeout: 15000
+  };
+  if (!LLM_LOCAL) opts.headers['Authorization'] = 'Bearer '+DEEPSEEK_API_KEY;
+  var apiReq = transport.request(opts, function(apiRes){
+    var data=[];
+    apiRes.on('data',function(c){data.push(c)});
+    apiRes.on('end',function(){
+      try{
+        var json = JSON.parse(Buffer.concat(data).toString());
+        var text = json.choices&&json.choices[0]&&json.choices[0].message&&json.choices[0].message.content||'';
+        text = text.trim().replace(/^[""「」]+|[""「」]+$/g,'');
+        res.json({text:text});
+      }catch(e){
+        res.json({text:''});
+      }
+    });
+  });
+  apiReq.on('error',function(){res.json({text:''})});
+  apiReq.on('timeout',function(){apiReq.destroy();res.json({text:''})});
+  apiReq.write(payload);
+  apiReq.end();
 });
 
 app.post('/api/chat', requireAuth, checkLimit, function(req,res){

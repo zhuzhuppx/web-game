@@ -6,12 +6,26 @@ services:
     ports:
       - "8765:8765"
     volumes:
-      - ./app:/app
       - ./data:/data
     environment:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - LLM_LOCAL=${LLM_LOCAL:-false}
+    networks:
+      - default
+      - d2gpcf
+
+  game-agent:
+    build: ./game-agent
+    container_name: ai-game-agent
+    restart: unless-stopped
+    ports:
+      - "8764:8764"
+    volumes:
+      - ./game-agent/games:/app/games
+      - ./data:/data
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
     networks:
       - default
       - d2gpcf

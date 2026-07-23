@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "feedback": "游戏太简单了，地鼠出现太慢，建议增加难度",
+    "rating": 3,
+    "aspect": "难度",
+    "timestamp": "2026-07-21T16:21:32.437835",
+    "applied": false
+  },
+  {
+    "id": 2,
+    "feedback": "游戏太简单了，地鼠出现太慢，建议增加难度",
+    "rating": 3,
+    "aspect": "难度",
+    "timestamp": "2026-07-21T16:27:26.798058",
+    "applied": false
+  }
+]

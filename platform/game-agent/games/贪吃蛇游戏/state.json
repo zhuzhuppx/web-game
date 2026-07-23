@@ -1,0 +1,12 @@
+{
+  "name": "贪吃蛇游戏",
+  "description": "做个贪吃蛇游戏",
+  "version": 1,
+  "spec": "做个贪吃蛇游戏",
+  "changelog": [
+    "v1: 保存为 v1.html"
+  ],
+  "status": "developing",
+  "created_at": "2026-07-21T07:59:36.810420",
+  "updated_at": "2026-07-21T07:59:36.810420"
+}

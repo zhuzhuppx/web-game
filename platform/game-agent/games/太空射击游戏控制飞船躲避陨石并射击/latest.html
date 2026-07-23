@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>太空射击 - 陨石猎手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 800px;
+            max-height: 600px;
+            position: relative;
+        }
+        #game-container canvas {
+            display: block;
+        }
+        /* 移动端虚拟按键 */
+        #mobile-controls {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            display: none;
+            justify-content: space-between;
+            padding: 0 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #mobile-controls .ctrl-left,
+        #mobile-controls .ctrl-right {
+            display: flex;
+            gap: 12px;
+            pointer-events: auto;
+        }
+        #mobile-controls button {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-size: 24px;
+            font-weight: bold;
+            backdrop-filter: blur(4px);
+            touch-action: none;
+            pointer-events: auto;
+            cursor: pointer;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.1s, transform 0.1s;
+        }
+        #mobile-controls button:active {
+            background: rgba(255, 255, 255, 0.35);
+            transform: scale(0.92);
+        }
+        #mobile-controls button.active {
+            background: rgba(255, 255, 255, 0.45);
+            transform: scale(0.88);
+        }
+        @media (pointer: coarse) {
+            #mobile-controls {
+                display: flex;
+            }
+        }
+        @media (max-width: 500px) {
+            #mobile-controls button {
+                width: 52px;
+                height: 52px;
+                font-size: 18px;
+            }
+        }
+        /* 加载提示 */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #0ff;
+            font-family: 'Courier New', monospace;
+            font-size: 20px;
+            z-index: 1;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 0.5;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="loading">🚀 加载中...</div>
+        <!-- Phaser 会将 canvas 注入到这里 -->
+        <!-- 移动端虚拟按键 -->
+        <div id="mobile-controls">
+            <div class="ctrl-left">
+                <button id="btn-up">▲</button>
+                <button id="btn-down">▼</button>
+                <button id="btn-left">◀</button>
+                <button id="btn-right">▶</button>
+            </div>
+            <div class="ctrl-right">
+                <button id="btn-fire">A</button>
+                <button id="btn-pause">⏸</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js">
+    </script>
+
+    <script>
+        // ============================================================
+        // 太空射击游戏 - 完整实现
+        // 使用 Phaser.js 3 + Arcade Physics
+        // ============================================================
+
+        // ---- 音效系统 (Web Audio API) ----
+        let audioCtx = null;
+
+        function initAudio() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                return true;
+            } catch (e) {
+                console.warn('Web Audio 不可用:', e);
+                return false;
+            }
+        }
+
+        function playBeep(freq, duration, type, volume) {
+            try {
+                if (!initAudio()) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type || 'square';
+                osc.frequency.value = freq;
+                const vol = volume || 0.25;
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) { /* 静默 */ }
+        }
+
+        function sfxShoot() { playBeep(880, 0.08, 'square', 0.12); }
+
+        function sfxHit() { playBeep(220, 0.2, 'sawtooth', 0.18); }
+
+        function sfxScore() { playBeep(1320, 0.1, 'sine', 0.18); }
+
+        function sfxCombo() { playBeep(1760, 0.12, 'sine', 0.22);
+            setTimeout(() => playBeep(1980, 0.08, 'sine', 0.18), 60); }
+
+        function sfxDie() { playBeep(160, 0.4, 'sawtooth', 0.25);
+            setTimeout(() => playBeep(120, 0.5, 'sawtooth', 0.18), 200); }
+
+        function sfxPowerup() { playBeep(660, 0.1, 'sine', 0.18);
+            setTimeout(() => playBeep(990, 0.12, 'sine', 0.18), 100); }
+
+        function sfxGameOver() { playBeep(400, 0.3, 'sawtooth', 0.25);
+            setTimeout(() => playBeep(300, 0.3, 'sawtooth', 0.2), 250);
+            setTimeout(() => playBeep(200, 0.5, 'sawtooth', 0.16), 500); }
+
+        function sfxShield() { playBeep(520, 0.15, 'sine', 0.16);
+            setTimeout(() => playBeep(780, 0.15, 'sine', 0.16), 80); }
+
+        // ---- 游戏场景 ----
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super('GameScene');
+                this.score = 0;
+                this.lives = 3;
+                this.isGameOver = false;
+                this.isPaused = false;
+                this.fireRate = 300;
+                this.lastFired = 0;
+                this.shieldActive = false;
+                this.shieldTimer = 0;
+                this.meteorSpeed = 100;
+                this.difficultyTimer = 0;
+                this.comboCount = 0;
+                this.maxCombo = 0;
+                this.meteorSpawnRate = 1200;
+                this.lastSpawn = 0;
+                this.starField = [];
+                this.keys = {};
+                this.mobilePressed = {
+                    up: false,
+                    down: false,
+                    left: false,
+                    right: false,
+                    fire: false
+                };
+            }
+
+            // ---- create: 初始化场景 ----
+            create() {
+                // 移除加载提示
+                const loadingEl = document.getElementById('loading');
+                if (loadingEl) loadingEl.style.display = 'none';
+
+                // 设置世界边界
+                const W = this.sys.game.config.width;
+                const H = this.sys.game.config.height;
+                this.physics.world.setBounds(0, 0, W, H);
+
+                // ---- 星空背景 ----
+                this.starField = [];
+                for (let i = 0; i < 80; i++) {
+                    const star = this.add.circle(
+                        Phaser.Math.Between(0, W),
+                        Phaser.Math.Between(0, H),
+                        Phaser.Math.Between(1, 3),
+                        Phaser.Math.RND.pick([0xffffff, 0x88ccff, 0xffcc88, 0xccddff]),
+                        0.6 + Math.random() * 0.4
+                    );
+                    star.setDepth(-1);
+                    star.speed = 20 + Math.random() * 40;
+                    this.starField.push(star);
+                }
+
+                // ---- 玩家飞船 ----
+                this.player = this.add.container(W / 2, H - 60);
+                // 飞船主体 (三角形)
+                const shipBody = this.add.triangle(0, 0, 0, -22, 18, 18, -18, 18, 0x33ccff);
+                shipBody.setStrokeStyle(2, 0x88ddff);
+                // 引擎光效
+                const engine = this.add.circle(0, 16, 8, 0xff6600, 0.7);
+                engine.setScale(1, 0.6);
+                this.player.add([shipBody, engine]);
+                this.player.setDepth(5);
+                this.player.setSize(36, 36);
+                this.player.setAlpha(1);
+                // 启用物理
+                this.physics.world.enable(this.player);
+                this.player.body.setCollideWorldBounds(true);
+                this.player.body.setSize(30, 30);
+                this.player.shipBody = shipBody;
+                this.player.engine = engine;
+
+                // 引擎粒子动画
+                this.tweens.add({
+                    targets: engine,
+                    scaleX: { from: 1, to: 0.6 },
+                    scaleY: { from: 0.8, to: 0.4 },
+                    alpha: { from: 0.8, to: 0.3 },
+                    duration: 120,
+                    yoyo: true,
+                    repeat: -1,
+                });
+
+                // ---- 子弹组 ----
+                this.bullets = this.physics.add.group({
+                    defaultKey: null,
+                    maxSize: 30,
+                    runChildUpdate: true
+                });
+
+                // ---- 陨石组 ----
+                this.meteors = this.physics.add.group({
+                    runChildUpdate: true
+                });
+
+                // ---- 道具组 (护盾) ----
+                this.powerups = this.physics.add.group();
+
+                // ---- 碰撞检测 ----
+                // 子弹 vs 陨石
+                this.physics.add.overlap(
+                    this.bullets,
+                    this.meteors,
+                    this.bulletHitMeteor,
+                    null,
+                    this
+                );
+                // 玩家 vs 陨石
+                this.physics.add.overlap(
+                    this.player,
+                    this.meteors,
+                    this.playerHitMeteor,
+                    null,
+                    this
+                );
+                // 玩家 vs 道具
+                this.physics.add.overlap(
+                    this.player,
+                    this.powerups,
+                    this.playerGetPowerup,
+                    null,
+                    this
+                );
+
+                // ---- 键盘 ----
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keys = this.input.keyboard.addKeys({
+                    w: Phaser.Input.Keyboard.KeyCodes.W,
+                    a: Phaser.Input.Keyboard.KeyCodes.A,
+                    s: Phaser.Input.Keyboard.KeyCodes.S,
+                    d: Phaser.Input.Keyboard.KeyCodes.D,
+                    j: Phaser.Input.Keyboard.KeyCodes.J,
+                    k: Phaser.Input.Keyboard.KeyCodes.K,
+                    space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+                    r: Phaser.Input.Keyboard.KeyCodes.R,
+                    esc: Phaser.Input.Keyboard.KeyCodes.ESC,
+                    p: Phaser.Input.Keyboard.KeyCodes.P
+                });
+
+                // ---- 移动端按键 ----
+                this.setupMobileControls();
+
+                // ---- UI (使用 Phaser 文本) ----
+                const uiStyle = {
+                    fontFamily: '"Courier New", monospace',
+                    fontSize: '18px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                };
+                this.scoreText = this.add.text(16, 16, '分数: 0', uiStyle).setDepth(20);
+                this.livesText = this.add.text(16, 44, '生命: ❤❤❤', uiStyle).setDepth(20);
+                this.comboText = this.add.text(16, 72, '', { ...uiStyle, color: '#ffcc00' }).setDepth(20);
+                this.pauseText = this.add.text(W / 2, H / 2, '⏸ 已暂停', {
+                    ...uiStyle,
+                    fontSize: '32px',
+                    color: '#ffff00'
+                }).setOrigin(0.5).setDepth(30).setVisible(false);
+
+                // 游戏结束覆盖层
+                this.gameOverOverlay = this.add.container(W / 2, H / 2).setDepth(40).setVisible(false);
+                const overlayBg = this.add.rectangle(0, 0, W + 40, H + 40, 0x000000, 0.7);
+                const goTitle = this.add.text(0, -60, '💥 游戏结束', {
+                    fontFamily: '"Courier New", monospace',
+                    fontSize: '40px',
+                    color: '#ff4444',
+                    stroke: '#000',
+                    strokeThickness: 4,
+                }).setOrigin(0.5);
+                this.goScoreText = this.add.text(0, 0, '最终得分: 0', {
+                    fontFamily: '"Courier New", monospace',
+                    fontSize: '26px',
+                    color: '#ffffff',
+                    stroke: '#000',
+                    strokeThickness: 3,
+                }).setOrigin(0.5);
+                this.goComboText = this.add.text(0, 36, '最大连击: 0', {
+                    fontFamily: '"Courier New", monospace',
+                    fontSize: '20px',
+                    color: '#ffcc00',
+                    stroke: '#000',
+                    strokeThickness: 2,
+                }).setOrigin(0.5);
+                const restartHint = this.add.text(0, 80, '按 R 或点击重新开始', {
+                    fontFamily: '"Courier New", monospace',
+                    fontSize: '18px',
+                    color: '#88ddff',
+                    stroke: '#000',
+                    strokeThickness: 2,
+                }).setOrigin(0.5);
+                this.gameOverOverlay.add([overlayBg, goTitle, this.goScoreText, this.goComboText, restartHint]);
+
+                // ---- 重新开始监听 ----
+                this.input.keyboard.on('keydown-R', () => {
+                    if (this.isGameOver) this.restartGame();
+                });
+                this.input.on('pointerdown', (pointer) => {
+                    if (this.isGameOver) {
+                        // 点击下半屏重新开始
+                        if (pointer.y > this.sys.game.config.height * 0.5) {
+                            this.restartGame();
+                        }
+                    }
+                });
+
+                // ---- 暂停控制 ----
+                this.input.keyboard.on('keydown-ESC', () => this.togglePause());
+                this.input.keyboard.on('keydown-P', () => this.togglePause());
+
+                // ---- 初始生成陨石 ----
+                this.lastSpawn = this.time.now;
+                this.spawnMeteor();
+                this.spawnMeteor();
+
+                // ---- 背景音乐 (简单循环音) ----
+                this.bgmInterval = setInterval(() => {
+                    if (!this.isGameOver && !this.isPaused) {
+                        playBeep(55, 0.5, 'sine', 0.03);
+                    }
+                }, 2000);
+
+                // ---- 暂停按钮 (移动端) ----
+                const pauseBtn = document.getElementById('btn-pause');
+                if (pauseBtn) {
+                    pauseBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.togglePause();
+                    });
+                }
+
+                console.log('游戏已启动!');
+            }
+
+            // ---- 移动端控制 ----
+            setupMobileControls() {
+                const bindBtn = (id, action) => {
+                    const btn = document.getElementById(id);
+                    if (!btn) return;
+                    const press = (e) => {
+                        e.preventDefault();
+                        if (this.isGameOver) return;
+                        if (action === 'fire') {
+                            this.mobilePressed.fire = true;
+                            this.tryShoot();
+                            btn.classList.add('active');
+                            return;
+                        }
+                        this.mobilePressed[action] = true;
+                        btn.classList.add('active');
+                    };
+                    const release = (e) => {
+                        e.preventDefault();
+                        if (action === 'fire') {
+                            this.mobilePressed.fire = false;
+                            btn.classList.remove('active');
+                            return;
+                        }
+                        this.mobilePressed[action] = false;
+                        btn.classList.remove('active');
+                    };
+                    btn.addEventListener('pointerdown', press);
+                    btn.addEventListener('pointerup', release);
+                    btn.addEventListener('pointerleave', release);
+                    btn.addEventListener('touchstart', (e) => { e.preventDefault();
+                        press(e); });
+                    btn.addEventListener('touchend', (e) => { e.preventDefault();
+                        release(e); });
+                    btn.addEventListener('touchcancel', (e) => { e.preventDefault();
+                        release(e); });
+                };
+                bindBtn('btn-up', 'up');
+                bindBtn('btn-down', 'down');
+                bindBtn('btn-left', 'left');
+                bindBtn('btn-right', 'right');
+                bindBtn('btn-fire', 'fire');
+            }
+
+            // ---- 切换暂停 ----
+            togglePause() {
+                if (this.isGameOver) return;
+                this.isPaused = !this.isPaused;
+                this.pauseText.setVisible(this.isPaused);
+                if (this.isPaused) {
+                    this.physics.pause();
+                } else {
+                    this.physics.resume();
+                }
+            }
+
+            // ---- 生成陨石 ----
+            spawnMeteor() {
+                if (this.isGameOver) return;
+                const W = this.sys.game.config.width;
+                const H = this.sys.game.config.height;
+                const size = Phaser.Math.Between(20, 50);
+                const x = Phaser.Math.Between(size, W - size);
+                const speed = this.meteorSpeed + Phaser.Math.Between(-20, 40);
+                const meteor = this.add.circle(x, -size, size, 0x886644, 0.9);
+                meteor.setStrokeStyle(2, 0xcc9966);
+                // 陨石纹理细节
+                const crater = this.add.circle(
+                    Phaser.Math.Between(-size * 0.3, size * 0.3),
+                    Phaser.Math.Between(-size * 0.3, size * 0.3),
+                    size * 0.2,
+                    0x664422,
+                    0.5
+                );
+                const container = this.add.container(x, -size);
+                container.add([meteor, crater]);
+                container.setSize(size * 2, size * 2);
+                container.setDepth(3);
+                this.physics.world.enable(container);
+                container.body.setVelocityY(speed);
+                container.body.setAngularVelocity(Phaser.Math.Between(-60, 60));
+                container.body.setCircle(size);
+                container.body.setOffset(-size, -size);
+                // 存储数据
+                container.setData('size', size);
+                container.setData('speed', speed);
+                container.setData('hp', Math.ceil(size / 20));
+                this.meteors.add(container);
+                // 旋转动画
+                this.tweens.add({
+                    targets: crater,
+                    alpha: { from: 0.5, to: 0.2 },
+                    duration: 600 + Math.random() * 400,
+                    yoyo: true,
+                    repeat: -1,
+                });
+                this.lastSpawn = this.time.now;
+            }
+
+            // ---- 生成道具 ----
+            spawnPowerup() {
+                if (this.isGameOver) return;
+                const W = this.sys.game.config.width;
+                const x = Phaser.Math.Between(50, W - 50);
+                const item = this.add.container(x, -20);
+                const bg = this.add.circle(0, 0, 16, 0x00ff88, 0.8);
+                const icon = this.add.text(0, 0, '🛡', {
+                    fontSize: '18px'
+                }).setOrigin(0.5);
+                item.add([bg, icon]);
+                item.setSize(32, 32);
+                item.setDepth(4);
+                this.physics.world.enable(item);
+                item.body.setVelocityY(60 + Math.random() * 30);
+                item.body.setCircle(16);
+                this.powerups.add(item);
+                // 闪烁
+                this.tweens.add({
+                    targets: bg,
+                    alpha: { from: 0.8, to: 0.3 },
+                    duration: 400,
+                    yoyo: true,
+                    repeat: -1,
+                });
+            }
+
+            // ---- 发射子弹 ----
+            tryShoot() {
+                if (this.isGameOver || this.isPaused) return;
+                const now = this.time.now;
+                if (now - this.lastFired < this.fireRate) return;
+                this.lastFired = now;
+                const px = this.player.x;
+                const py = this.player.y - 25;
+                const bullet = this.add.circle(px, py, 5, 0x00ccff, 1);
+                bullet.setStrokeStyle(1, 0x88eeff);
+                bullet.setDepth(6);
+                this.physics.world.enable(bullet);
+                bullet.body.setVelocityY(-450);
+                bullet.body.setCircle(5);
+                this.bullets.add(bullet);
+                sfxShoot();
+                // 子弹尾迹
+                this.tweens.add({
+                    targets: bullet,
+                    scaleX: { from: 1, to: 0.7 },
+                    scaleY: { from: 1, to: 1.3 },
+                    duration: 80,
+                    yoyo: true,
+                });
+                // 子弹超出屏幕自动销毁
+                this.time.delayedCall(2000, () => {
+                    if (bullet.active) bullet.destroy();
+                });
+            }
+
+            // ---- 子弹击中陨石 ----
+            bulletHitMeteor(bullet, meteor) {
+                if (!bullet.active || !meteor.active) return;
+                // 子弹消失
+                bullet.destroy();
+                // 陨石减血
+                let hp = meteor.getData('hp') || 1;
+                hp -= 1;
+                meteor.setData('hp', hp);
+                if (hp <= 0) {
+                    // 摧毁陨石
+                    this.destroyMeteor(meteor);
+                } else {
+                    // 闪烁表示受伤
+                    this.tweens.add({
+                        targets: meteor,
+                        alpha: { from: 0.5, to: 1 },
+                        duration: 80,
+                        yoyo: true,
+                        repeat: 1,
+                    });
+                    sfxHit();
+                }
+            }
+
+            // ---- 摧毁陨石 ----
+            destroyMeteor(meteor) {
+                if (!meteor.active) return;
+                const size = meteor.getData('size') || 20;
+                const points = Math.ceil(size / 5) + 5;
+                this.score += points;
+                this.comboCount += 1;
+                if (this.comboCount > this.maxCombo) this.maxCombo = this.comboCount;
+                this.updateUI();
+                // 音效
+                if (this.comboCount >= 3) {
+                    sfxCombo();
+                } else {
+                    sfxScore();
+                }
+                // 爆炸粒子效果
+                this.createExplosion(meteor.x, meteor.y, size, 0xcc8844);
+                meteor.destroy();
+                // 随机掉落道具 (10% 概率)
+                if (Math.random() < 0.10) {
+                    this.spawnPowerup();
+                }
+            }
+
+            // ---- 玩家被陨石击中 ----
+            playerHitMeteor(player, meteor) {
+                if (!player.active || !meteor.active || this.isGameOver) return;
+                if (this.shieldActive) {
+                    // 护盾保护，只摧毁陨石
+                    this.destroyMeteor(meteor);
+                    sfxShield();
+                    // 护盾闪烁
+                    this.tweens.add({
+                        targets: player,
+                        alpha: { from: 0.6, to: 1 },
+                        duration: 100,
+                        yoyo: true,
+                        repeat: 2,
+                    });
+                    return;
+                }
+                // 受伤
+                this.lives -= 1;
+                this.comboCount = 0;
+                this.updateUI();
+                sfxDie();
+                // 摧毁陨石
+                this.destroyMeteor(meteor);
+                // 玩家闪烁 (无敌帧)
+                this.player.setAlpha(0.5);
+                this.tweens.add({
+                    targets: this.player,
+                    alpha: { from: 0.5, to: 1 },
+                    duration: 100,
+                    yoyo: true,
+                    repeat: 8,
+                    onComplete: () => {
+                        if (this.player.active) this.player.setAlpha(1);
+                    }
+                });
+                // 屏幕震动
+                this.cameras.main.shake(200, 0.01);
+                if (this.lives <= 0) {
+                    this.gameOver();
+                }
+            }
+
+            // ---- 玩家拾取道具 ----
+            playerGetPowerup(player, powerup) {
+                if (!player.active || !powerup.active || this.isGameOver) return;
+                powerup.destroy();
+                this.shieldActive = true;
+                this.shieldTimer = 5000;
+                sfxPowerup();
+                // 护盾光环
+                const shieldRing = this.add.circle(player.x, player.y, 40, 0x00ff88, 0.15);
+                shieldRing.setStrokeStyle(3, 0x00ff88, 0.6);
+                shieldRing.setDepth(7);
+                const tween = this.tweens.add({
+                    targets: shieldRing,
+                    scaleX: { from: 1, to: 1.8 },
+                    scaleY: { from: 1, to: 1.8 },
+                    alpha: { from: 0.6, to: 0 },
+                    duration: 600,
+                    onComplete: () => shieldRing.destroy(),
+                });
+                // 玩家发光
+                this.tweens.add({
+                    targets: player,
+                    alpha: { from: 0.8, to: 1 },
+                    duration: 200,
+                    yoyo: true,
+                    repeat: 4,
+                });
+                // 显示护盾提示
+                const shieldText = this.add.text(player.x, player.y - 40, '🛡 护盾!', {
+                    fontFamily: '"Courier New", monospace',
+                    fontSize: '16px',
+                    color: '#00ff88',
+                    stroke: '#000',
+                    strokeThickness: 2,
+                }).setOrigin(0.5).setDepth(15);
+                this.tweens.add({
+                    targets: shieldText,
+                    y: shieldText.y - 40,
+                    alpha: { from: 1, to: 0 },
+                    duration: 1000,
+                    onComplete: () => shieldText.destroy(),
+                });
+            }
+
+            // ---- 爆炸粒子效果 ----
+            createExplosion(x, y, size, color) {
+                const count = Math.min(Math.ceil(size / 4), 12);
+                for (let i = 0; i < count; i++) {
+                    const particle = this.add.circle(
+                        x + Phaser.Math.Between(-5, 5),
+                        y + Phaser.Math.Between(-5, 5),
+                        Phaser.Math.Between(2, 5),
+                        Phaser.Math.RND.pick([color, 0xff8844, 0xffcc44, 0xffffff]),
+                        0.8
+                    );
+                    particle.setDepth(10);
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 60 + Math.random() * 120;
+                    this.tweens.add({
+                        targets: particle,
+                        x: x + Math.cos(angle) * speed * 0.5,
+                        y: y + Math.sin(angle) * speed * 0.5,
+                        alpha: { from: 0.9, to: 0 },
+                        scaleX: { from: 1, to: 0.2 },
+                        scaleY: { from: 1, to: 0.2 },
+                        duration: 300 + Math.random() * 300,
+                        onComplete: () => particle.destroy(),
+                    });
+                }
+            }
+
+            // ---- 更新 UI ----
+            updateUI() {
+                this.scoreText.setText('分数: ' + this.score);
+                let hearts = '';
+                for (let i = 0; i < this.lives; i++) hearts += '❤';
+                if (this.lives === 0) hearts = '💀';
+                this.livesText.setText('生命: ' + hearts);
+                if (this.comboCount >= 2) {
+                    this.comboText.setText('🔥 连击 x' + this.comboCount);
+                    this.comboText.setAlpha(1);
+                } else {
+                    this.comboText.setAlpha(0);
+                }
+            }
+
+            // ---- 游戏结束 ----
+            gameOver() {
+                this.isGameOver = true;
+                sfxGameOver();
+                this.physics.pause();
+                this.player.setAlpha(0.4);
+                // 显示结束界面
+                this.goScoreText.setText('最终得分: ' + this.score);
+                this.goComboText.setText('最大连击: ' + this.maxCombo);
+                this.gameOverOverlay.setVisible(true);
+                // 停止背景音
+                if (this.bgmInterval) {
+                    clearInterval(this.bgmInterval);
+                    this.bgmInterval = null;
+                }
+                // 按钮禁用状态
+                document.querySelectorAll('#mobile-controls button').forEach(b => {
+                    if (b.id !== 'btn-pause') b.style.opacity = '0.4';
+                });
+            }
+
+            // ---- 重新开始 ----
+            restartGame() {
+                // 清理所有对象
+                this.bullets.clear(true, true);
+                this.meteors.clear(true, true);
+                this.powerups.clear(true, true);
+                this.gameOverOverlay.setVisible(false);
+                // 重置状态
+                this.score = 0;
+                this.lives = 3;
+                this.isGameOver = false;
+                this.isPaused = false;
+                this.comboCount = 0;
+                this.maxCombo = 0;
+                this.shieldActive = false;
+                this.shieldTimer = 0;
+                this.meteorSpeed = 100;
+                this.lastSpawn = this.time.now;
+                this.player.setAlpha(1);
+                this.player.x = this.sys.game.config.width / 2;
+                this.player.y = this.sys.game.config.height - 60;
+                this.player.body.setVelocity(0, 0);
+                this.pauseText.setVisible(false);
+                this.updateUI();
+                this.physics.resume();
+                // 恢复按钮
+                document.querySelectorAll('#mobile-controls button').forEach(b => {
+                    b.style.opacity = '1';
+                });
+                // 重启背景音
+                if (!this.bgmInterval) {
+                    this.bgmInterval = setInterval(() => {
+                        if (!this.isGameOver && !this.isPaused) {
+                            playBeep(55, 0.5, 'sine', 0.03);
+                        }
+                    }, 2000);
+                }
+                // 生成初始陨石
+                this.spawnMeteor();
+                this.spawnMeteor();
+                console.log('游戏重新开始!');
+            }
+
+            // ---- update: 每帧更新 ----
+            update(time, delta) {
+                if (this.isGameOver) return;
+                if (this.isPaused) return;
+
+                const W = this.sys.game.config.width;
+                const H = this.sys.game.config.height;
+
+                // ---- 1. 星空滚动 ----
+                for (const star of this.starField) {
+                    if (star.active) {
+                        star.y += star.speed * delta * 0.001;
+                        if (star.y > H + 5) {
+                            star.y = -5;
+                            star.x = Phaser.Math.Between(0, W);
+                        }
+                    }
+                }
+
+                // ---- 2. 玩家移动 ----
+                let vx = 0,
+                    vy = 0;
+                const speed = 280;
+                // 键盘
+                if (this.cursors.left.isDown || this.keys.a.isDown) vx = -speed;
+                else if (this.cursors.right.isDown || this.keys.d.isDown) vx = speed;
+                if (this.cursors.up.isDown || this.keys.w.isDown) vy = -speed;
+                else if (this.cursors.down.isDown || this.keys.s.isDown) vy = speed;
+                // 移动端
+                if (this.mobilePressed.left) vx = -speed;
+                if (this.mobilePressed.right) vx = speed;
+                if (this.mobilePressed.up) vy = -speed;
+                if (this.mobilePressed.down) vy = speed;
+                // 限制对角线速度
+                if (vx !== 0 && vy !== 0) {
+                    vx *= 0.707;
+                    vy *= 0.707;
+                }
+                this.player.body.setVelocity(vx, vy);
+                // 飞船倾斜
+                if (this.player.active) {
+                    const tilt = Phaser.Math.Clamp(vx / speed * 0.3, -0.3, 0.3);
+                    this.player.setRotation(tilt);
+                }
+
+                // ---- 3. 射击 (键盘) ----
+                if (this.keys.j.isDown || this.keys.k.isDown || this.keys.space.isDown) {
+                    this.tryShoot();
+                }
+                // 移动端射击 (在按钮事件中已触发)
+                if (this.mobilePressed.fire) {
+                    // 由按钮事件触发 tryShoot，这里不再重复调用避免速率问题
+                }
+
+                // ---- 4. 陨石生成 ----
+                const now = this.time.now;
+                const spawnInterval = Math.max(400, this.meteorSpawnRate - this.score * 2);
+                if (now - this.lastSpawn > spawnInterval) {
+                    this.spawnMeteor();
+                    // 随分数增加生成更多
+                    if (this.score > 50 && Math.random() < 0.3) this.spawnMeteor();
+                    if (this.score > 150 && Math.random() < 0.3) this.spawnMeteor();
+                }
+
+                // ---- 5. 难度递增 ----
+                this.difficultyTimer += delta;
+                if (this.difficultyTimer > 3000) {
+                    this.difficultyTimer = 0;
+                    this.meteorSpeed += 3;
+                    if (this.meteorSpeed > 220) this.meteorSpeed = 220;
+                }
+
+                // ---- 6. 护盾计时 ----
+                if (this.shieldActive) {
+                    this.shieldTimer -= delta;
+                    if (this.shieldTimer <= 0) {
+                        this.shieldActive = false;
+                        // 提示护盾消失
+                        const warn = this.add.text(this.player.x, this.player.y - 40, '护盾消失', {
+                            fontFamily: '"Courier New", monospace',
+                            fontSize: '14px',
+                            color: '#ff6644',
+                            stroke: '#000',
+                            strokeThickness: 2,
+                        }).setOrigin(0.5).setDepth(15);
+                        this.tweens.add({
+                            targets: warn,
+                            y: warn.y - 30,
+                            alpha: { from: 1, to: 0 },
+                            duration: 800,
+                            onComplete: () => warn.destroy(),
+                        });
+                    } else {
+                        // 护盾光环呼吸
+                        if (this.player.active) {
+                            const glow = 0.5 + Math.sin(now * 0.005) * 0.2;
+                            this.player.setAlpha(0.7 + glow * 0.3);
+                        }
+                    }
+                }
+
+                // ---- 7. 清理超出边界的对象 ----
+                this.bullets.getChildren().forEach(b => {
+                    if (b.active && (b.y < -20 || b.y > H + 20 || b.x < -20 || b.x > W + 20)) {
+                        b.destroy();
+                    }
+                });
+                this.meteors.getChildren().forEach(m => {
+                    if (m.active && m.y > H + 60) {
+                        // 陨石落到底部，扣除生命 (但避免连续扣)
+                        if (!m.getData('penalty')) {
+                            m.setData('penalty', true);
+                            if (!this.shieldActive) {
+                                this.lives -= 1;
+                                this.comboCount = 0;
+                                this.updateUI();
+                                sfxDie();
+                                if (this.lives <= 0) {
+                                    this.gameOver();
+                                    return;
+                                }
+                                // 闪烁
+                                this.tweens.add({
+                                    targets: this.player,
+                                    alpha: { from: 0.5, to: 1 },
+                                    duration: 100,
+                                    yoyo: true,
+                                    repeat: 6,
+                                    onComplete: () => {
+                                        if (this.player.active) this.player.setAlpha(1);
+                                    }
+                                });
+                            }
+                        }
+                        m.destroy();
+                    }
+                });
+                this.powerups.getChildren().forEach(p => {
+                    if (p.active && (p.y > H + 30 || p.x < -30 || p.x > W + 30)) {
+                        p.destroy();
+                    }
+                });
+
+                // ---- 8. 更新护盾指示器 ----
+                if (this.shieldActive && this.player.active) {
+                    // 在玩家周围画一个护盾圈 (用 graphics)
+                    if (!this.shieldGraphic) {
+                        this.shieldGraphic = this.add.graphics().setDepth(6);
+                    }
+                    this.shieldGraphic.clear();
+                    this.shieldGraphic.lineStyle(2, 0x00ff88, 0.5);
+                    this.shieldGraphic.strokeCircle(this.player.x, this.player.y, 32);
+                    this.shieldGraphic.fillStyle(0x00ff88, 0.08);
+                    this.shieldGraphic.fillCircle(this.player.x, this.player.y, 32);
+                } else {
+                    if (this.shieldGraphic) {
+                        this.shieldGraphic.clear();
+                        this.shieldGraphic.destroy();
+                        this.shieldGraphic = null;
+                    }
+                }
+
+                // ---- 9. 更新连击显示 ----
+                if (this.comboCount >= 2) {
+                    this.comboText.setText('🔥 连击 x' + this.comboCount);
+                    this.comboText.setAlpha(1);
+                } else {
+                    this.comboText.setAlpha(0);
+                }
+            }
+
+            // ---- 场景关闭时清理 ----
+            shutdown() {
+                if (this.bgmInterval) {
+                    clearInterval(this.bgmInterval);
+                    this.bgmInterval = null;
+                }
+            }
+        }
+
+        // ---- Phaser 游戏配置 ----
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: 800,
+            height: 600,
+            backgroundColor: '#0a0a1a',
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                min: {
+                    width: 400,
+                    height: 300
+                },
+                max: {
+                    width: 1600,
+                    height: 1200
+                }
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false,
+                }
+            },
+            scene: GameScene,
+            render: {
+                antialias: true,
+                pixelArt: false,
+            },
+            input: {
+                activePointers: 3,
+                touch: true,
+            },
+        };
+
+        // ---- 启动游戏 ----
+        window.addEventListener('DOMContentLoaded', () => {
+            try {
+                const game = new Phaser.Game(config);
+                // 全局引用便于调试
+                window.__game = game;
+                console.log('Phaser 游戏实例已创建');
+            } catch (e) {
+                console.error('游戏启动失败:', e);
+                document.getElementById('loading').textContent = '⚠️ 加载失败，请刷新页面';
+                document.getElementById('loading').style.color = '#ff4444';
+            }
+        });
+
+        // 如果 DOM 已加载完成，直接启动
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            // 防止重复启动
+            if (!window.__gameStarted) {
+                window.__gameStarted = true;
+                try {
+                    const game = new Phaser.Game(config);
+                    window.__game = game;
+                    console.log('Phaser 游戏实例已创建 (立即模式)');
+                } catch (e) {
+                    console.error('游戏启动失败:', e);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

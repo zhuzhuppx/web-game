@@ -1,0 +1,263 @@
+我来帮你生成一个可直接运行的“Phaser小鸟飞行”游戏HTML文件，它实现了横版卷轴躲避管道的核心玩法。
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Phaser小鸟飞行</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js">
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            max-width: 800px;
+            max-height: 600px;
+        }
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <script>
+        // ============================================================
+        //  Phaser 小鸟飞行 - v1 核心玩法
+        //  引擎: Phaser 3.87.0  (Arcade Physics)
+        //  设计: 横版卷轴无尽跑酷
+        // ============================================================
+
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 600;
+
+        // ---------- 物理常量 (与设计文档一致) ----------
+        const GRAVITY = 800;
+        const FLAP_VELOCITY = -350;
+        const MAX_FALL_SPEED = 600;
+        const BASE_SCROLL_SPEED = 200;
+        const PIPE_WIDTH = 60;
+        const PIPE_GAP_HEIGHT_MIN = 150;
+        const PIPE_GAP_HEIGHT_MAX = 180;
+        const PIPE_CENTER_Y_MIN = 180;
+        const PIPE_CENTER_Y_MAX = 420;
+        const PIPE_SPACING_MIN = 250;
+        const PIPE_SPACING_MAX = 350;
+        const GROUND_Y = 550; // 碰撞边界
+        const GROUND_VISUAL_Y = 520;
+        const BIRD_X = 150;
+        const BIRD_INIT_Y = 300;
+        const BIRD_WIDTH = 40;
+        const BIRD_HEIGHT = 30;
+        const BIRD_BODY_WIDTH = 36;
+        const BIRD_BODY_HEIGHT = 26;
+
+        // ---------- 难度递增 ----------
+        function getScrollSpeed(score) {
+            if (score <= 10) return 200;
+            if (score <= 20) return 220;
+            if (score <= 40) return 240;
+            if (score <= 60) return 260;
+            return Math.min(280, 300);
+        }
+
+        // ============================================================
+        //  主场景
+        // ============================================================
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'GameScene' });
+                this.score = 0;
+                this.state = 'waiting'; // waiting | playing | gameover
+                this.pipePairs = []; // 每对: { top, bottom, scored, x }
+                this.nextSpawnX = GAME_WIDTH + 100;
+                this.currentSpeed = BASE_SCROLL_SPEED;
+                this.birdTween = null;
+            }
+
+            // ----------------------------------------
+            //  create
+            // ----------------------------------------
+            create() {
+                // ---- 物理世界 ----
+                this.physics.world.gravity.y = GRAVITY;
+
+                // ---- 背景 ----
+                this.drawBackground();
+
+                // ---- 地面 (视觉) ----
+                this.groundVisual = this.add.rectangle(
+                    GAME_WIDTH / 2,
+                    GROUND_VISUAL_Y + (GAME_HEIGHT - GROUND_VISUAL_Y) / 2,
+                    GAME_WIDTH,
+                    GAME_HEIGHT - GROUND_VISUAL_Y,
+                    0x8B5E3C
+                );
+                this.groundVisual.setDepth(1);
+
+                // 地面顶部装饰线
+                this.groundLine = this.add.rectangle(
+                    GAME_WIDTH / 2,
+                    GROUND_VISUAL_Y,
+                    GAME_WIDTH,
+                    4,
+                    0x6B3E1C
+                );
+                this.groundLine.setDepth(1);
+
+                // ---- 管道组 (物理) ----
+                this.pipeGroup = this.physics.add.group({
+                    allowGravity: false,
+                    immovable: true
+                });
+
+                // ---- 小鸟 (物理) ----
+                this.bird = this.physics.add.sprite(BIRD_X, BIRD_INIT_Y, '__DEFAULT');
+                this.bird.setTexture('__DEFAULT');
+                this.bird.setDisplaySize(BIRD_WIDTH, BIRD_HEIGHT);
+                this.bird.body.setSize(BIRD_BODY_WIDTH, BIRD_BODY_HEIGHT);
+                this.bird.body.setMaxVelocityY(MAX_FALL_SPEED);
+                this.bird.body.setAllowGravity(false); // 等待阶段无重力
+                this.bird.setDepth(10);
+
+                // 绘制小鸟 (用 graphics 生成纹理)
+                this.drawBirdTexture();
+
+                // ---- 碰撞: 小鸟 vs 管道 ----
+                this.physics.add.overlap(
+                    this.bird,
+                    this.pipeGroup,
+                    this.onHitPipe,
+                    null,
+                    this
+                );
+
+                // ---- UI 文字 ----
+                this.scoreText = this.add.text(40, 40, '得分：0', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '32px',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                });
+                this.scoreText.setDepth(20);
+
+                this.startText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, '点击或按空格键开始', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '28px',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 5
+                });
+                this.startText.setOrigin(0.5);
+                this.startText.setDepth(20);
+
+                this.gameOverText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, '游戏结束', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '48px',
+                    color: '#ff4444',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 6
+                });
+                this.gameOverText.setOrigin(0.5);
+                this.gameOverText.setDepth(20);
+                this.gameOverText.setVisible(false);
+
+                this.finalScoreText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, '', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '28px',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                });
+                this.finalScoreText.setOrigin(0.5);
+                this.finalScoreText.setDepth(20);
+                this.finalScoreText.setVisible(false);
+
+                this.restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 70, '按空格键或点击重新开始', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '22px',
+                    color: '#ffdd88',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                });
+                this.restartText.setOrigin(0.5);
+                this.restartText.setDepth(20);
+                this.restartText.setVisible(false);
+
+                // ---- 输入 ----
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+                this.input.on('pointerdown', (pointer) => {
+                    this.handleInput();
+                });
+
+                this.input.keyboard.on('keydown-SPACE', () => {
+                    this.handleInput();
+                });
+
+                this.input.keyboard.on('keydown-UP', () => {
+                    this.handleInput();
+                });
+
+                // ---- 初始状态: waiting ----
+                this.state = 'waiting';
+                this.bird.body.setAllowGravity(false);
+                this.bird.body.setVelocity(0, 0);
+
+                // 小鸟浮动动画
+                this.birdTween = this.tweens.add({
+                    targets: this.bird,
+                    y: BIRD_INIT_Y - 12,
+                    duration: 600,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+
+                // ---- 初始化变量 ----
+                this.score = 0;
+                this.currentSpeed = BASE_SCROLL_SPEED;
+                this.pipePairs = [];
+                this.pipeGroup.clear(true, true);
+                this.nextSpawnX = GAME_WIDTH + 100;
+
+                this.scoreText.setText('得分：0');
+                this.startText.setVisible(true);
+                this.gameOverText.setVisible(false);
+                this.finalScoreText.setVisible(false);
+                this.restartText.setVisible(false);
+
+                // 首组管道延迟生成 (等玩家开始)
+            }
+
+            // ----------------------------------------
+            //  update
+            // ----------------------------------------
+            update

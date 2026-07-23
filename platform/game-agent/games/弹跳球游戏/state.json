@@ -1,0 +1,13 @@
+{
+  "name": "弹跳球游戏",
+  "description": "做个弹跳球游戏",
+  "version": 2,
+  "spec": "做个弹跳球游戏",
+  "changelog": [
+    "v1: 保存为 v1.html",
+    "v1: 保存为 v2.html"
+  ],
+  "status": "developing",
+  "created_at": "2026-07-21T00:21:32.996930",
+  "updated_at": "2026-07-21T00:21:32.996930"
+}

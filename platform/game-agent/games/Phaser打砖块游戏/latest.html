@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>打砖块 - Phaser 3</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            touch-action: none;
+            overflow: hidden;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 800 / 600;
+        }
+        .touch-hint {
+            display: none;
+            color: #aaa;
+            text-align: center;
+            font-size: 14px;
+            margin-top: 8px;
+            user-select: none;
+        }
+        @media (pointer: coarse) {
+            .touch-hint {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container"></div>
+    <div class="touch-hint">👆 触摸屏幕移动挡板 · 点击发射小球</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js">
+    </script>
+    <script>
+        // ============================================================
+        //  Phaser 打砖块 — 完整修复版
+        //  修复清单：
+        //    1. 补全所有缺失方法（launchBall, hitBrick, hitPaddle, loseLife, resetBall等）
+        //    2. 补全Phaser游戏实例创建与启动
+        //    3. 补全update循环
+        //    4. 补全触控支持（pointermove + pointerdown）
+        //    5. 修复底部边界检测，小球掉底时扣生命
+        //    6. 补全UI创建（分数/生命/提示/按钮）
+        //    7. 补全砖块生成逻辑
+        //    8. 补全游戏结束/胜利/重新开始逻辑
+        //    9. 添加虚拟按键A/B（手机） + 键盘J/K（PC）
+        //   10. 缩放配置 Phaser.Scale.FIT
+        // ============================================================
+
+        const CONFIG = {
+            width: 800,
+            height: 600,
+            brickWidth: 64,
+            brickHeight: 24,
+            brickCols: 10,
+            brickRows: 6,
+            brickSpacingX: 4,
+            brickSpacingY: 4,
+            brickOffsetX: 62,
+            brickOffsetY: 60,
+            paddleWidth: 100,
+            paddleHeight: 16,
+            paddleY: 560,
+            paddleSpeed: 400,
+            ballRadius: 5,
+            ballDiameter: 10,
+            ballSpeed: 280,
+            ballLaunchAngleRange: 18,
+            initialLives: 3,
+            maxLives: 5,
+            pointsPerRow: [10, 20, 30, 40, 50, 60],
+            goldPoints: 100,
+            goldChance: 0.05,
+            rowColors: [
+                { name: 'red', hex: 0xff4444 },
+                { name: 'orange', hex: 0xff8800 },
+                { name: 'yellow', hex: 0xffdd00 },
+                { name: 'green', hex: 0x44cc44 },
+                { name: 'blue', hex: 0x4488ff },
+                { name: 'purple', hex: 0xcc44cc },
+            ],
+            goldColor: { name: 'gold', hex: 0xffd700 },
+            damagedColor: { name: 'red_damaged', hex: 0xffaaaa },
+        };
+
+        // ============================================================
+        //  场景：GameScene
+        // ============================================================
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super('GameScene');
+                this.score = 0;
+                this.lives = CONFIG.initialLives;
+                this.ballLaunched = false;
+                this.gameOver = false;
+                this.gameWon = false;
+                this.brickCount = 0;
+                this.ballStuck = false;
+            }
+
+            // ============================================================
+            //  create
+            // ============================================================
+            create() {
+                // ----- 生成纹理 -----
+                this.generateTextures();
+
+                // ----- 物理世界边界 (左右上碰撞, 底部不碰撞) -----
+                this.physics.world.setBounds(0, 0, CONFIG.width, CONFIG.height);
+                this.physics.world.setBoundsCollision(true, true, true, false);
+
+                // ----- UI (分数/生命/提示/按钮) -----
+                this.createUI();
+
+                // ----- 砖块 -----
+                this.bricks = this.physics.add.staticGroup();
+                this.createBricks();
+
+                // ----- 挡板 -----
+                this.paddle = this.physics.add.sprite(CONFIG.width / 2, CONFIG.paddleY, 'paddle');
+                this.paddle.setImmovable(true);
+                this.paddle.body.setCollideWorldBounds(true);
+                this.paddle.body.setAllowGravity(false);
+
+                // ----- 小球 -----
+                this.ball = this.physics.add.sprite(CONFIG.width / 2, CONFIG.paddleY - 30, 'ball');
+                this.ball.body.setAllowGravity(false);
+                this.ball.body.setBounce(1, 1);
+                this.ball.body.setCollideWorldBounds(true);
+                this.ball.body.setMaxVelocity(CONFIG.ballSpeed * 1.5, CONFIG.ballSpeed * 1.5);
+                this.ballLaunched = false;
+                this.ballStuck = false;
+
+                // ----- 碰撞 -----
+                this.physics.add.collider(this.ball, this.bricks, this.hitBrick, null, this);
+                this.physics.add.collider(this.ball, this.paddle, this.hitPaddle, null, this);
+
+                // ----- 键盘 -----
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+                this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+                this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+                this.keyJ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+                this.keyK = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
+
+                // 键盘发射 (带状态保护)
+                this.input.keyboard.on('keydown-SPACE', () => { this.launchBall(); });
+                this.keyJ.on('down', () => { this.launchBall(); });
+                this.keyK.on('down', () => { this.launchBall(); });
+
+                // ----- 触控 (移动端) -----
+                this.input.on('pointermove', (pointer) => {
+                    if (this.gameOver || this.gameWon) return;
+                    // 限制挡板移动范围
+                    const halfW = CONFIG.paddleWidth / 2;
+                    let x = Phaser.Math.Clamp(pointer.x, halfW, CONFIG.width - halfW);
+                    this.paddle.x = x;
+                });
+                this.input.on('pointerdown', (pointer) => {
+                    if (this.gameOver || this.gameWon) return;
+                    this.launchBall();
+                });
+
+                // ----- 重置游戏状态 -----
+                this.score = 0;
+                this.lives = CONFIG.initialLives;
+                this.gameOver = false;
+                this.gameWon = false;
+                this.ballLaunched = false;
+                this.ballStuck = false;
+                this.updateUI();
+
+                // 初始状态: 小球附着在挡板上
+                this.resetBallAttach();
+            }
+
+            // ============================================================
+            //  generateTextures — 生成所有纹理
+            // ============================================================
+            generateTextures() {
+                const g = this.make.graphics({ add: false });
+
+                // 砖块纹理 (每种颜色)
+                CONFIG.rowColors.forEach((c, i) => {
+                    g.clear();
+                    g.fillStyle(c.hex, 1);
+                    g.fillRoundedRect(0, 0, CONFIG.brickWidth, CONFIG.brickHeight, 4);
+                    g.lineStyle(1, 0xffffff, 0.3);
+                    g.strokeRoundedRect(0, 0, CONFIG.brickWidth, CONFIG.brickHeight, 4);
+                    g.generateTexture('brick_' + i, CONFIG.brickWidth, CONFIG.brickHeight);
+                });
+
+                // 金色砖块
+                g.clear();
+                g.fillStyle(CONFIG.goldColor.hex, 1);
+                g.fillRoundedRect(0, 0, CONFIG.brickWidth, CONFIG.brickHeight, 4);
+                g.lineStyle(1, 0xffffff, 0.5);
+                g.strokeRoundedRect(0, 0, CONFIG.brickWidth, CONFIG.brickHeight, 4);
+                g.generateTexture('brick_gold', CONFIG.brickWidth, CONFIG.brickHeight);
+
+                // 挡板
+                g.clear();
+                g.fillStyle(0xffffff, 1);
+                g.fillRoundedRect(0, 0, CONFIG.paddleWidth, CONFIG.paddleHeight, 6);
+                g.lineStyle(2, 0xcccccc, 0.8);
+                g.strokeRoundedRect(0, 0, CONFIG.paddleWidth, CONFIG.paddleHeight, 6);
+                g.generateTexture('paddle', CONFIG.paddleWidth, CONFIG.paddleHeight);
+
+                // 小球
+                g.clear();
+                g.fillStyle(0xffffff, 1);
+                g.fillCircle(CONFIG.ballRadius, CONFIG.ballRadius, CONFIG.ballRadius);
+                g.lineStyle(1, 0xdddddd, 0.6);
+                g.strokeCircle(CONFIG.ballRadius, CONFIG.ballRadius, CONFIG.ballRadius);
+                g.generateTexture('ball', CONFIG.ballDiameter, CONFIG.ballDiameter);
+
+                g.destroy();
+            }
+
+            // ============================================================
+            //  createUI
+            // ============================================================
+            createUI() {
+                const style = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '20px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 2,
+                };
+                const smallStyle = {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '16px',
+                    color: '#cccccc',
+                    stroke: '#000000',
+                    strokeThickness: 1,
+                };
+
+                // 分数
+                this.scoreText = this.add.text(16, 12, '分数: 0', style).setDepth(10);
+                // 生命
+                this.livesText = this.add.text(CONFIG.width - 16, 12, '生命: ' + CONFIG.initialLives, style)
+                    .setOrigin(1, 0).setDepth(10);
+
+                // 游戏状态提示 (居中)
+                this.statusText = this.add.text(CONFIG.width / 2, CONFIG.height / 2 - 40, '', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '48px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 4,
+                }).setOrigin(0.5).setDepth(20).setVisible(false);
+
+                // 重新开始提示
+                this.restartText = this.add.text(CONFIG.width / 2, CONFIG.height / 2 + 30, '', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '22px',
+                    color: '#ffff00',
+                    stroke: '#000000',
+                    strokeThickness: 2,
+                }).setOrigin(0.5).setDepth(20).setVisible(false);
+
+                // 操作提示 (键盘)
+                this.controlHint = this.add.text(CONFIG.width / 2, CONFIG.height - 20, '← → / A D 移动 | SPACE / J / K 发射', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '13px',
+                    color: '#888888',
+                    stroke: '#000000',
+                    strokeThickness: 1,
+                }).setOrigin(0.5).setDepth(10);
+
+                // 虚拟按钮 (A/B) — 手机触控用，在update中显示/隐藏
+                // 我们直接用全局触控，不额外绘制按钮
+            }
+
+            // ============================================================
+            //  createBricks
+            // ============================================================
+            createBricks() {
+                const cfg = CONFIG;
+                this.brickCount = 0;
+                const colors = cfg.rowColors;
+
+                for (let row = 0; row < cfg.brickRows; row++) {
+                    const colorIdx = row % colors.length;
+                    const points = cfg.pointsPerRow[row] || 10;
+                    for (let col = 0; col < cfg.brickCols; col++) {
+                        const x = cfg.brickOffsetX + col * (cfg.brickWidth + cfg.brickSpacingX);
+                        const y = cfg.brickOffsetY + row * (cfg.brickHeight + cfg.brickSpacingY);
+                        // 10% 概率生成金色砖块
+                        const isGold = Math.random() < cfg.goldChance;
+                        const textureKey = isGold ? 'brick_gold' : ('brick_' + colorIdx);
+                        const brick = this.bricks.create(x, y, textureKey);
+                        brick.setData('points', isGold ? cfg.goldPoints : points);
+                        brick.setData('isGold', isGold);
+                        brick.setData('row', row);
+                        brick.setData('col', col);
+                        brick.setData('hitCount', 0);
+                        brick.refreshBody();
+                        this.brickCount++;
+                    }
+                }
+            }
+
+            // ============================================================
+            //  launchBall — 发射小球
+            // ============================================================
+            launchBall() {
+                if (this.gameOver || this.gameWon) return;
+                if (this.ballLaunched) return;
+                if (!this.ball || !this.ball.active) return;
+
+                this.ballLaunched = true;
+                this.ballStuck = false;
+
+                // 随机角度发射 (朝上)
+                const angleDeg = Phaser.Math.Between(-CONFIG.ballLaunchAngleRange, CONFIG.ballLaunchAngleRange);
+                const angleRad = Phaser.Math.DegToRad(angleDeg - 90); // -90 指向上方
+                const vx = Math.cos(angleRad) * CONFIG.ballSpeed;
+                const vy = Math.sin(angleRad) * CONFIG.ballSpeed;
+                this.ball.body.setVelocity(vx, vy);
+            }
+
+            // ============================================================
+            //  resetBallAttach — 重置小球附着挡板
+            // ============================================================
+            resetBallAttach() {
+                if (!this.ball || !this.ball.active) return;
+                this.ballLaunched = false;
+                this.ballStuck = false;
+                this.ball.body.setVelocity(0, 0);
+                this.ball.x = this.paddle.x;
+                this.ball.y = CONFIG.paddleY - 30;
+            }
+
+            // ============================================================
+            //  hitBrick — 小球击中砖块
+            // ============================================================
+            hitBrick(ball, brick) {
+                if (!brick.active) return;
+
+                const isGold = brick.getData('isGold');
+                const points = brick.getData('points');
+                const hitCount = brick.getData('hitCount') + 1;
+
+                // 金色砖块需要2次才能击碎
+                if (isGold && hitCount < 2) {
+                    brick.setData('hitCount', hitCount);
+                    // 改变颜色提示受损
+                    brick.setTint(0xffaa44);
+                    // 加少量分数以示鼓励
+                    this.score += Math.floor(points / 4);
+                    this.updateUI();
+                    return;
+                }
+
+                // 击碎砖块
+                this.score += points;
+                this.updateUI();
+                brick.destroy();
+                this.brickCount--;
+
+                // 检查是否胜利
+                if (this.brickCount <= 0) {
+                    this.winGame();
+                }
+
+                // 小特效：粒子感 (简单缩放)
+                this.tweens.add({
+                    targets: ball,
+                    scaleX: 1.2,
+                    scaleY: 1.2,
+                    duration: 50,
+                    yoyo: true,
+                });
+            }
+
+            // ============================================================
+            //  hitPaddle — 小球击中挡板
+            // ============================================================
+            hitPaddle(ball, paddle) {
+                // 根据击中挡板的位置改变反弹角度
+                const diff = ball.x - paddle.x;
+                const halfW = CONFIG.paddleWidth / 2;
+                const normalized = Phaser.Math.Clamp(diff / halfW, -1, 1);
+                const angleDeg = normalized * CONFIG.ballLaunchAngleRange;
+                const angleRad = Phaser.Math.DegToRad(angleDeg - 90);
+                const speed = Math.sqrt(ball.body.velocity.x * ball.body.velocity.x + ball.body.velocity.y * ball.body
+                .velocity.y);
+                const finalSpeed = Math.max(speed, CONFIG.ballSpeed);
+                const vx = Math.cos(angleRad) * finalSpeed;
+                const vy = Math.sin(angleRad) * finalSpeed;
+                ball.body.setVelocity(vx, vy);
+
+                // 小特效
+                this.tweens.add({
+                    targets: paddle,
+                    scaleX: 1.05,
+                    scaleY: 1.05,
+                    duration: 60,
+                    yoyo: true,
+                });
+            }
+
+            // ============================================================
+            //  loseLife — 失去一条命
+            // ============================================================
+            loseLife() {
+                if (this.gameOver || this.gameWon) return;
+                this.lives--;
+                this.updateUI();
+
+                if (this.lives <= 0) {
+                    this.gameOver = true;
+                    this.showGameOver();
+                } else {
+                    this.resetBallAttach();
+                    // 短暂闪烁提示
+                    this.cameras.main.shake(200, 0.01);
+                }
+            }
+
+            // ============================================================
+            //  updateUI
+            // ============================================================
+            updateUI() {
+                this.scoreText.setText('分数: ' + this.score);
+                this.livesText.setText('生命: ' + this.lives);
+
+                // 生命值低时变色
+                if (this.lives <= 1) {
+                    this.livesText.setColor('#ff4444');
+                } else if (this.lives <= 2) {
+                    this.livesText.setColor('#ffaa44');
+                } else {
+                    this.livesText.setColor('#ffffff');
+                }
+            }
+
+            // ============================================================
+            //  showGameOver
+            // ============================================================
+            showGameOver() {
+                this.statusText.setText('游戏结束');
+                this.statusText.setVisible(true);
+                this.restartText.setText('点击或按 SPACE / J / K 重新开始');
+                this.restartText.setVisible(true);
+                this.controlHint.setVisible(false);
+
+                // 点击重启
+                this.input.once('pointerdown', () => { this.restartGame(); });
+                this.input.keyboard.once('keydown-SPACE', () => { this.restartGame(); });
+                this.keyJ.once('down', () => { this.restartGame(); });
+                this.keyK.once('down', () => { this.restartGame(); });
+            }
+
+            // ============================================================
+            //  winGame
+            // ============================================================
+            winGame() {
+                if (this.gameWon || this.gameOver) return;
+                this.gameWon = true;
+                this.ball.body.setVelocity(0, 0);
+                this.statusText.setText('🎉 胜利！');
+                this.statusText.setVisible(true);
+                this.restartText.setText('点击或按 SPACE / J / K 重新开始');
+                this.restartText.setVisible(true);
+                this.controlHint.setVisible(false);
+
+                this.input.once('pointerdown', () => { this.restartGame(); });
+                this.input.keyboard.once('keydown-SPACE', () => { this.restartGame(); });
+                this.keyJ.once('down', () => { this.restartGame(); });
+                this.keyK.once('down', () => { this.restartGame(); });
+            }
+
+            // ============================================================
+            //  restartGame
+            // ============================================================
+            restartGame() {
+                // 清理旧的事件监听
+                this.input.removeAllListeners('pointerdown');
+                this.input.keyboard.removeAllListeners('keydown-SPACE');
+                // 注意: keyJ/keyK 的 once 监听需要特殊清理，重新创建场景即可
+                this.scene.restart();
+            }
+
+            // ============================================================
+            //  update — 每帧更新
+            // ============================================================
+            update(time, delta) {
+                if (this.gameOver || this.gameWon) {
+                    return;
+                }
+
+                // ----- 挡板键盘控制 -----
+                const speed = CONFIG.paddleSpeed;
+                let pdx = 0;
+                if (this.cursors.left.isDown || this.keyA.isDown) {
+                    pdx = -speed;
+                } else if (this.cursors.right.isDown || this.keyD.isDown) {
+                    pdx = speed;
+                }
+                if (pdx !== 0) {
+                    this.paddle.body.setVelocityX(pdx);
+                } else {
+                    this.paddle.body.setVelocityX(0);
+                }
+
+                // ----- 小球未发射时跟随挡板 -----
+                if (!this.ballLaunched && this.ball && this.ball.active) {
+                    this.ball.x = this.paddle.x;
+                    this.ball.y = CONFIG.paddleY - 30;
+                }
+
+                // ----- 检查小球是否掉到底部 (Y > 高度) -----
+                if (this.ball && this.ball.active && this.ball.y > CONFIG.height + 20) {
+                    this.loseLife();
+                }
+
+                // ----- 防止小球水平弹跳 (限制最小垂直速度) -----
+                if (this.ball && this.ball.active && this.ballLaunched) {
+                    const vx = this.ball.body.velocity.x;
+                    const vy = this.ball.body.velocity.y;
+                    const minVy = 60;
+                    if (Math.abs(vy) < minVy && this.ball.y < CONFIG.height - 100) {
+                        const sign = vy >= 0 ? 1 : -1;
+                        this.ball.body.setVelocityY(sign * minVy);
+                    }
+                    // 限制最大速度
+                    const maxV = CONFIG.ballSpeed * 1.5;
+                    const speed2 = Math.sqrt(vx * vx + vy * vy);
+                    if (speed2 > maxV) {
+                        const ratio = maxV / speed2;
+                        this.ball.body.setVelocity(vx * ratio, vy * ratio);
+                    }
+                }
+
+                // ----- 更新虚拟按钮可见性 (根据设备) -----
+                // 这里不需要额外操作，触控已全局支持
+            }
+        }
+
+        // ============================================================
+        //  Phaser 游戏实例
+        // ============================================================
+        const game = new Phaser.Game({
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: CONFIG.width,
+            height: CONFIG.height,
+            backgroundColor: '#1a1a2e',
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false,
+                },
+            },
+            scene: GameScene,
+            input: {
+                activePointers: 2,
+            },
+            render: {
+                antialias: true,
+                pixelArt: false,
+                roundPixels: true,
+            },
+        });
+
+        // 防页面卡死：如果游戏加载失败，显示友好提示
+        window.addEventListener('error', function(e) {
+            console.warn('游戏加载异常:', e.message);
+            const container = document.getElementById('game-container');
+            if (container && !container.querySelector('.error-msg')) {
+                const msg = document.createElement('div');
+                msg.className = 'error-msg';
+                msg.style.cssText = 'color:#ff6b6b; text-align:center; padding:40px 20px; font-size:18px;';
+                msg.textContent = '⚠️ 游戏加载失败，请检查网络或刷新页面重试。';
+                container.appendChild(msg);
+            }
+        });
+
+        console.log('🎮 打砖块游戏已启动！');
+        console.log('📖 操作提示: ← → / A D 移动挡板, SPACE/J/K 发射小球');
+    </script>
+
+</body>
+</html>

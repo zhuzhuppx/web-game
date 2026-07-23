@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>反应测试小游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            max-width: 800px;
+            max-height: 600px;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+            margin: 0 auto;
+        }
+        /* 键盘提示（PC 端显示） */
+        #keyboard-hint {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.45);
+            font-size: 13px;
+            letter-spacing: 2px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 4px 14px;
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+            white-space: nowrap;
+            font-family: Arial, sans-serif;
+        }
+        @media (hover: hover) and (pointer: fine) {
+            #keyboard-hint {
+                display: block;
+            }
+        }
+        @media (max-width: 500px) {
+            #keyboard-hint {
+                font-size: 10px;
+                padding: 3px 10px;
+                bottom: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="keyboard-hint">J 点击 · K 重置 · 空格 重新开始</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js">
+    </script>
+    <script>
+        // ============================================================
+        // 音效系统 (Web Audio API)
+        // ============================================================
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playBeep(freq, duration, type = 'square', volume = 0.25) {
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+                // 释放节点
+                osc.onended = () => {
+                    try { osc.disconnect();
+                        gain.disconnect(); } catch (e) { /* 静默 */ }
+                };
+            } catch (e) { /* 静默失败 */ }
+        }
+
+        function playHitSound() {
+            playBeep(880, 0.12, 'sine', 0.3);
+            setTimeout(() => playBeep(1100, 0.08, 'sine', 0.2), 60);
+        }
+
+        function playMissSound() {
+            playBeep(220, 0.25, 'sawtooth', 0.2);
+        }
+
+        function playGameOverSound() {
+            playBeep(440, 0.2, 'sine', 0.3);
+            setTimeout(() => playBeep(330, 0.2, 'sine', 0.25), 150);
+            setTimeout(() => playBeep(220, 0.4, 'sine', 0.2), 300);
+        }
+
+        function playCountdownSound() {
+            playBeep(660, 0.1, 'sine', 0.2);
+        }
+
+        function playRewardSound() {
+            playBeep(1040, 0.1, 'sine', 0.3);
+            setTimeout(() => playBeep(1320, 0.15, 'sine', 0.25), 80);
+        }
+
+        // ============================================================
+        // 游戏主场景
+        // ============================================================
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'GameScene' });
+                // 游戏状态
+                this.state = 'countdown'; // countdown | playing | gameover
+                this.score = 0;
+                this.lives = 5;
+                this.maxLives = 5;
+                this.targetDuration = 1.2;
+                this.targetInterval = 1.0;
+                this.consecutiveHits = 0;
+                this.lostLivesSinceLastSpeedDown = 0;
+                this.scoreSinceLastSpeedUp = 0;
+                this.target = null;
+                this.targetTimer = null;
+                this.spawnTimer = null;
+                this.countdownValue = 3;
+                this.isPaused = false;
+                this.totalClicks = 0;
+                this.hitsOnTarget = 0;
+                this.flashOverlay = null;
+                this.particleGroup = null;
+                this.targetRadius = 36;
+                this.isGameOverHandled = false;
+                // 虚拟按钮引用
+                this.btnA = null;
+                this.btnB = null;
+                this.btnAText = null;
+                this.btnBText = null;
+                // 连击计时器
+                this.comboTimer = null;
+                this.comboActive = false;
+            }
+
+            create() {
+                const W = this.scale.width;
+                const H = this.scale.height;
+
+                // ---- 初始化物理世界边界 ----
+                this.physics.world.setBounds(0, 0, W, H);
+
+                // ---- 背景 ----
+                this.cameras.main.setBackgroundColor('#1a1a2e');
+
+                // ---- 粒子物理组 ----
+                this.particleGroup = this.physics.add.group({
+                    collideWorldBounds: true,
+                    bounceX: 0.7,
+                    bounceY: 0.7,
+                    dragX: 20,
+                    dragY: 20,
+                    maxSize: 60
+                });
+                // 粒子之间碰撞
+                this.physics.add.collider(this.particleGroup, this.particleGroup);
+
+                // ---- 闪屏覆盖层 ----
+                this.flashOverlay = this.add.rectangle(W / 2, H / 2, W, H, 0x00ff00, 0)
+                    .setDepth(100)
+                    .setScrollFactor(0);
+
+                // ---- 分数 ----
+                this.scoreText = this.add.text(24, 20, '0', {
+                    fontSize: '42px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setDepth(50);
+
+                // 分数标签
+                this.add.text(24, 62, '得分', {
+                    fontSize: '15px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: 'rgba(255,255,255,0.5)',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setDepth(50);
+
+                // ---- 生命值 (使用心形符号) ----
+                this.livesText = this.add.text(W - 24, 20, '❤️'.repeat(this.lives), {
+                    fontSize: '32px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ff6b6b',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                }).setOrigin(1, 0).setDepth(50);
+
+                // 生命标签
+                this.add.text(W - 24, 60, '生命', {
+                    fontSize: '15px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: 'rgba(255,255,255,0.5)',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(1, 0).setDepth(50);
+
+                // ---- 倒计时 / 游戏结束文字 ----
+                this.centerText = this.add.text(W / 2, H / 2 - 20, '', {
+                    fontSize: '90px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 8
+                }).setOrigin(0.5).setDepth(60);
+
+                // ---- 连击提示 ----
+                this.comboText = this.add.text(W / 2, H / 2 + 70, '', {
+                    fontSize: '30px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ffd700',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setOrigin(0.5).setDepth(60).setAlpha(0);
+
+                // ---- 游戏结束副标题 ----
+                this.subText = this.add.text(W / 2, H / 2 + 50, '', {
+                    fontSize: '22px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#aaaaff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                }).setOrigin(0.5).setDepth(60).setAlpha(0);
+
+                // ---- 目标容器（用于视觉分组） ----
+                this.targetContainer = this.add.container(0, 0).setDepth(30);
+
+                // ---- 虚拟按钮 (手机触控) ----
+                this.createVirtualButtons(W, H);
+
+                // ---- 键盘控制 ----
+                this.setupKeyboard();
+
+                // ---- 目标交互（全局点击） ----
+                this.input.on('pointerdown', (pointer) => {
+                    // 如果点击在虚拟按钮上，由按钮处理
+                    if (this.btnA && this.btnA.getBounds().contains(pointer.x, pointer.y)) return;
+                    if (this.btnB && this.btnB.getBounds().contains(pointer.x, pointer.y)) return;
+                    // 否则尝试点击目标
+                    this.handleClickTarget(pointer);
+                });
+
+                // ---- 初始化状态钩子 ----
+                this.updateStateHook();
+
+                // ---- 启动倒计时 ----
+                this.startCountdown();
+            }
+
+            // ============================================================
+            // 创建虚拟按钮
+            // ============================================================
+            createVirtualButtons(W, H) {
+                const btnW = 70;
+                const btnH = 56;
+                const btnY = H - 50;
+                const gap = 30;
+                const totalW = btnW * 2 + gap;
+                const startX = (W - totalW) / 2;
+
+                // A 按钮 (J)
+                const ax = startX + btnW / 2;
+                this.btnA = this.add.rectangle(ax, btnY, btnW, btnH, 0x445599, 0.70)
+                    .setStrokeStyle(2, 0x88bbff)
+                    .setDepth(200)
+                    .setInteractive({ useHandCursor: false })
+                    .on('pointerdown', () => {
+                        if (this.state === 'playing' && this.target && this.target.active) {
+                            this.onTargetClicked(this.target);
+                        } else if (this.state === 'gameover') {
+                            this.resetGame();
+                        }
+                    })
+                    .on('pointerover', () => this.btnA.setFillStyle(0x5577bb, 0.85))
+                    .on('pointerout', () => this.btnA.setFillStyle(0x445599, 0.70));
+                this.btnAText = this.add.text(ax, btnY, 'A', {
+                    fontSize: '26px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(201);
+
+                // A 按钮小提示
+                this.add.text(ax, btnY + 24, 'J', {
+                    fontSize: '11px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: 'rgba(255,255,255,0.5)',
+                    stroke: '#000000',
+                    strokeThickness: 1
+                }).setOrigin(0.5).setDepth(201);
+
+                // B 按钮 (K)
+                const bx = startX + btnW + gap + btnW / 2;
+                this.btnB = this.add.rectangle(bx, btnY, btnW, btnH, 0x995544, 0.70)
+                    .setStrokeStyle(2, 0xffaa88)
+                    .setDepth(200)
+                    .setInteractive({ useHandCursor: false })
+                    .on('pointerdown', () => {
+                        if (this.state === 'gameover' || this.state === 'playing') {
+                            this.resetGame();
+                        }
+                    })
+                    .on('pointerover', () => this.btnB.setFillStyle(0xbb6655, 0.85))
+                    .on('pointerout', () => this.btnB.setFillStyle(0x995544, 0.70));
+                this.btnBText = this.add.text(bx, btnY, 'B', {
+                    fontSize: '26px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(201);
+
+                // B 按钮小提示
+                this.add.text(bx, btnY + 24, 'K', {
+                    fontSize: '11px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: 'rgba(255,255,255,0.5)',
+                    stroke: '#000000',
+                    strokeThickness: 1
+                }).setOrigin(0.5).setDepth(201);
+            }
+
+            // ============================================================
+            // 键盘控制
+            // ============================================================
+            setupKeyboard() {
+                // J -> A 按钮功能
+                this.input.keyboard.on('keydown-J', () => {
+                    if (this.state === 'playing' && this.target && this.target.active) {
+                        this.onTargetClicked(this.target);
+                    } else if (this.state === 'gameover') {
+                        this.resetGame();
+                    }
+                });
+                // K -> B 按钮功能
+                this.input.keyboard.on('keydown-K', () => {
+                    if (this.state === 'gameover' || this.state === 'playing') {
+                        this.resetGame();
+                    }
+                });
+                // 空格 -> 重置
+                this.input.keyboard.on('keydown-SPACE', () => {
+                    if (this.state === 'gameover') {
+                        this.resetGame();
+                    } else if (this.state === 'countdown') {
+                        // 倒计时中不可重置，但可以忽略
+                    }
+                });
+                // ESC -> 重置（类似B按钮）
+                this.input.keyboard.on('keydown-ESC', () => {
+                    if (this.state === 'gameover' || this.state === 'playing') {
+                        this.resetGame();
+                    }
+                });
+                // 方向键下 / 上 也可作为备用
+            }
+
+            // ============================================================
+            // 更新状态钩子 window.__gameState
+            // ============================================================
+            updateStateHook() {
+                if (!window.__gameState) {
+                    window.__gameState = {};
+                }
+                window.__gameState.score = this.score;
+                window.__gameState.lives = this.lives;
+                window.__gameState.maxLives = this.maxLives;
+                window.__gameState.phase = this.state;
+                window.__gameState.consecutiveHits = this.consecutiveHits;
+                window.__gameState.targetInterval = this.targetInterval;
+                window.__gameState.targetDuration = this.targetDuration;
+            }
+
+            // ============================================================
+            // 倒计时
+            // ============================================================
+            startCountdown() {
+                this.state = 'countdown';
+                this.countdownValue = 3;
+                this.centerText.setAlpha(1);
+                this.subText.setAlpha(0);
+                this.comboText.setAlpha(0);
+                this.centerText.setText('3');
+                this.updateStateHook();
+
+                // 清除可能残留的定时器
+                if (this.spawnTimer) { this.spawnTimer.remove();
+                    this.spawnTimer = null; }
+                if (this.targetTimer) { this.targetTimer.remove();
+                    this.targetTimer = null; }
+
+                const countdownEvent = this.time.addEvent({
+                    delay: 800,
+                    repeat: 3,
+                    callback: () => {
+                        if (this.countdownValue > 1) {
+                            this.countdownValue--;
+                            this.centerText.setText(String(this.countdownValue));
+                            playCountdownSound();
+                            // 加一点缩放动画
+                            this.tweens.add({
+                                targets: this.centerText,
+                                scaleX: 1.25,
+                                scaleY: 1.25,
+                                duration: 100,
+                                yoyo: true,
+                                ease: 'Quad.easeOut'
+                            });
+                        } else {
+                            // 倒计时结束
+                            this.centerText.setText('开始！');
+                            playCountdownSound();
+                            this.tweens.add({
+                                targets: this.centerText,
+                                alpha: 0,
+                                scaleX: 1.5,
+                                scaleY: 1.5,
+                                duration: 400,
+                                delay: 300,
+                                ease: 'Quad.easeOut',
+                                onComplete: () => {
+                                    this.centerText.setAlpha(0);
+                                    this.centerText.setScale(1);
+                                    this.startPlaying();
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+
+            // ============================================================
+            // 开始游戏
+            // ============================================================
+            startPlaying() {
+                this.state = 'playing';
+                this.isGameOverHandled = false;
+                this.updateStateHook();
+                this.scheduleNextTarget();
+            }
+
+            // ============================================================
+            // 调度下一个目标
+            // ============================================================
+            scheduleNextTarget() {
+                if (this.state !== 'playing') return;
+                // 先清除旧的定时器
+                if (this.spawnTimer) { this.spawnTimer.remove();
+                    this.spawnTimer = null; }
+
+                // 随机间隔 0.7 ~ 1.3 * targetInterval
+                const minDelay = Math.max(0.3, this.targetInterval * 0.7);
+                const maxDelay = this.targetInterval * 1.3;
+                const delay = minDelay + Math.random() * (maxDelay - minDelay);
+
+                this.spawnTimer = this.time.addEvent({
+                    delay: delay * 1000,
+                    callback: () => {
+                        this.spawnTarget();
+                    }
+                });
+            }
+
+            // ============================================================
+            // 生成目标
+            // ============================================================
+            spawnTarget() {
+                if (this.state !== 'playing') return;
+                // 如果已有目标且还活着，不生成新的（避免重叠）
+                if (this.target && this.target.active) return;
+
+                const W = this.scale.width;
+                const H = this.scale.height;
+                const r = this.targetRadius;
+                const margin = 60;
+                // 随机位置，避开底部按钮区域
+                const x = Phaser.Math.Between(margin, W - margin);
+                const y = Phaser.Math.Between(margin + 40, H - margin - 80);
+
+                // 创建目标圆形
+                const circle = this.add.circle(x, y, r, 0xff4444)
+                    .setStrokeStyle(4, 0xff8888)
+                    .setDepth(35)
+                    .setInteractive({ useHandCursor: true })
+                    .on('pointerdown', (pointer) => {
+                        // 直接点击目标
+                        this.onTargetClicked(circle);
+                    });
+
+                // 添加发光效果（外圈）
+                const glow = this.add.circle(x, y, r + 8, 0xff4444, 0.15)
+                    .setDepth(34);
+                circle.setData('glow', glow);
+
+                // 添加一个内圈高光
+                const highlight = this.add.circle(x - r * 0.2, y - r * 0.2, r * 0.35, 0xffffff, 0.25)
+                    .setDepth(36);
+                circle.setData('highlight', highlight);
+
+                // 入场动画
+                circle.setScale(0);
+                glow.setScale(0);
+                highlight.setScale(0);
+                this.tweens.add({
+                    targets: [circle, glow, highlight],
+                    scaleX: 1,
+                    scaleY: 1,
+                    duration: 200,
+                    ease: 'Back.easeOut'
+                });
+
+                this.target = circle;
+                this.targetContainer.add(circle);
+                this.targetContainer.add(glow);
+                this.targetContainer.add(highlight);
+
+                // 显示"点击我"的小提示
+                const tip = this.add.text(x, y - r - 18, '⚡', {
+                    fontSize: '20px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ffcc00',
+                    stroke: '#000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(36);
+                circle.setData('tip', tip);
+
+                // 设置定时器：目标消失
+                if (this.targetTimer) { this.targetTimer.remove();
+                    this.targetTimer = null; }
+                this.targetTimer = this.time.addEvent({
+                    delay: this.targetDuration * 1000,
+                    callback: () => {
+                        if (circle.active) {
+                            this.onTargetMissed(circle);
+                        }
+                    }
+                });
+
+                // 闪烁动画提示
+                this.tweens.add({
+                    targets: tip,
+                    y: y - r - 28,
+                    alpha: 0.3,
+                    duration: 400,
+                    yoyo: true,
+                    repeat: 1,
+                    ease: 'Sine.easeInOut'
+                });
+            }
+
+            // ============================================================
+            // 目标被点击（得分）
+            // ============================================================
+            onTargetClicked(circle) {
+                if (!circle || !circle.active) return;
+                if (this.state !== 'playing') return;
+
+                // 取消消失定时器
+                if (this.targetTimer) {
+                    this.targetTimer.remove();
+                    this.targetTimer = null;
+                }
+
+                this.hitsOnTarget++;
+                this.consecutiveHits++;
+                this.score++;
+
+                // 连击奖励：每5连击额外加分
+                let bonus = 0;
+                if (this.consecutiveHits > 0 && this.consecutiveHits % 5 === 0) {
+                    bonus = Math.floor(this.consecutiveHits / 5);
+                    this.score += bonus;
+                    playRewardSound();
+                    // 显示连击奖励
+                    this.showComboText(`🔥 连击 ×${this.consecutiveHits} +${bonus}`);
+                } else {
+                    playHitSound();
+                }
+
+                // 速度调整：每10分加速
+                this.scoreSinceLastSpeedUp++;
+                if (this.scoreSinceLastSpeedUp >= 10) {
+                    this.scoreSinceLastSpeedUp = 0;
+                    this.targetInterval = Math.max(0.4, this.targetInterval - 0.05);
+                    this.targetDuration = Math.max(0.5, this.targetDuration - 0.05);
+                }
+
+                // 更新UI
+                this.updateUI();
+
+                // 闪屏效果
+                this.flashScreen();
+
+                // 生成粒子效果
+                this.spawnParticles(circle.x, circle.y, 0xff6666, 12);
+
+                // 得分弹出文字
+                const bonusStr = bonus > 0 ? `+${1 + bonus}` : '+1';
+                const popup = this.add.text(circle.x, circle.y - 10, bonusStr, {
+                    fontSize: '36px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ffdd44',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setOrigin(0.5).setDepth(80);
+
+                this.tweens.add({
+                    targets: popup,
+                    y: popup.y - 60,
+                    alpha: 0,
+                    duration: 600,
+                    ease: 'Quad.easeOut',
+                    onComplete: () => popup.destroy()
+                });
+
+                // 销毁目标
+                this.destroyTarget(circle);
+
+                // 调度下一个目标
+                this.scheduleNextTarget();
+                this.updateStateHook();
+            }
+
+            // ============================================================
+            // 目标消失（未点击，扣生命）
+            // ============================================================
+            onTargetMissed(circle) {
+                if (!circle || !circle.active) return;
+                if (this.state !== 'playing') return;
+
+                this.lives--;
+                this.consecutiveHits = 0;
+                this.lostLivesSinceLastSpeedDown++;
+
+                // 速度调整：每丢3命减速
+                if (this.lostLivesSinceLastSpeedDown >= 3) {
+                    this.lostLivesSinceLastSpeedDown = 0;
+                    this.targetInterval = Math.min(2.0, this.targetInterval + 0.1);
+                    this.targetDuration = Math.min(2.5, this.targetDuration + 0.1);
+                }
+
+                playMissSound();
+
+                // 显示miss文字
+                const missText = this.add.text(circle.x, circle.y - 10, 'Miss!', {
+                    fontSize: '30px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: '#ff4444',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                }).setOrigin(0.5).setDepth(80);
+
+                this.tweens.add({
+                    targets: missText,
+                    y: missText.y - 50,
+                    alpha: 0,
+                    duration: 500,
+                    ease: 'Quad.easeOut',
+                    onComplete: () => missText.destroy()
+                });
+
+                // 红色闪屏
+                this.flashScreen(0xff0000, 0.15);
+
+                // 生成灰色粒子
+                this.spawnParticles(circle.x, circle.y, 0x888888, 6);
+
+                this.destroyTarget(circle);
+
+                this.updateUI();
+                this.updateStateHook();
+
+                // 检查是否游戏结束
+                if (this.lives <= 0) {
+                    this.gameOver();
+                } else {
+                    this.scheduleNextTarget();
+                }
+            }
+
+            // ============================================================
+            // 销毁目标
+            // ============================================================
+            destroyTarget(circle) {
+                if (!circle) return;
+                const glow = circle.getData('glow');
+                const highlight = circle.getData('highlight');
+                const tip = circle.getData('tip');
+                if (glow && glow.active) glow.destroy();
+                if (highlight && highlight.active) highlight.destroy();
+                if (tip && tip.active) tip.destroy();
+                if (circle.active) {
+                    circle.removeInteractive();
+                    circle.destroy();
+                }
+                if (this.target === circle) {
+                    this.target = null;
+                }
+                if (this.targetTimer) {
+                    this.targetTimer.remove();
+                    this.targetTimer = null;
+                }
+            }
+
+            // ============================================================
+            // 游戏结束
+            // ============================================================
+            gameOver() {
+                if (this.isGameOverHandled) return;
+                this.isGameOverHandled = true;
+                this.state = 'gameover';
+
+                // 清除所有定时器
+                if (this.spawnTimer) { this.spawnTimer.remove();
+                    this.spawnTimer = null; }
+                if (this.targetTimer) { this.targetTimer.remove();
+                    this.targetTimer = null; }
+
+                // 销毁当前目标
+                if (this.target && this.target.active) {
+                    this.destroyTarget(this.target);
+                }
+
+                playGameOverSound();
+
+                // 显示游戏结束
+                this.centerText.setAlpha(1).setScale(1);
+                this.centerText.setText('游戏结束');
+                this.centerText.setColor('#ff6b6b');
+
+                this.subText.setAlpha(1);
+                this.subText.setText(`最终得分: ${this.score}  最高连击: ${this.getMaxCombo()}`);
+
+                // 显示重置提示
+                const resetHint = this.add.text(this.scale.width / 2, this.scale.height / 2 + 110, '按 空格 / A / B 重新开始', {
+                    fontSize: '18px',
+                    fontFamily: 'Arial, sans-serif',
+                    color: 'rgba(255,255,255,0.6)',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }).setOrigin(0.5).setDepth(60);
+
+                this.resetHint = resetHint;
+
+                // 闪烁重置提示
+                this.tweens.add({
+                    targets: resetHint,
+                    alpha: 0.3,
+                    duration: 800,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+
+                // 连击归零
+                this.consecutiveHits = 0;
+                this.comboText.setAlpha(0);
+
+                this.updateUI();
+                this.updateStateHook();
+            }
+
+            // ============================================================
+            // 获取最高连击（近似）
+            // ============================================================
+            getMaxCombo() {
+                // 由于我们没有记录历史最高，用当前连击近似
+                return this.consecutiveHits;
+            }
+
+            // ============================================================
+            // 重置游戏
+            // ============================================================
+            resetGame() {
+                // 清除旧的提示
+                if (this.resetHint) {
+                    this.resetHint.destroy();
+                    this.resetHint = null;
+                }
+
+                // 重置状态
+                this.score = 0;
+                this.lives = this.maxLives;
+                this.consecutiveHits = 0;
+                this.lostLivesSinceLastSpeedDown = 0;
+                this.scoreSinceLastSpeedUp = 0;
+                this.targetInterval = 1.0;
+                this.targetDuration = 1.2;
+                this.isGameOverHandled = false;
+                this.hitsOnTarget = 0;
+                this.totalClicks = 0;
+
+                // 清除定时器
+                if (this.spawnTimer) { this.spawnTimer.remove();
+                    this.spawnTimer = null; }
+                if (this.targetTimer) { this.targetTimer.remove();
+                    this.targetTimer = null; }
+
+                // 销毁当前目标
+                if (this.target && this.target.active) {
+                    this.destroyTarget(this.target);
+                }
+
+                // 清除所有粒子
+                this.particleGroup.clear(true, true);
+
+                // 清除连击显示
+                this.comboText.setAlpha(0);
+
+                // 重置UI
+                this.centerText.setAlpha(1).setScale(1);
+                this.centerText.setColor('#ffffff');
+                this.subText.setAlpha(0);
+                this.updateUI();
+
+                // 重新倒计时
+                this.startCountdown();
+                this.updateStateHook();
+            }
+
+            // ============================================================
+            // 显示连击文字
+            // ============================================================
+            showComboText(text) {
+                this.comboText.setText(text);
+                this.comboText.setAlpha(1).setScale(0.8);
+                this.tweens.add({
+                    targets: this.comboText,
+                    scaleX: 1.2,
+                    scaleY: 1.2,
+                    alpha: 1,
+                    duration: 200,
+                    ease: 'Quad.easeOut',
+                    yoyo: true,
+                    onComplete: () => {
+                        this.tweens.add({
+                            targets: this.comboText,
+                            alpha: 0,
+                            duration: 800,
+                            delay: 400,
+                            ease: 'Quad.easeIn'
+                        });
+                    }
+                });
+            }
+
+            // ============================================================
+            // 闪屏效果
+            // ============================================================
+            flashScreen(color = 0x00ff00, alpha = 0.2) {
+                this.flashOverlay.setFillStyle(color, alpha);
+                this.tweens.add({
+                    targets: this.flashOverlay,
+                    alpha: 0,
+                    duration: 150,
+                    ease: 'Quad.easeOut',
+                    onComplete: () => {
+                        this.flashOverlay.setFillStyle(0x00ff00, 0);
+                        this.flashOverlay.setAlpha(0);
+                    }
+                });
+            }
+
+            // ============================================================
+            // 生成粒子（物理碰撞）
+            // ============================================================
+            spawnParticles(x, y, color, count = 10) {
+                for (let i = 0; i < count; i++) {
+                    const size = Phaser.Math.Between(3, 7);
+                    const pColor = Phaser.Math.Between(0, 1) ? color : 0xffffff;
+                    const particle = this.add.circle(x, y, size, pColor)
+                        .setDepth(25);
+                    this.physics.add.existing(particle);
+                    const body = particle.body;
+                    body.setCollideWorldBounds(true);
+                    body.setBounce(0.7 + Math.random() * 0.3);
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 120 + Math.random() * 200;
+                    body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed - 80);
+                    body.setDrag(40 + Math.random() * 30);
+                    body.setGravityY(120);
+                    this.particleGroup.add(particle);
+
+                    // 自动消失
+                    this.time.addEvent({
+                        delay: 800 + Math.random() * 600,
+                        callback: () => {
+                            if (particle.active) {
+                                this.tweens.add({
+                                    targets: particle,
+                                    alpha: 0,
+                                    scaleX: 0.3,
+                                    scaleY: 0.3,
+                                    duration: 200,
+                                    ease: 'Quad.easeOut',
+                                    onComplete: () => {
+                                        if (particle.active) {
+                                            this.particleGroup.remove(particle);
+                                            particle.destroy();
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+
+            // ============================================================
+            // 更新UI
+            // ============================================================
+            updateUI() {
+                this.scoreText.setText(String(this.score));
+                // 生命值用心形显示
+                let hearts = '';
+                for (let i = 0; i < this.maxLives; i++) {
+                    hearts += i < this.lives ? '❤️' : '🖤';
+                }
+                this.livesText.setText(hearts);
+            }
+
+            // ============================================================
+            // 全局点击处理（点击空白区域）
+            // ============================================================
+            handleClickTarget(pointer) {
+                if (this.state === 'gameover') {
+                    // 点击空白区域也可以重置（方便手机操作）
+                    this.resetGame();
+                    return;
+                }
+                if (this.state === 'playing') {
+                    // 如果点击了空白区域，不扣生命（只扣生命当目标消失时）
+                    // 但记录点击
+                    this.totalClicks++;
+                }
+            }
+
+            // ============================================================
+            // Update 循环
+            // ============================================================
+            update(time, delta) {
+                // 更新状态钩子（定时刷新）
+                if (Math.floor(time / 200) !== Math.floor((time - delta) / 200)) {
+                    this.updateStateHook();
+                }
+            }
+        }
+
+        // ============================================================
+        // Phaser 游戏配置
+        // ============================================================
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: 800,
+            height: 600,
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                min: {
+                    width: 400,
+                    height: 300
+                },
+                max: {
+                    width: 1600,
+                    height: 1200
+                }
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            },
+            scene: [GameScene],
+            input: {
+                activePointers: 3,
+                touch: true
+            },
+            backgroundColor: '#1a1a2e',
+            render: {
+                pixelArt: false,
+                antialias: true
+            }
+        };
+
+        // ============================================================
+        // 启动游戏
+        // ============================================================
+        const game = new Phaser.Game(config);
+
+        // ============================================================
+        // 外部状态钩子（实时更新）
+        // ============================================================
+        window.__gameState = {
+            score: 0,
+            lives: 5,
+            maxLives: 5,
+            phase: 'countdown',
+            consecutiveHits: 0,
+            targetInterval: 1.0,
+            targetDuration: 1.2,
+            get isPlaying() { return this.phase === 'playing'; },
+            get isGameOver() { return this.phase === 'gameover'; },
+        };
+
+        // 监听游戏场景事件来更新钩子
+        game.events.on('step', () => {
+            const scene = game.scene.getScene('GameScene');
+            if (scene && scene.scene.isActive()) {
+                window.__gameState.score = scene.score;
+                window.__gameState.lives = scene.lives;
+                window.__gameState.phase = scene.state;
+                window.__gameState.consecutiveHits = scene.consecutiveHits;
+                window.__gameState.targetInterval = scene.targetInterval;
+                window.__gameState.targetDuration = scene.targetDuration;
+            }
+        });
+
+        console.log('🎯 反应测试小游戏已启动！');
+        console.log('📖 操作指南: J/A = 点击目标 | K/B/ESC = 重置 | 空格 = 重新开始');
+    </script>
+</body>
+</html>

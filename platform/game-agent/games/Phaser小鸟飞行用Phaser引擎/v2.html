@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Phaser小鸟飞行</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js">
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            max-width: 800px;
+            max-height: 600px;
+        }
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <script>
+        // ============================================================
+        //  Phaser 小鸟飞行 - 完整修复版
+        //  引擎: Phaser 3.87.0 (Arcade Physics)
+        //  设计: 横版卷轴无尽跑酷
+        // ============================================================
+
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 600;
+
+        // ---------- 物理常量 ----------
+        const GRAVITY = 800;
+        const FLAP_VELOCITY = -350;
+        const MAX_FALL_SPEED = 600;
+        const BASE_SCROLL_SPEED = 200;
+        const PIPE_WIDTH = 60;
+        const PIPE_GAP_HEIGHT_MIN = 150;
+        const PIPE_GAP_HEIGHT_MAX = 180;
+        const PIPE_CENTER_Y_MIN = 180;
+        const PIPE_CENTER_Y_MAX = 420;
+        const PIPE_SPACING_MIN = 250;
+        const PIPE_SPACING_MAX = 350;
+        const GROUND_Y = 550;
+        const GROUND_VISUAL_Y = 520;
+        const BIRD_X = 150;
+        const BIRD_INIT_Y = 300;
+        const BIRD_WIDTH = 40;
+        const BIRD_HEIGHT = 30;
+        const BIRD_BODY_WIDTH = 36;
+        const BIRD_BODY_HEIGHT = 26;
+
+        // ---------- 难度递增 ----------
+        function getScrollSpeed(score) {
+            if (score <= 10) return 200;
+            if (score <= 20) return 220;
+            if (score <= 40) return 240;
+            if (score <= 60) return 260;
+            return Math.min(280, 300);
+        }
+
+        // ============================================================
+        //  主场景
+        // ============================================================
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'GameScene' });
+                this.score = 0;
+                this.state = 'waiting'; // waiting | playing | gameover
+                this.pipePairs = [];
+                this.nextSpawnX = GAME_WIDTH + 100;
+                this.currentSpeed = BASE_SCROLL_SPEED;
+                this.birdTween = null;
+                this.pipeSpawnTimer = 0;
+                this.bestScore = parseInt(localStorage.getItem('birdBestScore') || '0');
+            }
+
+            // ----------------------------------------
+            //  create
+            // ----------------------------------------
+            create() {
+                // ---- 物理世界 ----
+                this.physics.world.gravity.y = GRAVITY;
+
+                // ---- 背景 ----
+                this.drawBackground();
+
+                // ---- 地面 (视觉) ----
+                this.groundVisual = this.add.rectangle(
+                    GAME_WIDTH / 2,
+                    GROUND_VISUAL_Y + (GAME_HEIGHT - GROUND_VISUAL_Y) / 2,
+                    GAME_WIDTH,
+                    GAME_HEIGHT - GROUND_VISUAL_Y,
+                    0x8B5E3C
+                );
+                this.groundVisual.setDepth(1);
+
+                this.groundLine = this.add.rectangle(
+                    GAME_WIDTH / 2,
+                    GROUND_VISUAL_Y,
+                    GAME_WIDTH,
+                    4,
+                    0x6B3E1C
+                );
+                this.groundLine.setDepth(1);
+
+                // ---- 管道组 (物理) ----
+                this.pipeGroup = this.physics.add.group({
+                    allowGravity: false,
+                    immovable: true
+                });
+
+                // ---- 小鸟 (物理) ----
+                this.bird = this.physics.add.sprite(BIRD_X, BIRD_INIT_Y, '__DEFAULT');
+                this.bird.setDisplaySize(BIRD_WIDTH, BIRD_HEIGHT);
+                this.bird.body.setSize(BIRD_BODY_WIDTH, BIRD_BODY_HEIGHT);
+                this.bird.body.setMaxVelocityY(MAX_FALL_SPEED);
+                this.bird.body.setAllowGravity(false);
+                this.bird.setDepth(10);
+
+                // 绘制小鸟纹理
+                this.drawBirdTexture();
+
+                // ---- 碰撞: 小鸟 vs 管道 ----
+                this.physics.add.overlap(
+                    this.bird,
+                    this.pipeGroup,
+                    this.onHitPipe,
+                    null,
+                    this
+                );
+
+                // ---- UI 文字 ----
+                this.scoreText = this.add.text(40, 40, '得分：0', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '32px',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                });
+                this.scoreText.setDepth(20);
+
+                this.bestScoreText = this.add.text(GAME_WIDTH - 40, 40, '最高：' + this.bestScore, {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '24px',
+                    color: '#ffd700',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 3
+                });
+                this.bestScoreText.setOrigin(1, 0);
+                this.bestScoreText.setDepth(20);
+
+                this.startText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, '点击或按空格键开始', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '28px',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 5
+                });
+                this.startText.setOrigin(0.5);
+                this.startText.setDepth(20);
+
+                // ---- 游戏结束 UI (初始隐藏) ----
+                this.gameOverGroup = this.add.group();
+
+                this.gameOverBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 400, 240, 0x000000, 0.7);
+                this.gameOverBg.setDepth(25);
+                this.gameOverGroup.add(this.gameOverBg);
+
+                this.gameOverText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, '游戏结束', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '40px',
+                    color: '#ff4444',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 5
+                });
+                this.gameOverText.setOrigin(0.5);
+                this.gameOverText.setDepth(26);
+                this.gameOverGroup.add(this.gameOverText);
+
+                this.finalScoreText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '得分：0', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '30px',
+                    color: '#ffffff',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                });
+                this.finalScoreText.setOrigin(0.5);
+                this.finalScoreText.setDepth(26);
+                this.gameOverGroup.add(this.finalScoreText);
+
+                this.restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 60, '点击或按空格键重新开始', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '22px',
+                    color: '#00ff88',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 4
+                });
+                this.restartText.setOrigin(0.5);
+                this.restartText.setDepth(26);
+                this.gameOverGroup.add(this.restartText);
+
+                // 隐藏游戏结束UI
+                this.gameOverGroup.setVisible(false);
+
+                // ---- 输入 ----
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+                this.input.on('pointerdown', () => {
+                    if (this.state === 'waiting') {
+                        this.startGame();
+                    } else if (this.state === 'playing') {
+                        this.flap();
+                    } else if (this.state === 'gameover') {
+                        this.restartGame();
+                    }
+                });
+
+                this.spaceKey.on('down', () => {
+                    if (this.state === 'waiting') {
+                        this.startGame();
+                    } else if (this.state === 'playing') {
+                        this.flap();
+                    } else if (this.state === 'gameover') {
+                        this.restartGame();
+                    }
+                });
+
+                // 上箭头也可以
+                this.input.keyboard.on('keydown-UP', () => {
+                    if (this.state === 'waiting') {
+                        this.startGame();
+                    } else if (this.state === 'playing') {
+                        this.flap();
+                    } else if (this.state === 'gameover') {
+                        this.restartGame();
+                    }
+                });
+
+                // ---- 等待动画: 小鸟上下浮动 ----
+                this.idleTween = this.tweens.add({
+                    targets: this.bird,
+                    y: this.bird.y - 20,
+                    duration: 600,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+
+                // ---- 初始化管道生成计时器 ----
+                this.pipeSpawnTimer = 1500; // 1.5秒后开始生成
+            }
+
+            // ----------------------------------------
+            //  绘制背景
+            // ----------------------------------------
+            drawBackground() {
+                // 天空渐变
+                const skyGraphics = this.add.graphics();
+                skyGraphics.setDepth(0);
+
+                // 用多个矩形模拟渐变
+                const colors = [
+                    0x4DC9F6, 0x5ECEF7, 0x6FD3F8, 0x80D8F9, 0x91DDFA,
+                    0xA2E2FB, 0xB3E7FC, 0xC4ECFD, 0xD5F1FE, 0xE6F6FF
+                ];
+                const stripHeight = GAME_HEIGHT / colors.length;
+                colors.forEach((color, i) => {
+                    skyGraphics.fillStyle(color, 1);
+                    skyGraphics.fillRect(0, i * stripHeight, GAME_WIDTH, stripHeight + 1);
+                });
+
+                // 云朵装饰
+                const cloudGraphics = this.add.graphics();
+                cloudGraphics.setDepth(0);
+                cloudGraphics.fillStyle(0xffffff, 0.8);
+
+                const drawCloud = (g, cx, cy, scale) => {
+                    const s = scale || 1;
+                    g.fillCircle(cx, cy, 30 * s);
+                    g.fillCircle(cx + 35 * s, cy - 10 * s, 25 * s);
+                    g.fillCircle(cx + 70 * s, cy, 28 * s);
+                    g.fillCircle(cx + 35 * s, cy + 8 * s, 22 * s);
+                };
+
+                drawCloud(cloudGraphics, 120, 80, 1.2);
+                drawCloud(cloudGraphics, 350, 50, 0.9);
+                drawCloud(cloudGraphics, 600, 100, 1.0);
+                drawCloud(cloudGraphics, 750, 60, 0.8);
+                drawCloud(cloudGraphics, 200, 150, 0.7);
+                drawCloud(cloudGraphics, 500, 130, 0.6);
+            }
+
+            // ----------------------------------------
+            //  绘制小鸟纹理
+            // ----------------------------------------
+            drawBirdTexture() {
+                // 检查是否已经有纹理
+                if (this.textures.exists('bird_texture')) {
+                    this.bird.setTexture('bird_texture');
+                    return;
+                }
+
+                const g = this.add.graphics();
+
+                // 身体 (黄色)
+                g.fillStyle(0xF5C842, 1);
+                g.fillEllipse(20, 15, 36, 26);
+
+                // 翅膀
+                g.fillStyle(0xE8A820, 1);
+                g.fillEllipse(12, 18, 20, 12);
+
+                // 眼睛
+                g.fillStyle(0xFFFFFF, 1);
+                g.fillCircle(28, 10, 6);
+                g.fillStyle(0x000000, 1);
+                g.fillCircle(30, 10, 3);
+
+                // 嘴巴
+                g.fillStyle(0xFF6B35, 1);
+                g.fillTriangle(36, 14, 44, 16, 36, 20);
+
+                // 渲染到纹理
+                g.generateTexture('bird_texture', 50, 34);
+                g.destroy();
+
+                this.bird.setTexture('bird_texture');
+                this.bird.setDisplaySize(BIRD_WIDTH, BIRD_HEIGHT);
+            }
+
+            // ----------------------------------------
+            //  开始游戏
+            // ----------------------------------------
+            startGame() {
+                if (this.state === 'playing' || this.state === 'gameover') return;
+
+                this.state = 'playing';
+                this.startText.setVisible(false);
+                this.bird.body.setAllowGravity(true);
+                this.bird.body.setGravityY(GRAVITY);
+
+                // 停止浮动动画
+                if (this.idleTween) {
+                    this.idleTween.stop();
+                    this.idleTween = null;
+                }
+
+                // 给一个初始向上的速度
+                this.bird.body.setVelocityY(FLAP_VELOCITY);
+
+                // 开始生成管道
+                this.pipeSpawnTimer = 1000;
+                this.nextSpawnX = GAME_WIDTH + 100;
+            }
+
+            // ----------------------------------------
+            //  拍翅膀 (flap)
+            // ----------------------------------------
+            flap() {
+                if (this.state !== 'playing') return;
+                this.bird.body.setVelocityY(FLAP_VELOCITY);
+
+                // 拍翅动画: 轻微旋转
+                this.tweens.add({
+                    targets: this.bird,
+                    angle: -20,
+                    duration: 100,
+                    ease: 'Quad.easeOut',
+                    onComplete: () => {
+                        this.tweens.add({
+                            targets: this.bird,
+                            angle: 0,
+                            duration: 200,
+                            ease: 'Quad.easeIn'
+                        });
+                    }
+                });
+            }
+
+            // ----------------------------------------
+            //  生成管道对
+            // ----------------------------------------
+            spawnPipePair() {
+                const centerY = Phaser.Math.Between(PIPE_CENTER_Y_MIN, PIPE_CENTER_Y_MAX);
+                const gapHeight = Phaser.Math.Between(PIPE_GAP_HEIGHT_MIN, PIPE_GAP_HEIGHT_MAX);
+
+                const topPipeHeight = centerY - gapHeight / 2;
+                const bottomPipeY = centerY + gapHeight / 2;
+                const bottomPipeHeight = GAME_HEIGHT - bottomPipeY - (GAME_HEIGHT - GROUND_VISUAL_Y);
+
+                // 上管道
+                const topPipe = this.add.rectangle(
+                    this.nextSpawnX,
+                    topPipeHeight / 2,
+                    PIPE_WIDTH,
+                    topPipeHeight,
+                    0x4CAF50
+                );
+                topPipe.setDepth(5);
+                this.physics.add.existing(topPipe, true);
+                topPipe.body.setImmovable(true);
+                topPipe.body.setAllowGravity(false);
+                this.pipeGroup.add(topPipe);
+
+                // 上管道边框
+                const topBorder = this.add.rectangle(
+                    this.nextSpawnX,
+                    topPipeHeight + 8,
+                    PIPE_WIDTH + 8,
+                    16,
+                    0x388E3C
+                );
+                topBorder.setDepth(6);
+                this.physics.add.existing(topBorder, true);
+                topBorder.body.setImmovable(true);
+                topBorder.body.setAllowGravity(false);
+                this.pipeGroup.add(topBorder);
+
+                // 下管道
+                const bottomPipe = this.add.rectangle(
+                    this.nextSpawnX,
+                    bottomPipeY + bottomPipeHeight / 2,
+                    PIPE_WIDTH,
+                    bottomPipeHeight,
+                    0x4CAF50
+                );
+                bottomPipe.setDepth(5);
+                this.physics.add.existing(bottomPipe, true);
+                bottomPipe.body.setImmovable(true);
+                bottomPipe.body.setAllowGravity(false);
+                this.pipeGroup.add(bottomPipe);
+
+                // 下管道边框
+                const bottomBorder = this.add.rectangle(
+                    this.nextSpawnX,
+                    bottomPipeY - 8,
+                    PIPE_WIDTH + 8,
+                    16,
+                    0x388E3C
+                );
+                bottomBorder.setDepth(6);
+                this.physics.add.existing(bottomBorder, true);
+                bottomBorder.body.setImmovable(true);
+                bottomBorder.body.setAllowGravity(false);
+                this.pipeGroup.add(bottomBorder);
+
+                // 存储管道对信息用于计分
+                this.pipePairs.push({
+                    top: topPipe,
+                    bottom: bottomPipe,
+                    topBorder: topBorder,
+                    bottomBorder: bottomBorder,
+                    scored: false,
+                    x: this.nextSpawnX,
+                    centerY: centerY
+                });
+
+                // 计算下一个生成位置
+                const spacing = Phaser.Math.Between(PIPE_SPACING_MIN, PIPE_SPACING_MAX);
+                this.nextSpawnX += spacing;
+            }
+
+            // ----------------------------------------
+            //  碰撞回调
+            // ----------------------------------------
+            onHitPipe() {
+                if (this.state !== 'playing') return;
+                this.gameOver();
+            }
+
+            // ----------------------------------------
+            //  游戏结束
+            // ----------------------------------------
+            gameOver() {
+                if (this.state === 'gameover') return;
+                this.state = 'gameover';
+
+                // 保存最高分
+                if (this.score > this.bestScore) {
+                    this.bestScore = this.score;
+                    localStorage.setItem('birdBestScore', this.bestScore.toString());
+                    this.bestScoreText.setText('最高：' + this.bestScore);
+                }
+
+                // 显示游戏结束UI
+                this.gameOverGroup.setVisible(true);
+                this.finalScoreText.setText('得分：' + this.score);
+
+                // 小鸟效果
+                this.bird.body.setVelocityY(0);
+                this.bird.body.setAllowGravity(false);
+                this.tweens.add({
+                    targets: this.bird,
+                    y: GAME_HEIGHT - 50,
+                    duration: 800,
+                    ease: 'Quad.easeIn'
+                });
+
+                // 停止管道
+                this.pipePairs.forEach(pair => {
+                    if (pair.top.body) {
+                        pair.top.body.setVelocityX(0);
+                        pair.topBorder.body.setVelocityX(0);
+                        pair.bottom.body.setVelocityX(0);
+                        pair.bottomBorder.body.setVelocityX(0);
+                    }
+                });
+            }
+
+            // ----------------------------------------
+            //  重新开始
+            // ----------------------------------------
+            restartGame() {
+                // 清除所有管道
+                this.pipePairs.forEach(pair => {
+                    pair.top.destroy();
+                    pair.topBorder.destroy();
+                    pair.bottom.destroy();
+                    pair.bottomBorder.destroy();
+                });
+                this.pipePairs = [];
+                this.pipeGroup.clear(true, true);
+
+                // 重置小鸟
+                this.bird.setPosition(BIRD_X, BIRD_INIT_Y);
+                this.bird.body.setVelocityY(0);
+                this.bird.body.setAllowGravity(false);
+                this.bird.setAngle(0);
+                this.bird.setVisible(true);
+
+                // 重置分数
+                this.score = 0;
+                this.scoreText.setText('得分：0');
+
+                // 重置状态
+                this.state = 'waiting';
+                this.nextSpawnX = GAME_WIDTH + 100;
+                this.pipeSpawnTimer = 1500;
+                this.currentSpeed = BASE_SCROLL_SPEED;
+
+                // 隐藏游戏结束UI
+                this.gameOverGroup.setVisible(false);
+
+                // 显示开始文字
+                this.startText.setVisible(true);
+
+                // 重新开始浮动动画
+                if (this.idleTween) {
+                    this.idleTween.stop();
+                }
+                this.idleTween = this.tweens.add({
+                    targets: this.bird,
+                    y: this.bird.y - 20,
+                    duration: 600,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1
+                });
+            }
+
+            // ----------------------------------------
+            //  update (每帧调用)
+            // ----------------------------------------
+            update(time, delta) {
+                if (this.state === 'gameover') return;
+
+                // ---- 等待状态 ----
+                if (this.state === 'waiting') {
+                    // 管道滚动（缓慢移动作为背景）
+                    this.updatePipes(delta, 60);
+                    return;
+                }
+
+                // ---- 游戏进行中 ----
+                if (this.state !== 'playing') return;
+
+                const speed = getScrollSpeed(this.score);
+                this.currentSpeed = speed;
+
+                // 更新管道位置
+                this.updatePipes(delta, speed);
+
+                // 生成新管道
+                this.pipeSpawnTimer -= delta;
+                if (this.pipeSpawnTimer <= 0) {
+                    this.spawnPipePair();
+                    this.pipeSpawnTimer = Phaser.Math.Between(1800, 2800);
+                }
+
+                // 计分检测
+                this.checkScore();
+
+                // 小鸟碰撞地面检测
+                if (this.bird.y >= GROUND_VISUAL_Y - BIRD_HEIGHT / 2) {
+                    if (this.state === 'playing') {
+                        this.gameOver();
+                    }
+                }
+
+                // 小鸟超出顶部限制
+                if (this.bird.y < 0) {
+                    this.bird.y = 0;
+                    this.bird.body.setVelocityY(0);
+                }
+
+                // 根据速度旋转小鸟
+                const vy = this.bird.body.velocity.y;
+                if (vy < 0) {
+                    // 上升时仰头
+                    this.bird.angle = Phaser.Math.Linear(this.bird.angle, -20, 0.05);
+                } else {
+                    // 下降时低头
+                    this.bird.angle = Phaser.Math.Linear(this.bird.angle, 30, 0.02);
+                }
+                // 限制角度
+                this.bird.angle = Phaser.Math.Clamp(this.bird.angle, -20, 70);
+            }
+
+            // ----------------------------------------
+            //  更新管道位置
+            // ----------------------------------------
+            updatePipes(delta, speed) {
+                const dx = -(speed * delta / 1000);
+
+                for (let i = this.pipePairs.length - 1; i >= 0; i--) {
+                    const pair = this.pipePairs[i];
+
+                    // 移动
+                    pair.x += dx;
+                    if (pair.top.body) {
+                        pair.top.body.position.x += dx;
+                        pair.topBorder.body.position.x += dx;
+                        pair.bottom.body.position.x += dx;
+                        pair.bottomBorder.body.position.x += dx;
+                    }
+
+                    // 更新实际位置
+                    pair.top.x = pair.x;
+                    pair.topBorder.x = pair.x;
+                    pair.bottom.x = pair.x;
+                    pair.bottomBorder.x = pair.x;
+
+                    // 移除屏幕外的管道
+                    if (pair.x < -PIPE_WIDTH * 2) {
+                        pair.top.destroy();
+                        pair.topBorder.destroy();
+                        pair.bottom.destroy();
+                        pair.bottomBorder.destroy();
+                        this.pipePairs.splice(i, 1);
+                    }
+                }
+            }
+
+            // ----------------------------------------
+            //  计分检测
+            // ----------------------------------------
+            checkScore() {
+                for (const pair of this.pipePairs) {
+                    if (!pair.scored && pair.x + PIPE_WIDTH / 2 < BIRD_X - BIRD_WIDTH / 2) {
+                        pair.scored = true;
+                        this.score++;
+                        this.scoreText.setText('得分：' + this.score);
+
+                        // 计分动画
+                        this.tweens.add({
+                            targets: this.scoreText,
+                            scaleX: 1.3,
+                            scaleY: 1.3,
+                            duration: 100,
+                            ease: 'Quad.easeOut',
+                            yoyo: true
+                        });
+                    }
+                }
+            }
+        }
+
+        // ============================================================
+        //  Phaser 游戏配置
+        // ============================================================
+        const config = {
+            type: Phaser.AUTO,
+            width: GAME_WIDTH,
+            height: GAME_HEIGHT,
+            parent: 'game-container',
+            backgroundColor: '#4DC9F6',
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            },
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            scene: GameScene,
+            input: {
+                activePointers: 2,
+                touch: true
+            },
+            render: {
+                pixelArt: false,
+                antialias: true
+            }
+        };
+
+        // ============================================================
+        //  启动游戏
+        // ============================================================
+        const game = new Phaser.Game(config);
+
+        // 全局错误处理，防止白屏
+        window.addEventListener('error', function(e) {
+            console.error('游戏运行时错误:', e.message);
+            const container = document.getElementById('game-container');
+            if (container) {
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText =
+                    'color: #ff6b6b; padding: 20px; text-align: center; font-size: 18px; background: #222; border-radius: 10px; margin: 20px;';
+                errorDiv.textContent = '游戏加载失败，请刷新页面重试。错误：' + e.message;
+                container.appendChild(errorDiv);
+            }
+        });
+
+        console.log('Phaser小鸟飞行 v1.0 已启动！');
+    </script>
+</body>
+</html>

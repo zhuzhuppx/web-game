@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>弹球接接乐</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: auto !important;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0, 200, 255, 0.15);
+        }
+        /* 防止 iOS 上按钮点击时的灰色遮罩 */
+        .no-tap-highlight {
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js">
+    </script>
+    <script>
+        // ============================================================
+        // 全局状态钩子 (必须暴露，并在运行时持续更新)
+        // ============================================================
+        window.__gameState = {
+            running: true,
+            score: 0,
+            lives: 3,
+            gameOver: false,
+            canRestart: true,
+            objects: {
+                player: true,
+                enemies: 0,
+                projectiles: 0
+            }
+        };
+
+        // ============================================================
+        // 音效引擎 (Web Audio API)
+        // ============================================================
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playBeep(freq, duration, type, volume) {
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type || 'square';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(volume || 0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                // 静默失败
+            }
+        }
+
+        function playSfxCatch() {
+            playBeep(660, 0.10, 'sine', 0.20);
+            setTimeout(function() { playBeep(880, 0.08, 'sine', 0.15); }, 60);
+        }
+
+        function playSfxScore() {
+            playBeep(880, 0.12, 'sine', 0.18);
+        }
+
+        function playSfxMiss() {
+            playBeep(300, 0.20, 'sawtooth', 0.18);
+            setTimeout(function() { playBeep(200, 0.25, 'sawtooth', 0.12); }, 100);
+        }
+
+        function playSfxGameOver() {
+            playBeep(440, 0.25, 'sine', 0.20);
+            setTimeout(function() { playBeep(330, 0.25, 'sine', 0.18); }, 200);
+            setTimeout(function() { playBeep(220, 0.40, 'sine', 0.16); }, 400);
+        }
+
+        function playSfxLifeUp() {
+            playBeep(600, 0.10, 'sine', 0.15);
+            setTimeout(function() { playBeep(800, 0.10, 'sine', 0.15); }, 80);
+            setTimeout(function() { playBeep(1000, 0.12, 'sine', 0.15); }, 160);
+        }
+
+        // ============================================================
+        // 音效调用辅助 (安全调用，防止音频未初始化)
+        // ============================================================
+        function safeCallSfx(fn) {
+            try {
+                initAudio();
+                fn();
+            } catch (e) { /* ignore */ }
+        }
+
+        // ============================================================
+        // Phaser 游戏主场景
+        // ============================================================
+        const W = 480;
+        const H = 800;
+
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'GameScene' });
+                this.score = 0;
+                this.lives = 3;
+                this.maxLives = 5;
+                this.ballSpeed = 200;
+                this.spawnInterval = 1500;
+                this.ballCount = 0;
+                this.isGameOver = false;
+                this.isPaused = false;
+                this.moveLeftFlag = false;
+                this.moveRightFlag = false;
+                this.touchFollowX = null;
+                this.lifeBonusCounter = 0;
+                this.difficultyLevel = 1;
+                // 键盘引用
+                this.cursors = null;
+                this.keyA = null;
+                this.keyD = null;
+                this.keyJ = null;
+                this.keyK = null;
+                this.keyW = null;
+                this.keyS = null;
+                // 游戏对象
+                this.paddle = null;
+                this.balls = null;
+                this.scoreText = null;
+                this.livesText = null;
+                this.gameOverGroup = null;
+                this.restartBtn = null;
+                this.gameOverText = null;
+                // 虚拟按钮
+                this.btnA = null;
+                this.btnB = null;
+                this.btnAPressed = false;
+                this.btnBPressed = false;
+                // 定时器
+                this.spawnTimer = null;
+                // 难度递增计时
+                this.difficultyTimer = 0;
+                // 已接住球数 (用于加命)
+                this.caughtCount = 0;
+                // 生命值变化标记 (用于闪烁)
+                this.livesChanged = false;
+                this.livesFlashTime = 0;
+            }
+
+            // ------------------------------------------------
+            // 生成纹理
+            // ------------------------------------------------
+            generateTextures() {
+                var g;
+
+                // 挡板 - 圆角矩形
+                g = this.make.graphics({ add: false });
+                g.fillStyle(0x00ff88);
+                g.fillRoundedRect(0, 0, 80, 16, 8);
+                g.generateTexture('paddle', 80, 16);
+                g.destroy();
+
+                // 普通小球 - 白色圆形
+                g = this.make.graphics({ add: false });
+                g.fillStyle(0xffffff);
+                g.fillCircle(16, 16, 16);
+                g.generateTexture('ball', 32, 32);
+                g.destroy();
+
+                // 金色球 - 金色带光环
+                g = this.make.graphics({ add: false });
+                g.fillStyle(0xffd700);
+                g.fillCircle(16, 16, 16);
+                g.lineStyle(3, 0xffaa00);
+                g.strokeCircle(16, 16, 12);
+                // 加一个小星芒
+                g.fillStyle(0xffee88);
+                g.fillCircle(16, 16, 6);
+                g.generateTexture('ball_gold', 32, 32);
+                g.destroy();
+
+                // 炸弹球 - 红色带 X 标记
+                g = this.make.graphics({ add: false });
+                g.fillStyle(0xff3333);
+                g.fillCircle(16, 16, 16);
+                // 黑色 X 标记 (两条对角线)
+                g.lineStyle(4, 0x000000);
+                g.beginPath();
+                g.moveTo(8, 8);
+                g.lineTo(24, 24);
+                g.strokePath();
+                g.beginPath();
+                g.moveTo(24, 8);
+                g.lineTo(8, 24);
+                g.strokePath();
+                // 中间小圆点
+                g.fillStyle(0x000000);
+                g.fillCircle(16, 16, 3);
+                g.generateTexture('ball_bomb', 32, 32);
+                g.destroy();
+
+                // 粒子纹理 (用于特效)
+                g = this.make.graphics({ add: false });
+                g.fillStyle(0xffffff);
+                g.fillCircle(4, 4, 4);
+                g.generateTexture('particle', 8, 8);
+                g.destroy();
+            }
+
+            // ------------------------------------------------
+            // create
+            // ------------------------------------------------
+            create() {
+                var self = this;
+
+                // --- 生成纹理 ---
+                this.generateTextures();
+
+                // --- 物理世界设置 ---
+                this.physics.world.setBounds(0, 0, W, H);
+
+                // --- 背景星空效果 (装饰) ---
+                this.drawBackground();
+
+                // --- 挡板 ---
+                this.paddle = this.physics.add.staticImage(W / 2, H - 40, 'paddle');
+                this.paddle.setTint(0x00ff88);
+                // 调整碰撞体略小于显示尺寸，更宽容
+                this.paddle.body.setSize(76, 12);
+                this.paddle.body.setOffset(2, 2);
+
+                // --- 球的分组 (动态物理体) ---
+                this.balls = this.physics.add.group({
+                    defaultKey: 'ball',
+                    collideWorldBounds: false,
+                    allowGravity: false,
+                });
+
+                // --- 碰撞检测: 球 vs 挡板 ---
+                this.physics.add.overlap(this.balls, this.paddle, this.hitPaddle, null, this);
+
+                // --- UI: 分数和生命值 ---
+                var uiStyle = {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '22px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                };
+                this.scoreText = this.add.text(16, 16, '分数: 0', uiStyle).setDepth(10);
+                this.livesText = this.add.text(W - 16, 16, '生命: ♥♥♥', uiStyle)
+                    .setOrigin(1, 0)
+                    .setDepth(10);
+
+                // --- 游戏结束组 (初始隐藏) ---
+                this.gameOverGroup = this.add.group();
+                var overlay = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.65).setDepth(20);
+                this.gameOverGroup.add(overlay);
+
+                var goStyle = {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '48px',
+                    color: '#ff4444',
+                    stroke: '#000000',
+                    strokeThickness: 5,
+                };
+                this.gameOverText = this.add.text(W / 2, H / 2 - 60, '游戏结束', goStyle)
+                    .setOrigin(0.5)
+                    .setDepth(21);
+                this.gameOverGroup.add(this.gameOverText);
+
+                var finalScoreStyle = {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '28px',
+                    color: '#ffdd44',
+                    stroke: '#000000',
+                    strokeThickness: 4,
+                };
+                this.finalScoreText = this.add.text(W / 2, H / 2, '最终分数: 0', finalScoreStyle)
+                    .setOrigin(0.5)
+                    .setDepth(21);
+                this.gameOverGroup.add(this.finalScoreText);
+
+                // 重新开始按钮
+                var btnBg = this.add.rectangle(W / 2, H / 2 + 80, 200, 56, 0x22aa44, 1)
+                    .setStrokeStyle(2, 0x44ff88)
+                    .setInteractive({ useHandCursor: true })
+                    .setDepth(21);
+                this.gameOverGroup.add(btnBg);
+
+                var btnText = this.add.text(W / 2, H / 2 + 80, '再来一次', {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '26px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                }).setOrigin(0.5).setDepth(22);
+                this.gameOverGroup.add(btnText);
+
+                this.restartBtn = btnBg;
+                this.restartBtn.on('pointerdown', function() {
+                    self.restartGame();
+                });
+                // 键盘R键也可以重新开始
+                this.input.keyboard.on('keydown-R', function() {
+                    if (self.isGameOver) self.restartGame();
+                });
+
+                // 隐藏游戏结束界面
+                this.gameOverGroup.setVisible(false);
+
+                // --- 键盘输入 ---
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+                this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+                this.keyJ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+                this.keyK = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
+                this.keyW = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+                this.keyS = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+
+                // --- 触摸 / 鼠标控制 (滑动跟随) ---
+                this.input.on('pointermove', function(pointer) {
+                    if (self.isGameOver || self.isPaused) return;
+                    // 如果正在触摸/鼠标按下，则跟随
+                    if (pointer.isDown) {
+                        self.touchFollowX = pointer.x;
+                    }
+                });
+                this.input.on('pointerdown', function(pointer) {
+                    // 点击时初始化音频 (浏览器政策要求)
+                    initAudio();
+                    if (self.isGameOver || self.isPaused) return;
+                    self.touchFollowX = pointer.x;
+                });
+                this.input.on('pointerup', function() {
+                    self.touchFollowX = null;
+                });
+
+                // --- 虚拟按钮 A / B (手机触控) ---
+                this.createVirtualButtons();
+
+                // --- 定时生成小球 ---
+                this.spawnTimer = this.time.addEvent({
+                    delay: this.spawnInterval,
+                    callback: this.spawnBall,
+                    callbackScope: this,
+                    loop: true,
+                });
+
+                // 开局立即生成一个小球
+                this.time.delayedCall(300, function() {
+                    if (!self.isGameOver) self.spawnBall();
+                });
+
+                // --- 难度递增定时器 (每15秒减少生成间隔) ---
+                this.difficultyTimer = this.time.addEvent({
+                    delay: 15000,
+                    callback: this.increaseDifficulty,
+                    callbackScope: this,
+                    loop: true,
+                });
+
+                // --- 初始化全局状态 ---
+                this.syncGameState();
+
+                // 标记游戏运行中
+                this.isGameOver = false;
+                this.isPaused = false;
+            }
+
+            // ------------------------------------------------
+            // 背景装饰
+            // ------------------------------------------------
+            drawBackground() {
+                // 深空渐变背景
+                var bg = this.add.graphics();
+                bg.fillGradientStyle(0x0a0a2e, 0x0a0a2e, 0x1a1a4e, 0x1a1a4e, 1);
+                bg.fillRect(0, 0, W, H);
+                bg.setDepth(-1);
+
+                // 随机星星
+                var stars = this.add.graphics();
+                stars.setDepth(0);
+                for (var i = 0; i < 50; i++) {
+                    var sx = Math.random() * W;
+                    var sy = Math.random() * H * 0.7;
+                    var sr = Math.random() * 1.8 + 0.5;
+                    var alpha = Math.random() * 0.5 + 0.3;
+                    stars.fillStyle(0xffffff, alpha);
+                    stars.fillCircle(sx, sy, sr);
+                }
+            }
+
+            // ------------------------------------------------
+            // 创建虚拟按钮 A / B
+            // ------------------------------------------------
+            createVirtualButtons() {
+                var self = this;
+                var btnSize = 70;
+                var margin = 20;
+                var bottomY = H - margin - btnSize / 2;
+
+                // A 按钮 (左)
+                var ax = margin + btnSize / 2 + 20;
+                var aBg = this.add.circle(ax, bottomY, btnSize / 2, 0xffffff, 0.15)
+                    .setStrokeStyle(2, 0xffffff, 0.4)
+                    .setDepth(15)
+                    .setInteractive({ useHandCursor: false });
+                var aText = this.add.text(ax, bottomY, 'A', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '28px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 2,
+                }).setOrigin(0.5).setDepth(16);
+
+                // B 按钮 (右)
+                var bx = W - margin - btnSize / 2 - 20;
+                var bBg = this.add.circle(bx, bottomY, btnSize / 2, 0xffffff, 0.15)
+                    .setStrokeStyle(2, 0xffffff, 0.4)
+                    .setDepth(15)
+                    .setInteractive({ useHandCursor: false });
+                var bText = this.add.text(bx, bottomY, 'B', {
+                    fontFamily: 'Arial, sans-serif',
+                    fontSize: '28px',
+                    color: '#ffffff',
+                    stroke: '#000000',
+                    strokeThickness: 2,
+                }).setOrigin(0.5).setDepth(16);
+
+                // A 按钮事件
+                aBg.on('pointerdown', function() {
+                    self.btnAPressed = true;
+                    initAudio();
+                });
+                aBg.on('pointerup', function() {
+                    self.btnAPressed = false;
+                });
+                aBg.on('pointerout', function() {
+                    self.btnAPressed = false;
+                });
+
+                // B 按钮事件
+                bBg.on('pointerdown', function() {
+                    self.btnBPressed = true;
+                    initAudio();
+                });
+                bBg.on('pointerup', function() {
+                    self.btnBPressed = false;
+                });
+                bBg.on('pointerout', function() {
+                    self.btnBPressed = false;
+                });
+
+                // 键盘提示 (J / K)
+                var hintStyle = {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '13px',
+                    color: '#aaaacc',
+                    stroke: '#000000',
+                    strokeThickness: 2,
+                };
+                this.add.text(ax, bottomY + 40, '键盘 J', hintStyle)
+                    .setOrigin(0.5)
+                    .setDepth(15)
+                    .setAlpha(0.7);
+                this.add.text(bx, bottomY + 40, '键盘 K', hintStyle)
+                    .setOrigin(0.5)
+                    .setDepth(15)
+                    .setAlpha(0.7);
+
+                // 保存引用
+                this.btnA = aBg;
+                this.btnB = bBg;
+                this.btnAText = aText;
+                this.btnBText = bText;
+            }
+
+            // ------------------------------------------------
+            // 生成小球
+            // ------------------------------------------------
+            spawnBall() {
+                if (this.isGameOver || this.isPaused) return;
+                if (this.balls.countActive() >= 15) return; // 防止太多球
+
+                // 随机类型: 普通 75%, 金色 12%, 炸弹 13%
+                var rand = Math.random();
+                var key = 'ball';
+                var type = 'normal';
+                if (rand < 0.12) {
+                    key = 'ball_gold';
+                    type = 'gold';
+                } else if (rand < 0.25) {
+                    key = 'ball_bomb';
+                    type = 'bomb';
+                }
+
+                var x = Phaser.Math.Between(30, W - 30);
+                var y = -20;
+                var ball = this.balls.create(x, y, key);
+                if (!ball) return;
+
+                ball.setDisplaySize(30, 30);
+                ball.setDepth(5);
+                ball.setData('type', type);
+                ball.setData('caught', false);
+
+                // 物理属性 - 匀速下落，略微随机水平飘移
+                var speed = this.ballSpeed + Math.random() * 40;
+                var vx = (Math.random() - 0.5) * 60;
+                ball.body.setVelocity(vx, speed);
+                ball.body.setAllowGravity(false);
+                ball.body.setSize(26, 26);
+                ball.body.setOffset(3, 3);
+
+                // 碰撞体不旋转
+                ball.body.setImmovable(false);
+
+                // 金色球加一点闪光效果 (闪烁tween)
+                if (type === 'gold') {
+                    this.tweens.add({
+                        targets: ball,
+                        alpha: { from: 1, to: 0.6 },
+                        duration: 300,
+                        yoyo: true,
+                        repeat: -1,
+                    });
+                }
+                // 炸弹球红色脉冲
+                if (type === 'bomb') {
+                    this.tweens.add({
+                        targets: ball,
+                        scaleX: { from: 1, to: 1.15 },
+                        scaleY: { from: 1, to: 1.15 },
+                        duration: 200,
+                        yoyo: true,
+                        repeat: -1,
+                    });
+                }
+
+                this.ballCount++;
+            }
+
+            // ------------------------------------------------
+            // 碰撞处理: 球碰到挡板
+            // ------------------------------------------------
+            hitPaddle(ball, paddle) {
+                if (this.isGameOver || this.isPaused) return;
+                if (ball.getData('caught')) return; // 防止重复处理
+                ball.setData('caught', true);
+
+                var type = ball.getData('type');
+
+                // 根据类型处理
+                if (type === 'bomb') {
+                    // 炸弹: 扣一条命
+                    this.lives--;
+                    this.livesChanged = true;
+                    this.livesFlashTime = this.time.now;
+                    safeCallSfx(playSfxMiss);
+                    this.showFloatingText(ball.x, ball.y, '💥 -1', '#ff4444');
+                    // 爆炸粒子效果
+                    this.createExplosion(ball.x, ball.y);
+                    // 屏幕震动效果 (轻微)
+                    this.cameras.main.shake(150, 0.005);
+                } else if (type === 'gold') {
+                    // 金色球: 加50分，一定概率加一条命
+                    this.score += 50;
+                    this.caughtCount++;
+                    safeCallSfx(playSfxCatch);
+                    this.showFloatingText(ball.x, ball.y, '✨ +50', '#ffd700');
+                    // 加命判定: 20%概率或者累积接球数达到5
+                    if (this.lives < this.maxLives && (Math.random() < 0.2 || this.caughtCount % 5 === 0)) {
+                        this.lives++;
+                        if (this.lives > this.maxLives) this.lives = this.maxLives;
+                        this.livesChanged = true;
+                        this.livesFlashTime = this.time.now;
+                        safeCallSfx(playSfxLifeUp);
+                        this.showFloatingText(ball.x, ball.y - 30, '❤️ +1', '#ff8888');
+                    }
+                    // 金色粒子
+                    this.createGoldParticles(ball.x, ball.y);
+                } else {
+                    // 普通球: 加10分
+                    this.score += 10;
+                    this.caughtCount++;
+                    safeCallSfx(playSfxCatch);
+                    this.showFloatingText(ball.x, ball.y, '+10', '#88ff88');
+                    // 普通粒子
+                    this.createNormalParticles(ball.x, ball.y);
+                }
+
+                // 每接住10个普通球加一条命 (累积)
+                if (this.caughtCount > 0 && this.caughtCount % 10 === 0 && this.lives < this.maxLives) {
+                    this.lives++;
+                    this.livesChanged = true;
+                    this.livesFlashTime = this.time.now;
+                    safeCallSfx(playSfxLifeUp);
+                    this.showFloatingText(W / 2, H / 2, '❤️ 奖励 +1', '#ff8888');
+                }
+
+                // 更新UI
+                this.updateUI();
+                this.syncGameState();
+
+                // 销毁球 (带一点动画)
+                this.tweens.add({
+                    targets: ball,
+                    alpha: 0,
+                    scaleX: 0.3,
+                    scaleY: 0.3,
+                    duration: 150,
+                    onComplete: function() {
+                        ball.destroy();
+                    }
+                });
+            }
+
+            // ------------------------------------------------
+            // 显示浮动文字
+            // ------------------------------------------------
+            showFloatingText(x, y, msg, color) {
+                var style = {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '22px',
+                    color: color,
+                    stroke: '#000000',
+                    strokeThickness: 3,
+                };
+                var txt = this.add.text(x, y, msg, style).setOrigin(0.5).setDepth(12);
+                this.tweens.add({
+                    targets: txt,
+                    y: y - 60,
+                    alpha: 0,
+                    duration: 700,
+                    ease: 'Power2',
+                    onComplete: function() {
+                        txt.destroy();
+                    }
+                });
+            }
+
+            // ------------------------------------------------
+            // 粒子特效
+            // ------------------------------------------------
+            createNormalParticles(x, y) {
+                for (var i = 0; i < 8; i++) {
+                    var p = this.add.image(x, y, 'particle').setDepth(11).setTint(0x88ff88).setScale(0.6);
+                    var angle = Math.random() * Math.PI * 2;
+                    var dist = Phaser.Math.Between(30, 60);
+                    this.tweens.add({
+                        targets: p,
+                        x: x + Math.cos(angle) * dist,
+                        y: y + Math.sin(angle) * dist,
+                        alpha: 0,
+                        scale: 0.1,
+                        duration: 400,
+                        ease: 'Power2',
+                        onComplete: function() { p.destroy(); }
+                    });
+                }
+            }
+
+            createGoldParticles(x, y) {
+                for (var i = 0; i < 14; i++) {
+                    var p = this.add.image(x, y, 'particle').setDepth(11).setTint(0xffd700).setScale(0.8);
+                    var angle = Math.random() * Math.PI * 2;
+                    var dist = Phaser.Math.Between(40, 80);
+                    this.tweens.add({
+                        targets: p,
+                        x: x + Math.cos(angle) * dist,
+                        y: y + Math.sin(angle) * dist,
+                        alpha: 0,
+                        scale: 0.1,
+                        duration: 500,
+                        ease: 'Power2',
+                        onComplete: function() { p.destroy(); }
+                    });
+                }
+            }
+
+            createExplosion(x, y) {
+                for (var i = 0; i < 20; i++) {
+                    var p = this.add.image(x, y, 'particle').setDepth(11).setTint(0xff4444).setScale(1.0);
+                    var angle = Math.random() * Math.PI * 2;
+                    var dist = Phaser.Math.Between(50, 100);
+                    this.tweens.add({
+                        targets: p,
+                        x: x + Math.cos(angle) * dist,
+                        y: y + Math.sin(angle) * dist,
+                        alpha: 0,
+                        scale: 0.2,
+                        duration: 500,
+                        ease: 'Power3',
+                        onComplete: function() { p.destroy(); }
+                    });
+                }
+                // 加一个闪光
+                var flash = this.add.circle(x, y, 30, 0xff4444, 0.6).setDepth(11);
+                this.tweens.add({
+                    targets: flash,
+                    scaleX: 3,
+                    scaleY: 3,
+                    alpha: 0,
+                    duration: 300,
+                    onComplete: function() { flash.destroy(); }
+                });
+            }
+
+            // ------------------------------------------------
+            // update
+            // ------------------------------------------------
+            update(time, delta) {
+                if (this.isGameOver || this.isPaused) {
+                    // 即使 game over 也同步状态
+                    this.syncGameState();
+                    return;
+                }
+
+                // --- 更新挡板位置 ---
+
+                // 1. 键盘控制
+                var moveSpeed = 320;
+                var dx = 0;
+                if (this.cursors.left.isDown || this.keyA.isDown || this.keyJ.isDown) {
+                    dx = -moveSpeed;
+                } else if (this.cursors.right.isDown || this.keyD.isDown || this.keyK.isDown) {
+                    dx = moveSpeed;
+                }
+
+                // 2. 虚拟按钮 A/B
+                if (this.btnAPressed) {
+                    dx = -moveSpeed;
+                } else if (this.btnBPressed) {
+                    dx = moveSpeed;
+                }
+
+                // 3. 触摸跟随 (优先级最高)
+                if (this.touchFollowX !== null) {
+                    var targetX = this.touchFollowX;
+                    var currentX = this.paddle.x;
+                    var diff = targetX - currentX;
+                    if (Math.abs(diff) > 5) {
+                        dx = diff * 4.5;
+                        if (Math.abs(dx) > moveSpeed * 1.2) {
+                            dx = Math.sign(dx) * moveSpeed * 1.2;
+                        }
+                    } else {
+                        dx = 0;
+                    }
+                }
+
+                // 应用位移
+                if (dx !== 0) {
+                    this.paddle.x += dx * (delta / 1000);
+                }
+
+                // 限制挡板在屏幕内
+                var halfW = this.paddle.displayWidth / 2;
+                if (this.paddle.x < halfW) this.paddle.x = halfW;
+                if (this.paddle.x > W - halfW) this.paddle.x = W - halfW;
+                this.paddle.body.updateFromGameObject();
+
+                // --- 检测是否有球超出底部 (漏接) ---
+                var activeBalls = this.balls.getChildren();
+                for (var i = activeBalls.length - 1; i >= 0; i--) {
+                    var ball = activeBalls[i];
+                    if (!ball.active) continue;
+                    if (ball.getData('caught')) continue;
+
+                    // 超出底部
+                    if (ball.y > H + 40) {
+                        ball.setData('caught', true);
+                        // 如果是炸弹球漏接，不扣命 (已经掉下去了)
+                        if (ball.getData('type') !== 'bomb') {
+                            // 普通或金色球漏接扣命
+                            this.lives--;
+                            this.livesChanged = true;
+                            this.livesFlashTime = time;
+                            safeCallSfx(playSfxMiss);
+                            this.showFloatingText(ball.x, H - 40, '💧 漏接 -1', '#ff8888');
+                            this.cameras.main.shake(100, 0.003);
+                        }
+                        // 销毁球
+                        ball.destroy();
+                        this.updateUI();
+                        this.syncGameState();
+
+                        // 检查游戏结束
+                        if (this.lives <= 0) {
+                            this.lives = 0;
+                            this.updateUI();
+                            this.gameOverHandler();
+                            return;
+                        }
+                    }
+                }
+
+                // 更新 UI (定期)
+                this.updateUI();
+                this.syncGameState();
+
+                // 生命值闪烁效果
+                if (this.livesChanged && this.livesText) {
+                    var elapsed = time - this.livesFlashTime;
+                    if (elapsed < 600) {
+                        var flash = Math.floor(elapsed / 100) % 2 === 0;
+                        this.livesText.setAlpha(flash ? 1 : 0.3);
+                    } else {
+                        this.livesText.setAlpha(1);
+                        this.livesChanged = false;
+                    }
+                }
+            }
+
+            // ------------------------------------------------
+            // 更新 UI
+            // ------------------------------------------------
+            updateUI() {
+                if (this.scoreText) {
+                    this.scoreText.setText('分数: ' + this.score);
+                }
+                if (this.livesText) {
+                    var hearts = '';
+                    for (var i = 0; i < this.lives; i++) {
+                        hearts += '♥';
+                    }
+                    var empty = '';
+                    for (var j = this.lives; j < this.maxLives; j++) {
+                        empty += '♡';
+                    }
+                    this.livesText.setText('生命: ' + hearts + empty);
+                    // 颜色根据生命值变化
+                    if (this.lives <= 1) {
+                        this.livesText.setColor('#ff4444');
+                    } else if (this.lives <= 2) {
+                        this.livesText.setColor('#ffaa44');
+                    } else {
+                        this.livesText.setColor('#ffffff');
+                    }
+                }
+            }
+
+            // ------------------------------------------------
+            // 游戏结束
+            // ------------------------------------------------
+            gameOverHandler() {
+                if (this.isGameOver) return;
+                this.isGameOver = true;
+
+                // 停止生成球
+                if (this.spawnTimer) this.spawnTimer.remove();
+                // 停止难度递增
+                if (this.difficultyTimer) this.difficultyTimer.remove();
+
+                // 音效
+                safeCallSfx(playSfxGameOver);
+
+                // 显示游戏结束界面
+                this.gameOverGroup.setVisible(true);
+                this.finalScoreText.setText('最终分数: ' + this.score);
+
+                // 让现有球停止
+                var activeBalls = this.balls.getChildren();
+                for (var i = 0; i < activeBalls.length; i++) {
+                    var ball = activeBalls[i];
+                    if (ball.active) {
+                        ball.body.setVelocity(0, 0);
+                    }
+                }
+
+                // 更新全局状态
+                this.syncGameState();
+            }
+
+            // ------------------------------------------------
+            // 重新开始
+            // ------------------------------------------------
+            restartGame() {
+                // 重置状态
+                this.score = 0;
+                this.lives = 3;
+                this.ballCount = 0;
+                this.isGameOver = false;
+                this.isPaused = false;
+                this.caughtCount = 0;
+                this.livesChanged = false;
+                this.ballSpeed = 200;
+                this.spawnInterval = 1500;
+                this.touchFollowX = null;
+                this.btnAPressed = false;
+                this.btnBPressed = false;
+
+                // 隐藏游戏结束界面
+                this.gameOverGroup.setVisible(false);
+
+                // 清除所有球
+                var activeBalls = this.balls.getChildren();
+                for (var i = activeBalls.length - 1; i >= 0; i--) {
+                    var ball = activeBalls[i];
+                    if (ball.active) ball.destroy();
+                }
+
+                // 重新开始定时器
+                if (this.spawnTimer) this.spawnTimer.remove();
+                this.spawnTimer = this.time.addEvent({
+                    delay: this.spawnInterval,
+                    callback: this.spawnBall,
+                    callbackScope: this,
+                    loop: true,
+                });
+                if (this.difficultyTimer) this.difficultyTimer.remove();
+                this.difficultyTimer = this.time.addEvent({
+                    delay: 15000,
+                    callback: this.increaseDifficulty,
+                    callbackScope: this,
+                    loop: true,
+                });
+
+                // 开局生成一个球
+                var self = this;
+                this.time.delayedCall(300, function() {
+                    if (!self.isGameOver) self.spawnBall();
+                });
+
+                // 更新UI和状态
+                this.updateUI();
+                this.syncGameState();
+
+                // 相机效果
+                this.cameras.main.flash(300, 100, 200, 100);
+            }
+
+            // ------------------------------------------------
+            // 难度递增
+            // ------------------------------------------------
+            increaseDifficulty() {
+                if (this.isGameOver) return;
+                this.difficultyLevel++;
+                // 增加球速
+                this.ballSpeed = Math.min(this.ballSpeed + 15, 400);
+                // 减少生成间隔
+                this.spawnInterval = Math.max(this.spawnInterval - 80, 600);
+                if (this.spawnTimer) {
+                    this.spawnTimer.remove();
+                    this.spawnTimer = this.time.addEvent({
+                        delay: this.spawnInterval,
+                        callback: this.spawnBall,
+                        callbackScope: this,
+                        loop: true,
+                    });
+                }
+                // 显示难度提升提示
+                var hint = this.add.text(W / 2, H / 2 - 100, '⚡ 加速! Lv.' + this.difficultyLevel, {
+                    fontFamily: 'Arial, "Microsoft YaHei", sans-serif',
+                    fontSize: '26px',
+                    color: '#ffaa44',
+                    stroke: '#000000',
+                    strokeThickness: 4,
+                }).setOrigin(0.5).setDepth(18);
+                this.tweens.add({
+                    targets: hint,
+                    y: hint.y - 50,
+                    alpha: 0,
+                    duration: 1200,
+                    onComplete: function() { hint.destroy(); }
+                });
+            }
+
+            // ------------------------------------------------
+            // 同步全局状态钩子
+            // ------------------------------------------------
+            syncGameState() {
+                window.__gameState.running = !this.isGameOver && !this.isPaused;
+                window.__gameState.score = this.score;
+                window.__gameState.lives = this.lives;
+                window.__gameState.gameOver = this.isGameOver;
+                window.__gameState.canRestart = this.isGameOver;
+                // 更新 objects 信息
+                var activeBalls = 0;
+                if (this.balls) {
+                    activeBalls = this.balls.countActive();
+                }
+                window.__gameState.objects.player = this.paddle ? this.paddle.active : true;
+                window.__gameState.objects.enemies = 0;
+                window.__gameState.objects.projectiles = activeBalls;
+            }
+        }
+
+        // ============================================================
+        // Phaser 游戏配置
+        // ============================================================
+        var config = {
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: W,
+            height: H,
+            backgroundColor: '#0a0a2e',
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                width: W,
+                height: H,
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false,
+                }
+            },
+            scene: GameScene,
+            input: {
+                activePointers: 2,
+            },
+            render: {
+                pixelArt: false,
+                antialias: true,
+            },
+        };
+
+        // ============================================================
+        // 启动游戏
+        // ============================================================
+        var game = new Phaser.Game(config);
+
+        // 初始化音频 (在用户首次交互时会被调用，这里先预备)
+        document.addEventListener('touchstart', function() {
+            initAudio();
+        }, { once: true });
+        document.addEventListener('click', function() {
+            initAudio();
+        }, { once: true });
+
+        console.log('🎮 弹球接接乐已启动！');
+        console.log('📖 控制方式:');
+        console.log('   ← → / A D / J K  移动挡板');
+        console.log('   R                  重新开始');
+        console.log('   手机: A/B 按钮 或 触摸滑动');
+    </script>
+</body>
+</html>
